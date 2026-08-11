@@ -15,22 +15,26 @@ function App() {
   // Builder has its own full-screen IDE layout, skip PageContainer
   if (isBuilderRoute) {
     return (
-      <Routes>
-        <Route path="/build" element={<BuilderPage />} />
-      </Routes>
+      <div key={location.pathname} className="page-enter h-screen flex flex-col">
+        <Routes>
+          <Route path="/build" element={<BuilderPage />} />
+        </Routes>
+      </div>
     );
   }
 
   return (
     <PageContainer>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/discover/no-matches" element={<NoMatchesPage />} />
-        <Route path="/status/success" element={<SuccessStatusPage />} />
-        <Route path="/status/error" element={<ErrorStatusPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Routes>
+      <div key={location.pathname} className="page-enter flex-1 flex flex-col">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/discover/no-matches" element={<NoMatchesPage />} />
+          <Route path="/status/success" element={<SuccessStatusPage />} />
+          <Route path="/status/error" element={<ErrorStatusPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Routes>
+      </div>
     </PageContainer>
   )
 }

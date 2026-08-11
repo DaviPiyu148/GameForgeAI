@@ -28,28 +28,35 @@ export const Navbar = () => {
         
         {/* Center Navigation */}
         <nav className="hidden md:flex items-center gap-4 h-full">
-          {navLinks.map((link) => (
-            <Link
-              key={link.name}
-              to={link.path}
-              className={`h-full flex items-center font-mono text-xs uppercase tracking-wider transition-colors px-3 ${
-                isActive(link.path)
-                  ? 'text-primary border-b-2 border-primary pb-0'
-                  : 'text-on-surface-variant hover:text-primary'
-              }`}
-            >
-              {link.name}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const active = isActive(link.path);
+            return (
+              <Link
+                key={link.name}
+                to={link.path}
+                className={`relative h-full flex items-center font-mono text-xs uppercase tracking-wider transition-colors px-3 ${
+                  active ? 'text-primary text-glow-cyan' : 'text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                {link.name}
+                {/* Animated active indicator */}
+                <div 
+                  className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transition-transform duration-300 origin-center ${
+                    active ? 'scale-x-100 glow-cyan' : 'scale-x-0'
+                  }`} 
+                />
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Right Actions */}
         <div className="flex items-center gap-3">
-          <Link to="/build" className="bg-secondary-container hover:bg-secondary-soft/20 text-white font-mono text-[10px] uppercase py-2 px-4 glow-box-magenta transition-all active:scale-95 flex items-center gap-2">
+          <Link to="/build" className="bg-secondary-container text-white font-mono text-[10px] uppercase py-2 px-4 glow-box-magenta flex items-center gap-2 btn-interactive glow-magenta energy-sweep">
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>construction</span>
             <span className="hidden md:inline">Build a Game</span>
           </Link>
-          <Link to="/profile" className="w-8 h-8 rounded-sm border border-outline-variant bg-surface-container flex items-center justify-center text-primary hover:border-primary transition-colors">
+          <Link to="/profile" className="w-8 h-8 rounded-sm border border-outline-variant bg-surface-container flex items-center justify-center text-primary icon-interactive hover:border-primary transition-colors">
             <span className="material-symbols-outlined text-sm">person</span>
           </Link>
         </div>

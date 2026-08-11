@@ -1,19 +1,27 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface PrototypeModalProps {
   onClose: () => void;
 }
 
 export const PrototypeModal = ({ onClose }: PrototypeModalProps) => {
+  const [isClosing, setIsClosing] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 250); // Matches var(--motion-medium) 260ms approximately
+  };
 
   useEffect(() => {
     // Focus the close button when opened
     closeBtnRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
+      if (e.key === 'Escape' && !isClosing) {
+        handleClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -21,22 +29,21 @@ export const PrototypeModal = ({ onClose }: PrototypeModalProps) => {
   }, [onClose]);
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // If the click is exactly on the backdrop (not bubbling up from children)
-    if (e.target === e.currentTarget) {
-      onClose();
+    if (e.target === e.currentTarget && !isClosing) {
+      handleClose();
     }
   };
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'}`}
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-label="Simulated Frontend Prototype"
     >
       <div 
-        className="w-full max-w-4xl bg-surface border-2 border-primary rounded-lg overflow-hidden flex flex-col shadow-[0_0_50px_rgba(76,224,210,0.2)]"
+        className={`w-full max-w-4xl bg-surface border-2 border-primary rounded-lg overflow-hidden flex flex-col shadow-[0_0_50px_rgba(76,224,210,0.2)] ${isClosing ? 'modal-exit' : 'modal-enter'}`}
         // Prevent clicks inside the modal from bubbling to the backdrop
         onClick={e => e.stopPropagation()}
       >
@@ -47,8 +54,8 @@ export const PrototypeModal = ({ onClose }: PrototypeModalProps) => {
           </div>
           <button 
             ref={closeBtnRef}
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-error transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary"
+            onClick={handleClose}
+            className="text-on-surface-variant icon-interactive hover:text-error transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary"
             aria-label="Close prototype preview"
           >
             <span className="material-symbols-outlined" aria-hidden="true">close</span>

@@ -38,9 +38,9 @@ const DashboardPage = () => {
             No games generated yet. Head to the Composer to build one!
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {state.myGames.map(game => (
-              <div key={game.id} className="bg-surface-container-low border border-primary/50 p-4 flex flex-col gap-4 relative overflow-hidden group hover:border-primary transition-colors glow-cyan">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-enter stagger-1">
+            {state.myGames.map((game, index) => (
+              <div key={game.id} className={`bg-surface-container-low border border-primary/50 p-4 flex flex-col gap-4 relative overflow-hidden group hover:border-primary hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(76,224,210,0.3)] transition-all duration-300 stagger-enter stagger-${(index % 5) + 1}`}>
                 <div className="absolute top-0 right-0 p-2 opacity-10 font-mono text-[10px] pointer-events-none group-hover:opacity-20 transition-opacity">
                   SYS.ID: {game.id.substring(0,6).toUpperCase()}<br/>MEM_ADDR: 0x00FF
                 </div>
@@ -59,7 +59,7 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                <div className="h-32 w-full bg-surface-dim border border-outline-variant overflow-hidden relative flex items-center justify-center">
+                <div className="h-32 w-full bg-surface-dim border border-outline-variant overflow-hidden relative flex items-center justify-center group-hover:brightness-110 transition-all">
                   <div className="absolute inset-0" style={{
                     backgroundImage: 'linear-gradient(rgba(76, 224, 210, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(76, 224, 210, 0.1) 1px, transparent 1px)',
                     backgroundSize: '20px 20px'
@@ -68,9 +68,9 @@ const DashboardPage = () => {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                  <button onClick={() => setShowPlayModal(true)} className="flex-1 bg-primary text-on-primary font-mono text-xs py-2 hover:bg-primary-fixed transition-colors uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer">PLAY</button>
-                  <button onClick={() => handleModify(game)} className="flex-1 border border-primary text-primary font-mono text-xs py-2 hover:bg-primary/10 transition-colors uppercase cursor-pointer">MODIFY</button>
-                  <button onClick={() => setDetailsProject(game)} className="flex-1 flex justify-center items-center gap-1 border border-outline-variant text-on-surface-variant font-mono text-xs hover:text-primary hover:border-primary transition-colors uppercase cursor-pointer">
+                  <button onClick={() => setShowPlayModal(true)} className="flex-1 bg-primary text-on-primary font-mono text-xs py-2 uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer btn-interactive energy-sweep glow-cyan">PLAY</button>
+                  <button onClick={() => handleModify(game)} className="flex-1 border border-primary text-primary font-mono text-xs py-2 hover:bg-primary/10 uppercase cursor-pointer btn-interactive">MODIFY</button>
+                  <button onClick={() => setDetailsProject(game)} className="flex-1 flex justify-center items-center gap-1 border border-outline-variant text-on-surface-variant font-mono text-xs hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive">
                     <span className="material-symbols-outlined text-[16px]">info</span> Details
                   </button>
                 </div>
@@ -87,9 +87,9 @@ const DashboardPage = () => {
           <h2 className="font-mono text-xs text-secondary uppercase tracking-widest">SAVED DISCOVERIES</h2>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {state.savedDiscoveries.map(discovery => (
-            <div key={discovery.id} className={`bg-surface-container border-2 border-outline-variant flex flex-col relative overflow-hidden`}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-enter stagger-2">
+          {state.savedDiscoveries.map((discovery, index) => (
+            <div key={discovery.id} className={`bg-surface-container border-2 border-outline-variant flex flex-col relative overflow-hidden stagger-enter stagger-${(index % 5) + 1}`}>
               <div className={`h-4 bg-outline-variant w-full flex gap-1 px-2 items-center`}>
                 <div className="w-1 h-1 bg-background rounded-full"></div>
                 <div className="w-1 h-1 bg-background rounded-full"></div>

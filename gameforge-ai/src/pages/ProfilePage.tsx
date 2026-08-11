@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
@@ -6,9 +6,52 @@ import { PrototypeModal } from '../components/Shared/PrototypeModal';
 export default function ProfilePage() {
   const { state, setPrompt, updateBuildParams } = useAppContext();
   const navigate = useNavigate();
-  
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showLikedGamesModal, setShowLikedGamesModal] = useState(false);
+  const [isClosingModal, setIsClosingModal] = useState(false);
+  const [displayPrompts, setDisplayPrompts] = useState(0);
+  const [displayGames, setDisplayGames] = useState(0);
+
+  const handleCloseModal = () => {
+    setIsClosingModal(true);
+    setTimeout(() => {
+      setShowLikedGamesModal(false);
+      setIsClosingModal(false);
+    }, 250);
+  };
+
+  useEffect(() => {
+    const endPrompts = 1337;
+    const endGames = state.myGames.length;
+    const duration = 1000;
+    const startTime = performance.now();
+
+    const updateCounter = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      const easeOutQuad = 1 - (1 - progress) * (1 - progress);
+      
+      setDisplayPrompts(Math.floor(endPrompts * easeOutQuad));
+      setDisplayGames(Math.floor(endGames * easeOutQuad));
+      
+      if (progress < 1) {
+        requestAnimationFrame(updateCounter);
+      } else {
+        setDisplayPrompts(endPrompts);
+        setDisplayGames(endGames);
+      }
+    };
+    
+    // Check for reduced motion
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (mediaQuery.matches) {
+      setDisplayPrompts(endPrompts);
+      setDisplayGames(endGames);
+    } else {
+      requestAnimationFrame(updateCounter);
+    }
+  }, [state.myGames.length]);
 
   const handleContinueEdit = (desc: string) => {
     setPrompt(desc);
@@ -46,11 +89,11 @@ export default function ProfilePage() {
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
             <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[140px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Total Prompts</div>
-              <div className="font-display text-primary">1,337</div>
+              <div className="font-display text-primary">{displayPrompts.toLocaleString()}</div>
             </div>
             <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[140px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Games Built</div>
-              <div className="font-display text-secondary">{state.myGames.length}</div>
+              <div className="font-display text-secondary">{displayGames}</div>
             </div>
           </div>
         </div>
@@ -63,7 +106,7 @@ export default function ProfilePage() {
         <div className="lg:col-span-1 space-y-6">
           
           {/* Stats/Preferences Panel */}
-          <div className="relative arcade-border bg-surface-container-low p-5 arcade-panel">
+          <div className="relative arcade-border bg-surface-container-low p-5 arcade-panel stagger-enter stagger-1">
             <div className="absolute -top-3 -right-3 bg-primary text-background text-xs font-display px-2 py-1 uppercase tracking-wider shadow-[2px_2px_0px_#000]">Preferences</div>
             
             <div className="flex items-center gap-2 mb-6">
@@ -139,7 +182,7 @@ export default function ProfilePage() {
           </div>
           
           {/* Liked Games Panel */}
-          <div className="relative arcade-border bg-surface-container-low p-5 arcade-panel">
+          <div className="relative arcade-border bg-surface-container-low p-5 arcade-panel stagger-enter stagger-2">
             <div className="flex items-center gap-2 mb-6">
               <span className="material-symbols-outlined text-secondary">favorite</span>
               <h2 className="font-display text-lg uppercase tracking-wide">Liked Games</h2>
@@ -168,7 +211,7 @@ export default function ProfilePage() {
               
               <button 
                 onClick={() => setShowLikedGamesModal(true)}
-                className="w-full py-2.5 mt-2 border border-outline-variant text-sm font-semibold hover:bg-surface-container-highest hover:text-primary transition-colors uppercase tracking-wider rounded-sm flex items-center justify-center gap-2 group cursor-pointer"
+                className="w-full py-2.5 mt-2 border border-outline-variant text-sm font-semibold hover:bg-surface-container-highest hover:text-primary transition-colors uppercase tracking-wider rounded-sm flex items-center justify-center gap-2 group cursor-pointer btn-interactive"
               >
                 View All
                 <span className="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -182,7 +225,7 @@ export default function ProfilePage() {
         <div className="lg:col-span-2 flex flex-col gap-6">
           
           {/* Generated Games Panel */}
-          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel flex-1 flex flex-col">
+          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel flex-1 flex flex-col stagger-enter stagger-3">
             <div className="absolute -top-3 -right-3 bg-tertiary text-background text-xs font-display px-2 py-1 uppercase tracking-wider shadow-[2px_2px_0px_#000]">Activity</div>
             
             <div className="flex items-center gap-2 mb-6">
@@ -207,7 +250,7 @@ export default function ProfilePage() {
                 </div>
                 <button 
                   onClick={() => setShowPlayModal(true)}
-                  className="flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors font-semibold uppercase tracking-wider cursor-pointer"
+                  className="flex items-center gap-2 text-sm text-tertiary hover:text-primary transition-colors font-semibold uppercase tracking-wider cursor-pointer btn-interactive origin-left"
                 >
                   <span className="material-symbols-outlined text-[18px]">play_arrow</span>
                   Play Prototype
@@ -230,7 +273,7 @@ export default function ProfilePage() {
                 </div>
                 <button 
                   onClick={() => handleContinueEdit('Navigate a procedurally generated deep-sea trench in a rickety submarine. Manage dwindling resources while avoiding unspeakable horrors in the dark.')}
-                  className="flex items-center gap-2 text-sm text-primary hover:text-tertiary transition-colors font-semibold uppercase tracking-wider cursor-pointer"
+                  className="flex items-center gap-2 text-sm text-primary hover:text-tertiary transition-colors font-semibold uppercase tracking-wider cursor-pointer btn-interactive origin-left"
                 >
                   <span className="material-symbols-outlined text-[18px]">edit_document</span>
                   Continue Edit
@@ -240,7 +283,7 @@ export default function ProfilePage() {
           </div>
           
           {/* Recent Discoveries Panel */}
-          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel stagger-enter stagger-4">
             <div className="flex items-center gap-2 mb-6">
               <span className="material-symbols-outlined text-primary">search</span>
               <h2 className="font-display text-lg uppercase tracking-wide">Recent Discoveries</h2>
@@ -277,14 +320,14 @@ export default function ProfilePage() {
       {showPlayModal && <PrototypeModal onClose={() => setShowPlayModal(false)} />}
       
       {showLikedGamesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm" onClick={() => setShowLikedGamesModal(false)}>
-          <div className="w-full max-w-lg bg-surface border-2 border-secondary rounded-sm overflow-hidden flex flex-col shadow-[0_0_30px_rgba(255,107,181,0.2)]" onClick={e => e.stopPropagation()}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${isClosingModal ? 'modal-backdrop-exit' : 'modal-backdrop-enter'}`} onClick={(e) => { if (e.target === e.currentTarget && !isClosingModal) handleCloseModal(); }}>
+          <div className={`w-full max-w-lg bg-surface border-2 border-secondary rounded-sm overflow-hidden flex flex-col shadow-[0_0_30px_rgba(255,107,181,0.2)] ${isClosingModal ? 'modal-exit' : 'modal-enter'}`} onClick={e => e.stopPropagation()}>
             <div className="bg-terminal-header border-b border-secondary/30 p-3 flex justify-between items-center">
               <div className="flex items-center gap-2 text-secondary">
                 <span className="material-symbols-outlined">favorite</span>
                 <span className="font-mono text-sm tracking-widest font-bold uppercase">All Liked Games</span>
               </div>
-              <button onClick={() => setShowLikedGamesModal(false)} className="text-on-surface-variant hover:text-secondary p-1">
+              <button onClick={handleCloseModal} className="text-on-surface-variant hover:text-secondary p-1 icon-interactive cursor-pointer">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>

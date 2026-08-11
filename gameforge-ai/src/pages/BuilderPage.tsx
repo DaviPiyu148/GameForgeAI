@@ -70,7 +70,7 @@ const BuilderPage = () => {
               </h1>
             </header>
 
-            <div className="bg-terminal-bg border border-outline-variant flex flex-col flex-1 overflow-hidden relative">
+            <div className="bg-terminal-bg border border-outline-variant focus-within:border-primary-bright focus-within:shadow-[0_0_20px_rgba(76,224,210,0.5)] transition-all flex flex-col flex-1 overflow-hidden relative">
               {/* Editor Header */}
               <div className="flex justify-between items-center px-4 py-2 border-b border-primary/20 bg-terminal-header relative">
                 <h2 className="font-mono text-xs text-primary flex items-center gap-2 uppercase">
@@ -80,14 +80,14 @@ const BuilderPage = () => {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setShowHistory(!showHistory)}
-                    className={`text-primary/70 hover:text-primary p-1 transition-colors cursor-pointer rounded ${showHistory ? 'bg-primary/20' : 'hover:bg-primary/10'}`}
+                    className={`text-primary/70 hover:text-primary p-1 transition-colors icon-interactive cursor-pointer rounded ${showHistory ? 'bg-primary/20' : 'hover:bg-primary/10'}`}
                     title="Prompt History"
                   >
                     <span className="material-symbols-outlined text-sm">history</span>
                   </button>
                   <button 
                     onClick={handleCopy}
-                    className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors cursor-pointer rounded flex items-center gap-1"
+                    className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors icon-interactive cursor-pointer rounded flex items-center gap-1"
                     title="Copy to clipboard"
                   >
                     {copyFeedback ? (
@@ -100,7 +100,7 @@ const BuilderPage = () => {
                 
                 {/* History Popover */}
                 {showHistory && (
-                  <div className="absolute top-full right-4 mt-2 w-72 bg-surface-container border border-primary/50 shadow-lg z-30 flex flex-col max-h-64 rounded-sm">
+                  <div className="absolute top-full right-4 mt-2 w-72 bg-surface-container border border-primary/50 shadow-lg z-30 flex flex-col max-h-64 rounded-sm modal-enter">
                     <div className="bg-terminal-header border-b border-primary/30 px-3 py-2 flex justify-between items-center">
                       <span className="font-mono text-[10px] text-primary uppercase">Prompt History</span>
                       <button onClick={() => setShowHistory(false)} className="text-primary/70 hover:text-primary">
@@ -152,7 +152,7 @@ const BuilderPage = () => {
                 <button 
                   onClick={() => compileProject(navigate)}
                   disabled={state.buildStatus === 'COMPILING'}
-                  className={`bg-secondary-container hover:bg-secondary-soft/30 text-on-surface border border-secondary-soft px-6 py-2 font-mono text-xs uppercase tracking-wide flex items-center gap-2 transition-all ${state.buildStatus === 'COMPILING' ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                  className={`bg-secondary-container hover:bg-secondary-soft/30 text-on-surface border border-secondary-soft px-6 py-2 font-mono text-xs uppercase tracking-wide flex items-center gap-2 btn-interactive energy-sweep glow-magenta ${state.buildStatus === 'COMPILING' ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                 >
                   <span className="material-symbols-outlined text-sm">{state.buildStatus === 'COMPILING' ? 'sync' : 'play_arrow'}</span>
                   {state.buildStatus === 'COMPILING' ? 'Compiling...' : 'Compile Scene'}
@@ -264,8 +264,9 @@ const BuilderPage = () => {
           </div>
 
           {/* ═══ Output Console (Left, Row 2) ═══ */}
-          <div className="hidden lg:flex col-start-1 col-end-2 row-start-2 row-end-3 border-t border-r pane-border bg-terminal-bg flex-col h-full">
-            <div className="flex justify-between items-center px-4 py-1.5 border-b border-primary/20 bg-terminal-header">
+          <div className={`hidden lg:flex col-start-1 col-end-2 row-start-2 row-end-3 border-t border-r pane-border bg-terminal-bg flex-col h-full relative overflow-hidden ${state.buildStatus === 'COMPILING' ? 'crt-flicker delay-2' : ''}`}>
+            {state.buildStatus === 'COMPILING' && <div className="absolute inset-0 scanline-effect opacity-30 pointer-events-none"></div>}
+            <div className="flex justify-between items-center px-4 py-1.5 border-b border-primary/20 bg-terminal-header relative z-10">
               <h2 className="font-mono text-[10px] uppercase text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined text-[14px]">dvr</span>
                 Compiler Output
@@ -285,7 +286,7 @@ const BuilderPage = () => {
                 </>
               ) : (
                 state.compilerLogs.map((log, i) => (
-                  <div key={i} className={log.includes('FATAL') ? 'text-error font-bold' : log.includes('[MOD]') ? 'text-secondary-soft' : 'text-primary'}>
+                  <div key={i} className={`animate-[fadeIn_0.15s_ease-out_forwards] ${log.includes('FATAL') ? 'text-error font-bold' : log.includes('[MOD]') ? 'text-secondary-soft' : 'text-primary'}`}>
                     {log}
                   </div>
                 ))

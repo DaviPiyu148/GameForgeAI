@@ -41,29 +41,30 @@ const NoMatchesPage = () => {
           </div>
 
           {/* Terminal Body */}
-          <div className="bg-terminal-bg border border-outline-variant p-8 flex flex-col items-center text-center rounded-b-md">
+          <div className="bg-terminal-bg border border-outline-variant p-8 flex flex-col items-center text-center rounded-b-md relative overflow-hidden stagger-enter stagger-1">
+            <div className="absolute inset-0 scanline-effect opacity-20 pointer-events-none"></div>
             {/* Large Icon Box */}
-            <div className="relative w-24 h-24 border-2 border-outline-variant flex items-center justify-center bg-surface/50 mb-6">
+            <div className="relative w-24 h-24 border-2 border-outline-variant flex items-center justify-center bg-surface/50 mb-6 z-10">
               {/* Corner markers */}
               <span className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-secondary" />
               <span className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-secondary" />
               <span className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-secondary" />
               <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-secondary" />
 
-              <span className="material-symbols-outlined text-[48px] text-on-surface-variant">
+              <span className="material-symbols-outlined text-[48px] text-on-surface-variant animate-[pulse_0.5s_ease-out_1]">
                 search_off
               </span>
             </div>
 
             {/* Heading */}
-            <h1 className="font-display text-2xl text-on-surface mb-4 flex items-center justify-center gap-3 flex-wrap">
+            <h1 className="font-display text-2xl text-on-surface mb-4 flex items-center justify-center gap-3 flex-wrap relative z-10">
               <span className="text-error text-glow-error">!</span>
               <span>NO STRONG MATCHES FOUND</span>
               <span className="text-error text-glow-error">!</span>
             </h1>
 
             {/* Subtext */}
-            <div className="font-mono text-xs text-on-surface-variant space-y-1.5 mb-8 max-w-md">
+            <div className="font-mono text-xs text-on-surface-variant space-y-1.5 mb-8 max-w-md relative z-10">
               <p>&gt; Nothing in the current catalog matches your idea closely enough.</p>
               <p className="text-error">
                 &gt; Status: 404_CONCEPT_NOT_FOUND
@@ -72,10 +73,10 @@ const NoMatchesPage = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-row flex-wrap items-center justify-center gap-4">
+            <div className="flex flex-row flex-wrap items-center justify-center gap-4 relative z-10">
               <Link
                 to="/build"
-                className="font-mono text-xs uppercase px-6 py-3 bg-secondary-container text-white flex items-center gap-2 hover:bg-secondary-container/90 transition-all glow-magenta"
+                className="font-mono text-xs uppercase px-6 py-3 bg-secondary-container text-white flex items-center gap-2 hover:bg-secondary-container/90 btn-interactive energy-sweep glow-magenta"
               >
                 <span className="material-symbols-outlined text-base">construction</span>
                 <span>BUILD THIS IDEA</span>
@@ -83,7 +84,7 @@ const NoMatchesPage = () => {
 
               <Link
                 to="/"
-                className="font-mono text-xs uppercase px-6 py-3 border border-primary text-primary flex items-center gap-2 hover:bg-primary/10 transition-all glow-cyan"
+                className="font-mono text-xs uppercase px-6 py-3 border border-primary text-primary flex items-center gap-2 hover:bg-primary/10 btn-interactive glow-cyan"
               >
                 <span className="material-symbols-outlined text-base">tune</span>
                 <span>REFINE SEARCH</span>
@@ -93,23 +94,23 @@ const NoMatchesPage = () => {
         </div>
 
         {/* Suggestion Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full stagger-enter stagger-2">
           <div 
             onClick={handleRandomize}
-            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-primary cursor-pointer group"
+            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-primary hover:shadow-[0_0_15px_rgba(76,224,210,0.2)] cursor-pointer group btn-interactive"
           >
             <div className="flex items-center gap-2 text-primary font-mono text-xs font-bold mb-1">
               <span className="material-symbols-outlined text-base">casino</span>
               <span>&gt; RANDOMIZE</span>
             </div>
-            <p className="text-on-surface-variant text-xs font-body">
+            <p className="text-on-surface-variant text-xs font-body group-hover:text-on-surface transition-colors">
               Explore chaotic generation vectors.
             </p>
           </div>
 
           <div 
             onClick={handlePreviousQueries}
-            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-tertiary cursor-pointer group"
+            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-tertiary hover:shadow-[0_0_15px_rgba(255,194,76,0.2)] cursor-pointer group btn-interactive"
           >
             <div className="flex items-center gap-2 text-tertiary font-mono text-xs font-bold mb-1">
               <span className="material-symbols-outlined text-base">history</span>

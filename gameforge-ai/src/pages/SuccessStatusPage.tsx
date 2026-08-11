@@ -10,7 +10,7 @@ const SuccessStatusPage = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 w-full max-w-[800px] mx-auto relative z-10">
         {/* 1. Success Icon & Title */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-24 h-24 rounded-full border-4 border-primary bg-primary/10 glow-cyan flex items-center justify-center check-anim mb-6">
+          <div className="w-24 h-24 rounded-full border-4 border-primary bg-primary/10 glow-cyan flex items-center justify-center modal-enter mb-6">
             <span
               className="material-symbols-outlined text-6xl text-primary"
               style={{ fontVariationSettings: "'FILL' 1" }}
@@ -122,7 +122,7 @@ const SuccessStatusPage = () => {
         <div className="flex flex-row flex-wrap items-center justify-center gap-4 final-reveal w-full">
           <button 
             onClick={() => setShowPlayModal(true)}
-            className="bg-primary text-on-primary glow-cyan hover:glow-cyan-strong font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded transition-all duration-200 cursor-pointer"
+            className="bg-primary text-on-primary glow-cyan btn-interactive energy-sweep font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded cursor-pointer"
           >
             <span
               className="material-symbols-outlined text-xl"
@@ -135,7 +135,7 @@ const SuccessStatusPage = () => {
 
           <Link
             to="/build"
-            className="border border-secondary-soft text-secondary-soft hover:bg-secondary/10 font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded transition-all duration-200"
+            className="border border-secondary-soft text-secondary-soft hover:bg-secondary/10 font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded btn-interactive cursor-pointer"
           >
             <span className="material-symbols-outlined text-xl">edit</span>
             <span>MODIFY</span>
@@ -143,7 +143,7 @@ const SuccessStatusPage = () => {
 
           <Link
             to="/dashboard"
-            className="border border-outline-variant text-on-surface hover:text-primary hover:border-primary font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded transition-all duration-200"
+            className="border border-outline-variant text-on-surface hover:text-primary hover:border-primary font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded btn-interactive cursor-pointer"
           >
             <span className="material-symbols-outlined text-xl">dashboard</span>
             <span>DASHBOARD</span>

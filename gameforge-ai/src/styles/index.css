@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+:root {
+  --motion-fast: 100ms;
+  --motion-normal: 180ms;
+  --motion-medium: 260ms;
+  --motion-slow: 400ms;
+  --ease-cyber: cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
 @theme {
   /* ─── Background & Surface ─── */
   --color-background: #0a0d14;
@@ -65,6 +73,89 @@
 
 /* ─── Utility Classes ─── */
 @layer utilities {
+  /* Interactive Buttons */
+  .btn-interactive {
+    transition: transform var(--motion-normal) var(--ease-cyber), filter var(--motion-normal) var(--ease-cyber), box-shadow var(--motion-normal) var(--ease-cyber);
+  }
+  .btn-interactive:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+  }
+  .btn-interactive:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    filter: brightness(1.2);
+  }
+  .btn-interactive.glow-cyan:hover:not(:disabled) { box-shadow: 0 0 20px rgba(76, 224, 210, 0.5); }
+  .btn-interactive.glow-cyan:active:not(:disabled) { box-shadow: 0 0 30px rgba(76, 224, 210, 0.7); }
+  .btn-interactive.glow-magenta:hover:not(:disabled) { box-shadow: 0 0 20px rgba(255, 61, 129, 0.5); }
+  .btn-interactive.glow-magenta:active:not(:disabled) { box-shadow: 0 0 30px rgba(255, 61, 129, 0.7); }
+
+  /* Interactive Icons */
+  .icon-interactive {
+    transition: transform var(--motion-fast) var(--ease-cyber), filter var(--motion-fast) var(--ease-cyber), text-shadow var(--motion-fast) var(--ease-cyber);
+  }
+  .icon-interactive:hover:not(:disabled) {
+    transform: scale(1.05);
+    filter: brightness(1.2);
+  }
+  .icon-interactive:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  /* Energy Sweep */
+  .energy-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+  .energy-sweep::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: skewX(-20deg);
+    transition: none;
+  }
+  .energy-sweep:hover:not(:disabled)::after {
+    animation: sweep var(--motion-slow) linear;
+  }
+
+  /* Page Transitions */
+  .page-enter {
+    animation: pageFadeIn var(--motion-medium) var(--ease-cyber) forwards;
+  }
+
+  /* Stagger Transitions */
+  .stagger-enter {
+    opacity: 0;
+    animation: staggerFadeIn var(--motion-medium) var(--ease-cyber) forwards;
+  }
+  .stagger-1 { animation-delay: 40ms; }
+  .stagger-2 { animation-delay: 80ms; }
+  .stagger-3 { animation-delay: 120ms; }
+  .stagger-4 { animation-delay: 160ms; }
+  .stagger-5 { animation-delay: 200ms; }
+
+  /* Modals */
+  .modal-backdrop-enter {
+    animation: fadeIn var(--motion-medium) var(--ease-cyber) forwards;
+  }
+  .modal-backdrop-exit {
+    animation: fadeOut var(--motion-medium) var(--ease-cyber) forwards;
+  }
+  .modal-enter {
+    animation: modalIn var(--motion-medium) var(--ease-cyber) forwards;
+  }
+  .modal-exit {
+    animation: modalOut var(--motion-medium) var(--ease-cyber) forwards;
+  }
+
+  /* Pulse Ring */
+  .mic-listening {
+    animation: pulseRing 1.5s cubic-bezier(0.2, 0, 0.2, 1) infinite;
+  }
   .glow-cyan {
     box-shadow: 0 0 15px rgba(76, 224, 210, 0.3);
   }
@@ -253,4 +344,48 @@
 
 .stat-bar {
   animation: fillBar 1s ease-out forwards;
+}
+
+/* ─── Central Motion Keyframes ─── */
+@keyframes sweep {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(76, 224, 210, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(76, 224, 210, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 224, 210, 0); }
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .btn-interactive, .icon-interactive, .page-enter, .stagger-enter, .modal-enter, .modal-exit, .modal-backdrop-enter, .modal-backdrop-exit, .energy-sweep::after, .mic-listening {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
 }

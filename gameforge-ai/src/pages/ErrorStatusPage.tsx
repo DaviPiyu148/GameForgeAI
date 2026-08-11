@@ -6,7 +6,16 @@ const ErrorStatusPage = () => {
   const { state, compileProject } = useAppContext();
   const navigate = useNavigate();
   const [showLogModal, setShowLogModal] = useState(false);
+  const [isClosingModal, setIsClosingModal] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const handleCloseModal = () => {
+    setIsClosingModal(true);
+    setTimeout(() => {
+      setShowLogModal(false);
+      setIsClosingModal(false);
+    }, 250);
+  };
 
   // If we somehow get here without an error state, kick back to builder
   useEffect(() => {
@@ -22,7 +31,7 @@ const ErrorStatusPage = () => {
     if (showLogModal) {
       closeBtnRef.current?.focus();
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setShowLogModal(false);
+        if (e.key === 'Escape' && !isClosingModal) handleCloseModal();
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
@@ -50,7 +59,7 @@ const ErrorStatusPage = () => {
       </div>
 
       {/* 2. Error Terminal */}
-      <div className="bg-terminal-bg border-2 border-error glow-error overflow-hidden w-full">
+      <div className="bg-terminal-bg border-2 border-error glow-error overflow-hidden w-full crt-flicker delay-2">
         {/* Header */}
         <div className="bg-terminal-header border-b-2 border-error px-4 py-2.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
@@ -110,7 +119,7 @@ const ErrorStatusPage = () => {
         <button
           onClick={() => compileProject(navigate)}
           disabled={(state.buildStatus as string) === 'COMPILING'}
-          className={`font-mono text-xs uppercase px-6 py-3 bg-primary text-on-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary-bright hover:border-primary-bright transition-all glow-cyan cursor-pointer ${(state.buildStatus as string) === 'COMPILING' ? 'opacity-50 cursor-wait' : ''}`}
+          className={`font-mono text-xs uppercase px-6 py-3 bg-primary text-on-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 glow-cyan btn-interactive energy-sweep cursor-pointer ${(state.buildStatus as string) === 'COMPILING' ? 'opacity-50 cursor-wait' : 'hover:bg-primary-bright hover:border-primary-bright'}`}
         >
           <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
             {(state.buildStatus as string) === 'COMPILING' ? 'sync' : 'restart_alt'}
@@ -120,7 +129,7 @@ const ErrorStatusPage = () => {
         
         <Link
           to="/build"
-          className="font-mono text-xs uppercase px-6 py-3 text-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary/10 transition-all cursor-pointer"
+          className="font-mono text-xs uppercase px-6 py-3 text-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary/10 btn-interactive cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">edit_note</span>
           MODIFY PROMPT
@@ -128,7 +137,7 @@ const ErrorStatusPage = () => {
         
         <Link
           to="/build"
-          className="font-mono text-xs uppercase px-6 py-3 text-secondary-soft border-2 border-secondary-soft font-bold inline-flex items-center justify-center gap-2 hover:bg-secondary/10 transition-all cursor-pointer"
+          className="font-mono text-xs uppercase px-6 py-3 text-secondary-soft border-2 border-secondary-soft font-bold inline-flex items-center justify-center gap-2 hover:bg-secondary/10 btn-interactive cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">undo</span>
           RETURN TO BUILDER
@@ -139,7 +148,7 @@ const ErrorStatusPage = () => {
       <div>
         <button
           onClick={() => setShowLogModal(true)}
-          className="font-mono text-xs text-tertiary hover:underline tracking-wider uppercase inline-flex items-center gap-1 hover:text-tertiary-bright transition-colors cursor-pointer"
+          className="font-mono text-xs text-tertiary hover:underline tracking-wider uppercase inline-flex items-center gap-1 hover:text-tertiary-bright btn-interactive cursor-pointer"
         >
           <span className="text-tertiary font-bold">&gt;</span>
           VIEW TECHNICAL LOG
@@ -149,13 +158,13 @@ const ErrorStatusPage = () => {
       {/* Technical Log Modal */}
       {showLogModal && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowLogModal(false); }}
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm ${isClosingModal ? 'modal-backdrop-exit' : 'modal-backdrop-enter'}`}
+          onClick={(e) => { if (e.target === e.currentTarget && !isClosingModal) handleCloseModal(); }}
           role="dialog"
           aria-modal="true"
           aria-label="Technical Log"
         >
-          <div className="w-full max-w-3xl bg-surface border-2 border-error rounded-sm overflow-hidden flex flex-col shadow-[0_0_30px_rgba(255,77,77,0.15)]" onClick={e => e.stopPropagation()}>
+          <div className={`w-full max-w-3xl bg-surface border-2 border-error rounded-sm overflow-hidden flex flex-col shadow-[0_0_30px_rgba(255,77,77,0.15)] ${isClosingModal ? 'modal-exit' : 'modal-enter'}`} onClick={e => e.stopPropagation()}>
             <div className="bg-terminal-header border-b border-error/30 p-3 flex justify-between items-center">
               <div className="flex items-center gap-2 text-error">
                 <span className="material-symbols-outlined text-sm">terminal</span>
@@ -163,8 +172,8 @@ const ErrorStatusPage = () => {
               </div>
               <button 
                 ref={closeBtnRef}
-                onClick={() => setShowLogModal(false)}
-                className="text-on-surface-variant hover:text-error p-1 transition-colors focus:outline-none focus:ring-1 focus:ring-error cursor-pointer"
+                onClick={handleCloseModal}
+                className="text-on-surface-variant hover:text-error p-1 icon-interactive focus:outline-none focus:ring-1 focus:ring-error cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
