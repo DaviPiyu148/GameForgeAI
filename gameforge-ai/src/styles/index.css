@@ -1,0 +1,256 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── Background & Surface ─── */
+  --color-background: #0a0d14;
+  --color-surface: #10131a;
+  --color-surface-dim: #10131a;
+  --color-surface-bright: #363941;
+  --color-surface-variant: #32353d;
+  
+  --color-surface-container-lowest: #0b0e15;
+  --color-surface-container-low: #191b23;
+  --color-surface-container: #1d1f27;
+  --color-surface-container-high: #272a32;
+  --color-surface-container-highest: #32353d;
+
+  /* ─── Primary (Cyan) ─── */
+  --color-primary: #4ce0d2;
+  --color-primary-bright: #6ffdee;
+  --color-on-primary: #003733;
+  --color-primary-container: #4ce0d2;
+  --color-on-primary-container: #006059;
+  --color-primary-fixed: #69f8ea;
+  --color-primary-fixed-dim: #46dcce;
+
+  /* ─── Secondary (Magenta/Pink) ─── */
+  --color-secondary: #ff3d81;
+  --color-secondary-soft: #ffb1c2;
+  --color-on-secondary: #66002b;
+  --color-secondary-container: #c9005b;
+  --color-on-secondary-container: #ffdbe1;
+
+  /* ─── Tertiary (Amber) ─── */
+  --color-tertiary: #ffc24c;
+  --color-tertiary-bright: #ffe4b9;
+  --color-on-tertiary: #422d00;
+  --color-tertiary-container: #fec14b;
+  --color-on-tertiary-container: #714f00;
+
+  /* ─── Error ─── */
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  /* ─── Outline ─── */
+  --color-outline: #859491;
+  --color-outline-variant: #3c4947;
+  
+  /* ─── On-Surface ─── */
+  --color-on-surface: #e1e2ec;
+  --color-on-surface-variant: #bbcac6;
+  --color-on-background: #e1e2ec;
+  --color-inverse-surface: #e1e2ec;
+  
+  /* ─── Terminal ─── */
+  --color-terminal-bg: #10131a;
+  --color-terminal-header: #1e2233;
+  
+  /* ─── Typography ─── */
+  --font-display: "Press Start 2P", monospace;
+  --font-body: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* ─── Utility Classes ─── */
+@layer utilities {
+  .glow-cyan {
+    box-shadow: 0 0 15px rgba(76, 224, 210, 0.3);
+  }
+  .glow-cyan-strong {
+    box-shadow: 0 0 25px rgba(76, 224, 210, 0.5);
+  }
+  .glow-magenta {
+    box-shadow: 0 0 15px rgba(255, 61, 129, 0.3);
+  }
+  .glow-amber {
+    box-shadow: 0 0 15px rgba(255, 194, 76, 0.3);
+  }
+  .glow-error {
+    box-shadow: 0 0 20px rgba(255, 180, 171, 0.2);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 10px rgba(76, 224, 210, 0.8);
+  }
+  .text-glow-magenta {
+    text-shadow: 0 0 10px rgba(255, 61, 129, 0.8);
+  }
+  .text-glow-amber {
+    text-shadow: 0 0 10px rgba(255, 194, 76, 0.8);
+  }
+  .text-glow-error {
+    text-shadow: 0 0 12px rgba(255, 180, 171, 0.6);
+  }
+  .glow-box-cyan {
+    box-shadow: 0 0 15px rgba(76, 224, 210, 0.3);
+    border: 1px solid #4ce0d2;
+  }
+  .glow-box-magenta {
+    box-shadow: 0 0 15px rgba(255, 61, 129, 0.3);
+    border: 1px solid #ff3d81;
+  }
+  .glow-box-amber {
+    box-shadow: 0 0 15px rgba(255, 194, 76, 0.3);
+    border: 1px solid #ffc24c;
+  }
+  .terminal-cursor {
+    animation: blink 1s step-end infinite;
+  }
+  .ai-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .crt-flicker {
+    animation: flicker 0.15s infinite;
+  }
+  .glass-nav {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    background-color: rgba(10, 13, 20, 0.8);
+  }
+  .pane-border {
+    border: 1px solid #3c4947;
+  }
+  .arcade-border {
+    border: 2px solid #46dcce;
+    box-shadow: 0 0 8px rgba(70, 220, 206, 0.4), inset 0 0 8px rgba(70, 220, 206, 0.4);
+  }
+  .arcade-panel {
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 2px);
+  }
+}
+
+/* ─── Base Styles ─── */
+@layer base {
+  body {
+    background-color: #0a0d14;
+    color: #e1e2ec;
+    font-family: "Space Grotesk", sans-serif;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: #4ce0d2;
+    color: #003733;
+  }
+
+  .scanline-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05));
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.8;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #10131a; border-left: 1px solid #3c4947; }
+  ::-webkit-scrollbar-thumb { background: #32353d; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3c4947; }
+
+  /* Custom range slider */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #32353d;
+    outline: none;
+    border-radius: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #c9005b;
+    cursor: pointer;
+    border: none;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #c9005b;
+    cursor: pointer;
+    border: none;
+    border-radius: 0;
+  }
+}
+
+/* ─── Animations ─── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 5px currentColor; }
+  50% { opacity: .5; box-shadow: none; }
+}
+
+@keyframes flicker {
+  0% { opacity: 0.95; }
+  50% { opacity: 1; }
+  100% { opacity: 0.95; }
+}
+
+@keyframes slideInFade {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes revealUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fillBar {
+  from { width: 0; }
+  to { width: var(--target-width); }
+}
+
+.check-anim {
+  opacity: 0;
+  transform: translateX(-10px);
+  animation: slideInFade 0.4s forwards;
+}
+.delay-1 { animation-delay: 0.2s; }
+.delay-2 { animation-delay: 0.6s; }
+.delay-3 { animation-delay: 1.0s; }
+.delay-4 { animation-delay: 1.4s; }
+.delay-5 { animation-delay: 1.8s; }
+
+.final-reveal {
+  opacity: 0;
+  animation: revealUp 0.8s forwards;
+  animation-delay: 2.2s;
+}
+
+.stat-bar {
+  animation: fillBar 1s ease-out forwards;
+}
