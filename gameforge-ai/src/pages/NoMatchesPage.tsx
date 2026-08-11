@@ -1,6 +1,28 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
+
+const MOCK_PROMPTS = [
+  "A neon-drenched cyberpunk racing game with zero gravity mechanics.",
+  "Cozy farming simulator but you are a mech pilot defending the crops at night.",
+  "Turn-based psychological horror set in a 1920s submarine.",
+  "Fast-paced roguelike where you fight using only a deck of cursed tarot cards.",
+  "An MMORPG where players manage a dynamic galactic economy and trade rare resources."
+];
 
 const NoMatchesPage = () => {
+  const { setPrompt } = useAppContext();
+  const navigate = useNavigate();
+
+  const handleRandomize = () => {
+    const randomPrompt = MOCK_PROMPTS[Math.floor(Math.random() * MOCK_PROMPTS.length)];
+    setPrompt(randomPrompt);
+    navigate('/build');
+  };
+
+  const handlePreviousQueries = () => {
+    navigate('/dashboard');
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center py-6 w-full">
       <div className="max-w-2xl w-full mx-auto">
@@ -72,7 +94,10 @@ const NoMatchesPage = () => {
 
         {/* Suggestion Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full">
-          <div className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-primary cursor-pointer group">
+          <div 
+            onClick={handleRandomize}
+            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-primary cursor-pointer group"
+          >
             <div className="flex items-center gap-2 text-primary font-mono text-xs font-bold mb-1">
               <span className="material-symbols-outlined text-base">casino</span>
               <span>&gt; RANDOMIZE</span>
@@ -82,7 +107,10 @@ const NoMatchesPage = () => {
             </p>
           </div>
 
-          <div className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-tertiary cursor-pointer group">
+          <div 
+            onClick={handlePreviousQueries}
+            className="bg-surface-container border border-outline-variant p-4 transition-all duration-200 hover:border-tertiary cursor-pointer group"
+          >
             <div className="flex items-center gap-2 text-tertiary font-mono text-xs font-bold mb-1">
               <span className="material-symbols-outlined text-base">history</span>
               <span>&gt; PREVIOUS_QUERIES</span>
