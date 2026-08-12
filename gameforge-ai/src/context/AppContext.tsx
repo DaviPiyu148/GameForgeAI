@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { AppState, BuildParams, AppContextType, GameProject } from '../types';
+import type { AppState, BuildParams, AppContextType, GameProject, RecommendationMatch } from '../types';
+import { recommendGames, buildProject } from '../services/api';
 
 const defaultState: AppState = {
   currentUser: {
@@ -43,7 +44,8 @@ const defaultState: AppState = {
   },
   currentPrompt: '',
   buildStatus: 'IDLE',
-  compilerLogs: []
+  compilerLogs: [],
+  recommendations: []
 };
 
 const STORAGE_KEY = 'gameforge_ai_state';
@@ -56,8 +58,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Ensure buildStatus is IDLE on startup
-        return { ...defaultState, ...parsed, buildStatus: 'IDLE', compilerLogs: [] };
+        return {
+          ...defaultState,
+          ...parsed,
+          buildStatus: 'IDLE',
+          compilerLogs: [],
+          recommendations: []
+        };
       }
     } catch (e) {
       console.error('Failed to parse state from localStorage', e);
@@ -70,11 +77,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // Don't persist transient buildStatus or logs
       const stateToPersist = {
         ...state,
         buildStatus: 'IDLE',
-        compilerLogs: []
+        compilerLogs: [],
+        recommendations: []
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
     } catch (e) {
@@ -96,12 +103,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const addGameProject = (project: GameProject) => setState(s => ({ ...s, myGames: [project, ...s.myGames] }));
   const clearCompilerLogs = () => setState(s => ({ ...s, compilerLogs: [] }));
 
+  const fetchRecommendations = async (prompt: string): Promise<RecommendationMatch[]> => {
+    try {
+      const response = await recommendGames(prompt);
+      const matches = response.matches || [];
+      setState(s => ({ ...s, recommendations: matches }));
+      return matches;
+    } catch (err) {
+      console.warn('Backend recommendation request failed or offline:', err);
+      setState(s => ({ ...s, recommendations: [] }));
+      return [];
+    }
+  };
+
   const compileProject = (navigate: (path: string) => void) => {
-    // Prevent overlapping compilations
     if (state.buildStatus === 'COMPILING') return;
 
     if (timerRef.current) window.clearTimeout(timerRef.current);
     if (intervalRef.current) window.clearInterval(intervalRef.current);
+
+    const activePrompt = state.currentPrompt;
+    const activeParams = state.currentBuildParams;
 
     setState(s => ({
       ...s,
@@ -109,9 +131,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       compilerLogs: [
         '[SYS] Initializing build pipeline...', 
         '[SYS] Analyzing prompt syntax...',
-        ...s.currentBuildParams.modules.map(m => `[MOD] Linking module: ${m}`)
+        ...activeParams.modules.map(m => `[MOD] Linking module: ${m}`)
       ]
     }));
+
+    // Trigger backend build request asynchronously
+    const apiBuildPromise = buildProject(activePrompt, activeParams).catch(err => {
+      return { _isError: true, error: err };
+    });
 
     let step = 0;
     intervalRef.current = window.setInterval(() => {
@@ -123,30 +150,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 800);
 
-    timerRef.current = window.setTimeout(() => {
+    timerRef.current = window.setTimeout(async () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
-      
+
+      const apiResult = await apiBuildPromise;
+      const localHasError = /\bERROR\b/i.test(activePrompt);
+
+      let isError = localHasError;
+      let newProject: GameProject | null = null;
+
+      if (apiResult && '_isError' in apiResult && apiResult._isError) {
+        // Backend returned error (e.g. status 400 for ERROR) or network failure
+        isError = true;
+      } else if (apiResult && !('_isError' in apiResult) && apiResult.id) {
+        isError = false;
+        newProject = {
+          id: apiResult.id,
+          title: apiResult.title || activePrompt.substring(0, 40).trim() || 'UNTITLED PROJECT',
+          genre: apiResult.genre || 'Generated Concept',
+          status: 'PLAYABLE',
+          lastModified: apiResult.lastModified || 'Just now',
+          parameters: apiResult.parameters || activeParams,
+          prompt: apiResult.prompt || activePrompt
+        };
+      }
+
+      // Fallback if backend was unreachable or returned offline fallback
+      if (!isError && !newProject) {
+        newProject = {
+          id: `proj_${Date.now().toString(16)}`,
+          title: activePrompt.substring(0, 40).trim() || 'UNTITLED PROJECT',
+          genre: 'Generated Concept',
+          status: 'PLAYABLE',
+          lastModified: 'Just now',
+          parameters: activeParams,
+          prompt: activePrompt
+        };
+      }
+
       setState(s => {
-        // Test for \bERROR\b exactly, case-insensitive
-        const hasError = /\bERROR\b/i.test(s.currentPrompt);
-        
-        if (hasError) {
+        if (isError) {
           setTimeout(() => navigate('/status/error'), 0);
           return {
             ...s,
             buildStatus: 'ERROR',
             compilerLogs: [...s.compilerLogs, '> FATAL_EXCEPTION: BUILD_FAILED', 'Process terminated unexpectedly.']
           };
-        } else {
-          const newProject: GameProject = {
-            id: `proj_${Date.now().toString(16)}`,
-            title: s.currentPrompt.substring(0, 40).trim() || 'UNTITLED PROJECT',
-            genre: 'Generated Concept',
-            status: 'PLAYABLE',
-            lastModified: 'Just now',
-            parameters: s.currentBuildParams,
-            prompt: s.currentPrompt
-          };
+        } else if (newProject) {
           setTimeout(() => navigate('/status/success'), 0);
           return {
             ...s,
@@ -155,12 +205,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             compilerLogs: [...s.compilerLogs, '[SYS] Compilation successful. Build ready.']
           };
         }
+        return s;
       });
     }, 3000);
   };
 
   return (
-    <AppContext.Provider value={{ state, setPrompt, updateBuildParams, setBuildStatus, addGameProject, setState, compileProject, clearCompilerLogs }}>
+    <AppContext.Provider
+      value={{
+        state,
+        setPrompt,
+        updateBuildParams,
+        setBuildStatus,
+        addGameProject,
+        setState,
+        compileProject,
+        clearCompilerLogs,
+        fetchRecommendations
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

@@ -34,6 +34,14 @@ export interface SavedDiscovery {
   themeClass: 'secondary' | 'primary' | 'tertiary';
 }
 
+export interface RecommendationMatch {
+  id: string;
+  title: string;
+  description: string;
+  score: number;
+  reasons: string[];
+}
+
 export interface AppState {
   currentUser: UserProfile;
   myGames: GameProject[];
@@ -42,6 +50,7 @@ export interface AppState {
   currentPrompt: string;
   buildStatus: 'IDLE' | 'COMPILING' | 'SUCCESS' | 'ERROR';
   compilerLogs: string[];
+  recommendations: RecommendationMatch[];
 }
 
 export interface AppContextType {
@@ -53,4 +62,5 @@ export interface AppContextType {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   compileProject: (navigate: (path: string) => void) => void;
   clearCompilerLogs: () => void;
+  fetchRecommendations: (prompt: string) => Promise<RecommendationMatch[]>;
 }

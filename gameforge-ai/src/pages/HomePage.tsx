@@ -6,7 +6,7 @@ const HomePage = () => {
   const [promptText, setPromptText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const navigate = useNavigate();
-  const { setPrompt, state } = useAppContext();
+  const { setPrompt, state, fetchRecommendations } = useAppContext();
 
   // Sync initial prompt from context if needed, but usually homepage is fresh.
   useEffect(() => {
@@ -20,10 +20,11 @@ const HomePage = () => {
     setPrompt(text); // Also update context immediately
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (promptText.trim()) {
       setPrompt(promptText);
+      await fetchRecommendations(promptText);
       navigate('/discover/no-matches');
     } else {
       navigate('/build');

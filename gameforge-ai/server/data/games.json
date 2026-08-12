@@ -1,0 +1,182 @@
+[
+  {
+    "id": "game-001",
+    "title": "Cyberpunk 2077",
+    "description": "An open-world action-adventure RPG set in Night City, a megalopolis obsessed with power, glamour and body modification.",
+    "genres": ["RPG", "Action"],
+    "themes": ["Cyberpunk", "Sci-Fi", "Dystopian"],
+    "mechanics": ["Shooter", "Open World", "First-Person", "Hacking"],
+    "tags": ["robots", "cyberware", "night city", "singleplayer", "futuristic"]
+  },
+  {
+    "id": "game-002",
+    "title": "Helldivers 2",
+    "description": "A third-person squad-based shooter where players fight intergalactic threats for Freedom across the galaxy.",
+    "genres": ["Action", "Shooter"],
+    "themes": ["Sci-Fi", "Post-Apocalyptic"],
+    "mechanics": ["Co-op", "Third-Person", "Multiplayer", "Extraction"],
+    "tags": ["co-op", "robots", "bugs", "space", "shooter", "squad"]
+  },
+  {
+    "id": "game-003",
+    "title": "Stardew Valley",
+    "description": "A cozy farming simulation RPG where you inherit your grandfather's old farm plot and build a new life.",
+    "genres": ["Simulation", "Farming", "RPG"],
+    "themes": ["Cozy", "Relaxing", "Rural"],
+    "mechanics": ["Crafting", "Farming", "Exploration", "Social"],
+    "tags": ["cozy", "pixel art", "gardening", "fishing", "cute", "singleplayer"]
+  },
+  {
+    "id": "game-004",
+    "title": "Deep Rock Galactic",
+    "description": "A 1-4 player co-op FPS featuring badass space Dwarves, 100% destructible environments, procedural caves, and alien hordes.",
+    "genres": ["Action", "Shooter"],
+    "themes": ["Sci-Fi", "Space"],
+    "mechanics": ["Co-op", "Procedural Gen", "First-Person", "Mining"],
+    "tags": ["co-op", "dwarves", "robots", "bugs", "shooter", "multiplayer"]
+  },
+  {
+    "id": "game-005",
+    "title": "Elden Ring",
+    "description": "A fantasy action-RPG epic focused on tactical combat, vast open-world exploration, and challenging boss battles.",
+    "genres": ["RPG", "Action"],
+    "themes": ["Fantasy", "Dark Fantasy"],
+    "mechanics": ["Open World", "Third-Person", "Boss Fights", "Combat"],
+    "tags": ["souls-like", "magic", "sword", "hardcore", "singleplayer"]
+  },
+  {
+    "id": "game-006",
+    "title": "Subnautica",
+    "description": "Descend into the depths of an alien underwater world filled with wonder and peril. Craft equipment, pilot submarines and outsmart wildlife.",
+    "genres": ["Survival", "Exploration"],
+    "themes": ["Sci-Fi", "Ocean", "Horror"],
+    "mechanics": ["Crafting", "Base Building", "First-Person", "Underwater"],
+    "tags": ["cozy", "alien", "ocean", "crafting", "survival", "singleplayer"]
+  },
+  {
+    "id": "game-007",
+    "title": "Slay the Spire",
+    "description": "Fuse deck-building with roguelike mechanics to craft a unique deck, encounter bizarre creatures, and discover relics of immense power.",
+    "genres": ["Strategy", "Roguelike"],
+    "themes": ["Fantasy"],
+    "mechanics": ["Deck-Building", "Turn-Based", "Tactical", "Card Game"],
+    "tags": ["deckbuilding", "cards", "roguelite", "strategy", "singleplayer"]
+  },
+  {
+    "id": "game-008",
+    "title": "Doom Eternal",
+    "description": "Hell's armies have invaded Earth. Become the Slayer in an epic single-player campaign to conquer demons across dimensions.",
+    "genres": ["Action", "Shooter"],
+    "themes": ["Sci-Fi", "Dark Fantasy"],
+    "mechanics": ["First-Person", "Fast-Paced", "Movement", "Gore"],
+    "tags": ["shooter", "demons", "heavy metal", "singleplayer", "sci-fi"]
+  },
+  {
+    "id": "game-009",
+    "title": "Phasmophobia",
+    "description": "A 4-player co-op psychological horror where you and your team members enter haunted locations filled with paranormal activity.",
+    "genres": ["Horror", "Simulation"],
+    "themes": ["Paranormal", "Mystery"],
+    "mechanics": ["Co-op", "Investigation", "First-Person", "Voice Control"],
+    "tags": ["co-op", "ghosts", "scary", "multiplayer", "horror"]
+  },
+  {
+    "id": "game-010",
+    "title": "Forza Horizon 5",
+    "description": "Your ultimate Horizon Adventure awaits! Explore the vibrant open world landscapes of Mexico with limitless, fun driving action.",
+    "genres": ["Racing", "Simulation"],
+    "themes": ["Automotive", "Modern"],
+    "mechanics": ["Open World", "Driving", "Customization", "Multiplayer"],
+    "tags": ["cars", "racing", "speed", "open-world", "mexico"]
+  },
+  {
+    "id": "game-011",
+    "title": "Dead Space",
+    "description": "A sci-fi survival horror classic rebuilt from the ground up to offer a deeper and more immersive experience on a mining spaceship.",
+    "genres": ["Horror", "Action"],
+    "themes": ["Sci-Fi", "Space"],
+    "mechanics": ["Third-Person", "Shooter", "Survival Horror", "Dismemberment"],
+    "tags": ["space", "aliens", "scary", "shooter", "singleplayer"]
+  },
+  {
+    "id": "game-012",
+    "title": "Factorio",
+    "description": "Build and maintain factories. Mine resources, research technologies, build infrastructure, automate production, and fight enemies.",
+    "genres": ["Strategy", "Simulation"],
+    "themes": ["Sci-Fi", "Industrial"],
+    "mechanics": ["Automation", "Base Building", "Crafting", "Resource Management"],
+    "tags": ["factory", "logistics", "robots", "engineering", "crafting"]
+  },
+  {
+    "id": "game-013",
+    "title": "Valheim",
+    "description": "A brutal exploration and survival game for 1-10 players set in a procedurally-generated purgatory inspired by Norse mythology.",
+    "genres": ["Survival", "Action"],
+    "themes": ["Viking", "Fantasy", "Cozy"],
+    "mechanics": ["Co-op", "Crafting", "Base Building", "Open World"],
+    "tags": ["co-op", "vikings", "crafting", "sailing", "bosses", "multiplayer"]
+  },
+  {
+    "id": "game-014",
+    "title": "Portal 2",
+    "description": "An inventive puzzle adventure featuring mind-bending portal physics, single-player storyline, and a dedicated co-op campaign.",
+    "genres": ["Puzzle", "Action"],
+    "themes": ["Sci-Fi", "Comedy"],
+    "mechanics": ["Co-op", "First-Person", "Physics", "Portal Gun"],
+    "tags": ["co-op", "robots", "puzzles", "glados", "physics", "humor"]
+  },
+  {
+    "id": "game-015",
+    "title": "Left 4 Dead 2",
+    "description": "Set in the zombie apocalypse, Left 4 Dead 2 is the highly anticipated sequel to the award-winning co-op shooter.",
+    "genres": ["Action", "Shooter"],
+    "themes": ["Post-Apocalyptic", "Zombie"],
+    "mechanics": ["Co-op", "First-Person", "Survival", "Horde"],
+    "tags": ["co-op", "zombies", "shooter", "squad", "multiplayer"]
+  },
+  {
+    "id": "game-016",
+    "title": "Hades",
+    "description": "Defy the god of the dead as you hack and slash your way out of the Underworld in this rogue-like dungeon crawler from Supergiant Games.",
+    "genres": ["Action", "Roguelike", "RPG"],
+    "themes": ["Mythology", "Fantasy"],
+    "mechanics": ["Isometric", "Hack and Slash", "Boons", "Fast-Paced"],
+    "tags": ["roguelite", "greek mythology", "singleplayer", "dungeon crawler"]
+  },
+  {
+    "id": "game-017",
+    "title": "Terraria",
+    "description": "Dig, fight, explore, build! Nothing is impossible in this action-packed adventure game with endless 2D crafting and building.",
+    "genres": ["Survival", "Sandbox", "RPG"],
+    "themes": ["Fantasy", "Exploration"],
+    "mechanics": ["2D", "Crafting", "Building", "Mining", "Co-op"],
+    "tags": ["2d", "crafting", "co-op", "bosses", "sandbox", "pixel art"]
+  },
+  {
+    "id": "game-018",
+    "title": "Outer Wilds",
+    "description": "An open world mystery about a solar system trapped in an endless time loop. Explore dangerous planets and unearth ancient secrets.",
+    "genres": ["Exploration", "Puzzle"],
+    "themes": ["Sci-Fi", "Space", "Mystery"],
+    "mechanics": ["Time Loop", "Physics", "First-Person", "Spaceflight"],
+    "tags": ["space", "mystery", "exploration", "singleplayer", "story"]
+  },
+  {
+    "id": "game-019",
+    "title": "Rust",
+    "description": "The only aim in Rust is to survive. Overcome struggles such as hunger, thirst and cold. Build a fire. Build a shelter. Kill animals for meat.",
+    "genres": ["Survival", "Action"],
+    "themes": ["Post-Apocalyptic", "Hardcore"],
+    "mechanics": ["Multiplayer", "Base Building", "PvP", "Crafting"],
+    "tags": ["survival", "pvp", "open-world", "crafting", "multiplayer"]
+  },
+  {
+    "id": "game-020",
+    "title": "Cyber Neon: Zero Gravity",
+    "description": "A neon-drenched futuristic cyberpunk racing simulator with zero gravity physics and customization.",
+    "genres": ["Racing", "Action"],
+    "themes": ["Cyberpunk", "Sci-Fi"],
+    "mechanics": ["Physics", "Zero Gravity", "Fast-Paced", "Customization"],
+    "tags": ["cyberpunk", "neon", "racing", "zero gravity", "futuristic"]
+  }
+]
