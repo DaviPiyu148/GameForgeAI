@@ -41,7 +41,7 @@ const BuilderPage = () => {
   const promptHistory = Array.from(new Set(state.myGames.map(g => g.prompt))).filter(Boolean);
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-body">
+    <div className="min-h-screen flex flex-col font-body">
       {/* Scanline */}
       <div className="scanline-effect"></div>
       
@@ -49,17 +49,17 @@ const BuilderPage = () => {
       <Navbar />
 
       {/* Main Workspace */}
-      <main className="flex-1 bg-background relative overflow-hidden">
+      <main className="flex-1 bg-background relative overflow-y-auto lg:overflow-hidden">
         {/* Scanline overlay on workspace */}
         <div className="absolute inset-0 pointer-events-none z-20" style={{
           background: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))',
           backgroundSize: '100% 2px, 3px 100%'
         }}></div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] grid-rows-[1fr_200px_auto] h-[calc(100vh-64px)] relative z-10">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_320px] lg:grid-rows-[1fr_200px_auto] lg:h-[calc(100vh-64px)] relative z-10">
           
           {/* ═══ Main Prompt Editor (Left, Row 1) ═══ */}
-          <div className="col-start-1 col-end-2 row-start-1 row-end-2 flex flex-col p-4 lg:border-r pane-border overflow-hidden">
+          <div className="order-1 lg:col-start-1 lg:col-end-2 lg:row-start-1 lg:row-end-2 flex flex-col p-4 lg:border-r pane-border overflow-hidden min-h-[60vh] lg:min-h-0">
             <header className="mb-4 flex justify-between items-center">
               <h1 className="font-display text-2xl text-primary flex items-center gap-3">
                 Scene Composer
@@ -162,7 +162,7 @@ const BuilderPage = () => {
           </div>
 
           {/* ═══ Configuration Panel (Right Sidebar, Rows 1-2) ═══ */}
-          <div className="col-start-1 lg:col-start-2 lg:col-end-3 row-start-1 lg:row-end-3 flex flex-col pane-border bg-surface-container-low overflow-y-auto">
+          <div className="order-2 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:row-end-3 flex flex-col pane-border bg-surface-container-low overflow-y-auto">
             {/* Live Preview */}
             <div className="p-4 border-b pane-border">
               <h3 className="font-mono text-[10px] text-secondary-soft mb-3 flex items-center gap-2 uppercase tracking-wide">

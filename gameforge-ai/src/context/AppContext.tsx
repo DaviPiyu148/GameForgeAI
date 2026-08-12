@@ -140,7 +140,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         } else {
           const newProject: GameProject = {
             id: `proj_${Date.now().toString(16)}`,
-            title: s.currentPrompt.substring(0, 20).trim() || 'UNTITLED PROJECT',
+            title: s.currentPrompt.substring(0, 40).trim() || 'UNTITLED PROJECT',
             genre: 'Generated Concept',
             status: 'PLAYABLE',
             lastModified: 'Just now',

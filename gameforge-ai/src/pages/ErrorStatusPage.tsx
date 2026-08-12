@@ -24,9 +24,7 @@ const ErrorStatusPage = () => {
     }
   }, [state.buildStatus, navigate]);
 
-  if (state.buildStatus !== 'ERROR') return null;
-
-  // Log Modal Accessibility
+  // Log Modal Accessibility — MUST be before any early return (Rules of Hooks)
   useEffect(() => {
     if (showLogModal) {
       closeBtnRef.current?.focus();
@@ -37,6 +35,8 @@ const ErrorStatusPage = () => {
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
   }, [showLogModal]);
+
+  if (state.buildStatus !== 'ERROR') return null;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 my-auto w-full max-w-4xl mx-auto space-y-8">
