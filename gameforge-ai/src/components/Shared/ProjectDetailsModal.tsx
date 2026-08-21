@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameProject } from '../../types';
 
@@ -11,12 +11,12 @@ export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalPro
   const [isClosing, setIsClosing] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       onClose();
     }, 250);
-  };
+  }, [onClose]);
 
   useEffect(() => {
     closeBtnRef.current?.focus();
@@ -28,7 +28,7 @@ export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalPro
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [isClosing, handleClose]);
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && !isClosing) {

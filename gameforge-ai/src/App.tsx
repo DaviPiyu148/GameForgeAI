@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import NoMatchesPage from './pages/NoMatchesPage';
 import BuilderPage from './pages/BuilderPage';
@@ -19,6 +19,7 @@ function App() {
       <div key={location.pathname} className="page-enter h-screen flex flex-col">
         <Routes>
           <Route path="/build" element={<BuilderPage />} />
+          <Route path="*" element={<Navigate to="/build" replace />} />
         </Routes>
         <AuthModal />
       </div>
@@ -35,6 +36,7 @@ function App() {
           <Route path="/status/error" element={<ErrorStatusPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <AuthModal />
       </div>

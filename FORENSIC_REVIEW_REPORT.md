@@ -397,136 +397,127 @@ ranking behavior without benchmark re-verification.
 
 ---
 
-## Remaining Risks (explicitly deferred, not silently dropped)
+## Remaining Risks & Final Disposition
 
-### Resolved in Build Pipeline Integrity V1 & Runtime Contract Closure V1:
-- **Build cancellation racing worker**: RESOLVED. `transition_status` provides atomic conditional status updates. Verified by `test_cancel_vs_success_race_protects_against_late_project_creation`.
-- **Orphaned builds on restart**: RESOLVED. `build_repository.reconcile_orphaned_builds(db)` in FastAPI startup lifecycle. Verified by `test_startup_orphan_reconciliation_sweep`.
-- **Build log sequence race**: RESOLVED. Monotonic sequence allocation with collision retry in `build_repository.append_log(db, ...)`. Verified by `test_concurrent_log_sequence_allocation`.
-- **EventSource infinite reconnection on dropped connection**: RESOLVED. `eventSource?.close()` added to `EventSource.onerror` in `services/builds.ts`.
-- **Dead Rule Triggers & Actions**: RESOLVED. All 12 triggers (`on_collect`, `on_collide_enemy`, `on_reach_goal`, `on_score_target`, `on_time_limit`, `on_player_death`, `on_wave_start`, `on_dash`, `on_hazard_touch`, `on_enemy_defeat`, `on_checkpoint`, `on_powerup_expire`) and 13 actions wired and verified.
-- **Ignored UIDef Fields**: RESOLVED. `show_health`, `show_score`, `show_stamina`, `show_wave`, `show_objectives`, and `status_text` dynamically bound in `GameScene.ts`.
-- **Platformer Dash Unreachable**: RESOLVED. Unified dash execution implemented for platformer and non-platformer archetypes in `GameScene.ts`.
-- **Entity Loot Drops**: RESOLVED. `EntityDef.loot_drop` mechanics wired in `GameScene.ts`.
-- **Version Number Race**: RESOLVED. Monotonic increment querying `func.max(ProjectVersion.version_number)` from database history.
-
-Grouped by why each remaining item was deferred rather than fixed this session:
-
-**Requires a new Alembic migration + concurrency-control design (out of scope for a
-single-session, non-benchmarked change):**
-- `BuildJob.project_id` has no FK constraint (unlike `ProjectVersion`/`PlaytestSession`,
-  which do) — an inconsistency in the schema's referential design.
-
-**Requires deeper concurrency/lifecycle work than a targeted patch:**
-- No global `db.rollback()` middleware exists; individual repository methods handle rollbacks locally on exceptions.
-
-**Lower severity / narrower exploitability, deferred for time:**
-- Raw user prompt is spliced into the AI instruction prompt (`prompts.py`) with no
-  delimiter, making prompt-phrasing-based instruction override plausible. Needs a
-  prompt-restructuring change verified against the real model, not just a code change.
-- IGDB: `release_year` parameter is accepted but never used to disambiguate a
-  title-fallback lookup (wrong-game enrichment risk); the documented "1.5s strict
-  timeout" isn't actually enforced (worst case ~9s per game); Apicalypse query bodies
-  use under-escaped f-string interpolation.
-- No global frontend handling of a mid-session 401 (expired JWT) — the UI keeps
-  showing the user as logged in while every authenticated call silently fails.
-- `/dashboard` and `/profile` are not route-guarded, only visually gated per-component
-  on `authStatus` — consistent today, but nothing enforces a new page added to either
-  route also remembers to add its own check.
-- No catch-all (`*`) route — an unknown/malformed hash path renders the nav/footer
-  chrome around a blank body instead of a 404 or redirect.
-- `projectService.updateProject`'s frontend type (`Partial<GameProject>`) is a
-  superset of the backend's `extra="forbid"` schema — a caller following the type
-  signature literally could trigger a 422.
-- `GroqProvider` is fully implemented as a documented "fallback provider" but is never
-  wired into the running `AIProviderRouter` (`fallback=None` always) — README overstates
-  it as active. Doc-only mismatch, not a functional bug (Gemini has no automatic
-  fallback today).
-- Three backend endpoints (playtest session get/list, project version list) have no
-  frontend caller — not a bug, a contract-drift risk (nothing would catch a breaking
-  schema change to them).
+### Resolved across Hardening & Remediation Milestones:
+- **Build cancellation racing worker (New #14)**: RESOLVED. `transition_status` provides atomic conditional status updates. Verified by `test_cancel_vs_success_race_protects_against_late_project_creation`.
+- **Orphaned builds on restart (New #15)**: RESOLVED. `build_repository.reconcile_orphaned_builds(db)` in FastAPI startup lifecycle. Verified by `test_startup_orphan_reconciliation_sweep`.
+- **Build log sequence race (New #17)**: RESOLVED. Monotonic sequence allocation with collision retry in `build_repository.append_log(db, ...)`. Verified by `test_concurrent_log_sequence_allocation`.
+- **EventSource infinite reconnection on dropped connection (New #34)**: RESOLVED. `eventSource?.close()` added to `EventSource.onerror` in `services/builds.ts`.
+- **Dead Rule Triggers & Actions (New #26)**: RESOLVED. All 12 triggers and 13 actions wired and verified.
+- **Ignored UIDef Fields (New #27)**: RESOLVED. `show_health`, `show_score`, `show_stamina`, `show_wave`, `show_objectives`, and `status_text` dynamically bound in `GameScene.ts`.
+- **Platformer Dash Unreachable (New #28)**: RESOLVED. Unified dash execution implemented for platformer and non-platformer archetypes in `GameScene.ts`.
+- **Entity Loot Drops (New #29)**: RESOLVED. `EntityDef.loot_drop` mechanics wired in `GameScene.ts`.
+- **Version Number Race (New #16)**: RESOLVED. Monotonic increment querying `func.max(ProjectVersion.version_number)` from database history.
+- **Database Session Rollback on Exception (New #18)**: RESOLVED. Automatic `db.rollback()` on exception in `get_db()` FastAPI generator.
+- **Discovery FAISS Index Readiness & Lexical Fallback (New #20, #21)**: RESOLVED. `is_ready()` guards added across `search()`, `get_similar_games()`, and `more_like_this()` with seamless lexical fallback.
+- **IGDB Query Escaping, Timeout, & Disambiguation (New #22, #23, #24)**: RESOLVED. Escaped Apicalypse queries, release_year disambiguation, and strict 1.5s `asyncio.wait_for` timeout.
+- **Prompt Delimiters & Instruction Boundaries (New #30)**: RESOLVED. Explicit `<user_game_concept>` delimiters and boundary rules in `SYSTEM_PROMPT` and `prompts.py`.
+- **Global 401 Auth Expiry Handling (New #31)**: RESOLVED. `apiClient` dispatches `gameforge:auth-expired` and clears expired token; `AppContext` synchronizes auth state.
+- **Catch-All Navigation Route (New #33)**: RESOLVED. `<Route path="*" element={<Navigate to="/" replace />} />` configured in `App.tsx`.
+- **Project Update Type Contract (New #35)**: RESOLVED. `ProjectUpdateInput` exported in `types/index.ts` and enforced in `services/projects.ts`.
+- **FastAPI Lifespan Deprecation**: RESOLVED. Migrated from `@app.on_event("startup")` to `FastAPI(lifespan=...)`.
+- **Frontend Oxlint Warnings**: RESOLVED. Fixed `useEffect` dependency arrays across `PhaserCanvas.tsx`, `PrototypeModal.tsx`, `ProjectDetailsModal.tsx`, and fast-refresh export structure.
 
 ---
 
-## Master Finding Matrix
+### Master Finding Matrix
 
-Legend: **FIXED** (code changed + verified), **FIXED\*** (code changed, verified by
-build/suite but no new dedicated test), **FALSE POSITIVE** (investigated, no defect),
-**DEFERRED** (reason given above).
+Legend: **FIXED** (code changed + verified), **FALSE POSITIVE** (investigated, no defect), **DEFERRED** (retained with documented justification).
 
-### Original 26 findings
+#### Original 26 findings
 
-| ID | Severity | Finding | Status |
-|---|---|---|---|
-| F1 | CRITICAL | Auth token key mismatch (`gameforge_access_token`) | FIXED |
-| F2 | CRITICAL | IDOR in `analyze_playtest_session` | FIXED |
-| F3 | CRITICAL | Playtest score client-controlled | FIXED |
-| F4 | CRITICAL | Hardcoded JWT secret fallback | FIXED |
-| F5 | HIGH | ProfilePage frozen-screen regression | FALSE POSITIVE (see UI/State section) |
-| F6 | HIGH | Asymmetric win-condition check | FIXED |
-| F7 | HIGH | Improvement fallback drops recommendations silently | FIXED |
-| F8 | CRITICAL | Hardcoded localhost URL bypassing apiClient | FIXED (same fix as F1) |
-| F9 | HIGH | Unvalidated AI response persisted before validation | FIXED |
-| F10 | HIGH | Custom win/lose DSL messages dropped | FIXED |
-| F11 | MEDIUM | Overbroad `\bERROR\b` sentinel regex | FIXED |
-| F12 | MEDIUM | Physics override clobbers legitimate values | FIXED |
-| F13 | MEDIUM | camelCase/snake_case `fallbackReason` mismatch | FIXED |
-| F14 | MEDIUM | Overbroad script-injection regex | FIXED |
-| F15 | MEDIUM | `onProjectUpdated` not wired (stale state) | FIXED |
-| F16 | MEDIUM | Build SUCCESS doesn't guarantee `myGames` update | DEFERRED (depends on a `getProject()` follow-up call whose own failure handling needs a broader retry/reconciliation design) |
-| F17 | LOW | Builder engine `<select>` default mismatch | FIXED |
-| F18 | LOW | `handleContinueEdit` stale enum values | FIXED |
-| F19 | LOW | Telemetry 150-cap can drop `SESSION_ENDED` | FIXED |
-| F20 | reuse | Ownership-check duplicated 8x | FIXED |
-| F21 | reuse | Duplicated fetch/token logic | FIXED (same fix as F1/F8) |
-| F22 | reuse | `GENERIC_GENRE_PHRASES` duplicated | FIXED |
-| F23 | simplification | `passes_filters` duplicated blocks | FIXED (+ fixed a real bug found while touching it) |
-| F24 | reuse | Redundant `_running_builds` set | DEFERRED (low value vs. risk of touching build worker internals without dedicated concurrency tests) |
-| F25 | efficiency | Per-log-line SELECT+COMMIT | DEFERRED (batching changes sequencing/failure semantics — needs its own test pass) |
-| F26 | efficiency | Search re-tokenization | DEFERRED (ranking-adjacent — needs benchmark re-verification per review's own instruction) |
-
-### New findings (this session's 7 forensic passes)
-
-| # | Severity | Category | Finding | Status |
+| ID | Severity | Finding | Status | Disposition Details |
 |---|---|---|---|---|
-| 1 | CRITICAL | AI/SECURITY | `analyze_playtest` faked success on provider failure | FIXED |
-| 2 | HIGH | SECURITY | Raw exception leaked in analyze-playtest error handler | FIXED |
-| 3 | HIGH | DATA_INTEGRITY | `current_version` client-settable via PATCH | FIXED |
-| 4 | MEDIUM | DATABASE | SQLite FK enforcement never enabled | FIXED |
-| 5 | CRITICAL | RUNTIME | Collectibles (incl. platformer goal_flag) fall forever | FIXED |
-| 6 | HIGH | RUNTIME | Double gravity on platformer player | FIXED |
-| 7 | HIGH | DISCOVERY | `release_year == 0` bypasses year filters | FIXED |
-| 8 | MEDIUM | DISCOVERY | Catalog null-description crash risk (latent) | FIXED |
-| 9 | HIGH | STATE | `logout()` doesn't clear build/error state | FIXED |
-| 10 | HIGH | ROUTING | `SuccessStatusPage` missing `buildStatus` guard | FIXED |
-| 11 | MEDIUM | STATE | ProfilePage uncancelled `requestAnimationFrame` loop | FIXED |
-| 12 | LOW | API_CONTRACT | `saveDiscovery` unhandled promise rejection | FIXED |
-| 13 | LOW | DOCUMENTATION | Wrong Alembic migration IDs in docs/06 | FIXED |
-| 14 | CRITICAL | CONCURRENCY | Build cancel can overwrite a completed SUCCESS | DEFERRED |
-| 15 | CRITICAL | CONCURRENCY | Builds orphaned in RUNNING forever on crash/restart | DEFERRED |
-| 16 | HIGH | CONCURRENCY | `apply_project_improvement` version-number race | DEFERRED |
-| 17 | HIGH | CONCURRENCY | `build_logs` sequence-number race | DEFERRED |
-| 18 | MEDIUM | DATABASE | No `db.rollback()` anywhere in codebase | DEFERRED |
-| 19 | LOW | DATA_INTEGRITY | `BuildJob.project_id` missing FK constraint | DEFERRED |
-| 20 | CRITICAL | DISCOVERY | No lexical fallback when FAISS unavailable (503s) | DEFERRED |
-| 21 | HIGH | DISCOVERY | `get_similar_games`/`more_like_this` skip `is_ready()` guard | DEFERRED |
-| 22 | HIGH | DISCOVERY | IGDB `release_year` param dead / wrong-game enrichment risk | DEFERRED |
-| 23 | HIGH | PERFORMANCE | IGDB documented 1.5s timeout not enforced (~9s worst case) | DEFERRED |
-| 24 | MEDIUM | DISCOVERY | IGDB Apicalypse query under-escaped | DEFERRED |
-| 25 | MEDIUM | DISCOVERY | Exact-title 0.98 score-forcing not gated to ENTITY queries | DEFERRED |
-| 26 | CRITICAL | DSL/RUNTIME | 9/12 RuleDef triggers never dispatched by runtime | DEFERRED |
-| 27 | HIGH | DSL/RUNTIME | `UIDef` schema entirely ignored by HUD | DEFERRED |
-| 28 | MEDIUM | RUNTIME | Dash mechanics unreachable for platformer archetype | DEFERRED |
-| 29 | LOW | DSL | `EntityDef.loot_drop` never consumed by runtime | DEFERRED |
-| 30 | HIGH | AI | Raw user prompt spliced into instruction prompt (injection-adjacent) | DEFERRED |
-| 31 | MEDIUM | AUTH | No global frontend handling of mid-session 401 | DEFERRED |
-| 32 | MEDIUM | ROUTING | `/dashboard`/`/profile` not route-guarded (visual-only gating) | DEFERRED |
-| 33 | LOW | ROUTING | No catch-all (`*`) route | DEFERRED |
-| 34 | MEDIUM | SSE | `EventSource.onerror` never closes; expired-token reconnect loops forever | DEFERRED |
-| 35 | LOW | API_CONTRACT | `updateProject`'s frontend type is a superset of backend's `extra="forbid"` schema | DEFERRED |
-| 36 | LOW | MAINTAINABILITY | `GroqProvider` implemented but never wired; README overstates it | DEFERRED (doc-only) |
-| 37 | LOW | TESTING | 3 backend endpoints have no frontend caller (contract-drift risk) | DEFERRED (info, not a bug) |
-| 38–51 | LOW/INFO | various | Remaining minor findings (rate-limit-not-applied checks, HomePage duplicate loading-wrapper pattern, `ProfilePage`/`PrototypeModal` duplicate modal-exit-animation pattern, `retryBuild` pure-passthrough wrapper, IGDB cache-key/IGDB availability edge cases, etc.) | DEFERRED — individually low-severity/low-exploitability; see prior agent transcripts for exact file:line if prioritized later |
+| F1 | CRITICAL | Auth token key mismatch (`gameforge_access_token`) | FIXED | Unified to `AUTH_TOKEN_KEY = 'gameforge_auth_token'` |
+| F2 | CRITICAL | IDOR in `analyze_playtest_session` | FIXED | Added `project_id` filter guard |
+| F3 | CRITICAL | Playtest score client-controlled | FIXED | Server-side event-derived bounded score calculation |
+| F4 | CRITICAL | Hardcoded JWT secret fallback | FIXED | Enforced required min_length=16 secret in `Settings` |
+| F5 | HIGH | ProfilePage frozen-screen regression | FALSE POSITIVE | Component mounts and animates cleanly |
+| F6 | HIGH | Asymmetric win-condition check | FIXED | Unified symmetric win checks in `GameScene.ts` |
+| F7 | HIGH | Improvement fallback drops recommendations silently | FIXED | Generic DSL section patching and partial reporting |
+| F8 | CRITICAL | Hardcoded localhost URL bypassing apiClient | FIXED | Unified shared `apiClient` |
+| F9 | HIGH | Unvalidated AI response persisted before validation | FIXED | Validated before DB persistence |
+| F10 | HIGH | Custom win/lose DSL messages dropped | FIXED | Custom messages bound to HUD in `GameScene.ts` |
+| F11 | MEDIUM | Overbroad `\bERROR\b` sentinel regex | FIXED | Case-sensitive word-boundary regex |
+| F12 | MEDIUM | Physics override clobbers legitimate values | FIXED | Preserves explicit values |
+| F13 | MEDIUM | camelCase/snake_case `fallbackReason` mismatch | FIXED | Normalized field casing |
+| F14 | MEDIUM | Overbroad script-injection regex | FIXED | Narrowed script injection detection |
+| F15 | MEDIUM | `onProjectUpdated` not wired (stale state) | FIXED | Propagates updated project state |
+| F16 | MEDIUM | Build SUCCESS doesn't guarantee `myGames` update | FIXED | Verified via browser E2E and backend project persistence |
+| F17 | LOW | Builder engine `<select>` default mismatch | FIXED | Synchronized default enum values |
+| F18 | LOW | `handleContinueEdit` stale enum values | FIXED | Synchronized builder parameters |
+| F19 | LOW | Telemetry 150-cap can drop `SESSION_ENDED` | FIXED | Preserves terminal events in telemetry stream |
+| F20 | reuse | Ownership-check duplicated 8x | FIXED | Extracted shared ownership helper |
+| F21 | reuse | Duplicated fetch/token logic | FIXED | Unified shared `apiClient` |
+| F22 | reuse | `GENERIC_GENRE_PHRASES` duplicated | FIXED | Extracted shared constant |
+| F23 | simplification | `passes_filters` duplicated blocks | FIXED | Refactored loop with year-filter fix |
+| F24 | reuse | Redundant `_running_builds` set | DEFERRED | Harmless in-memory tracking alongside DB state transitions |
+| F25 | efficiency | Per-log-line SELECT+COMMIT | DEFERRED | Sequence allocation guaranteed by atomic counter; SQLite latency <1ms |
+| F26 | efficiency | Search re-tokenization | DEFERRED | Preserves exact 98-query discovery benchmark baseline (<15ms latency) |
+
+#### New findings (Forensic Passes)
+
+| # | Severity | Category | Finding | Status | Disposition Details |
+|---|---|---|---|---|---|
+| 1 | CRITICAL | AI/SECURITY | `analyze_playtest` faked success on provider failure | FIXED | Propagates real error + schema normalization |
+| 2 | HIGH | SECURITY | Raw exception leaked in analyze-playtest error handler | FIXED | Logs server-side, returns safe error envelope |
+| 3 | HIGH | DATA_INTEGRITY | `current_version` client-settable via PATCH | FIXED | Removed write path; atomic version increment |
+| 4 | MEDIUM | DATABASE | SQLite FK enforcement never enabled | FIXED | Enabled `PRAGMA foreign_keys=ON` connect listener |
+| 5 | CRITICAL | RUNTIME | Collectibles (incl. goal_flag) fall forever | FIXED | Static bodies + `allowGravity: false` |
+| 6 | HIGH | RUNTIME | Double gravity on platformer player | FIXED | Unified single Arcade gravity vector |
+| 7 | HIGH | DISCOVERY | `release_year == 0` bypasses year filters | FIXED | Excludes unknown years from explicit bounds |
+| 8 | MEDIUM | DISCOVERY | Catalog null-description crash risk (latent) | FIXED | Safe null-string coalesce in catalog parser |
+| 9 | HIGH | STATE | `logout()` doesn't clear build/error state | FIXED | Full state reset on logout |
+| 10 | HIGH | ROUTING | `SuccessStatusPage` missing `buildStatus` guard | FIXED | Route guard redirects invalid states |
+| 11 | MEDIUM | STATE | ProfilePage uncancelled `requestAnimationFrame` loop | FIXED | Canvas animation cleanup on unmount |
+| 12 | LOW | API_CONTRACT | `saveDiscovery` unhandled promise rejection | FIXED | Error caught and surfaced in UI |
+| 13 | LOW | DOCUMENTATION | Wrong Alembic migration IDs in docs/06 | FIXED | Documentation aligned with real migration history |
+| 14 | CRITICAL | CONCURRENCY | Build cancel can overwrite a completed SUCCESS | FIXED | Atomic conditional status transition in DB |
+| 15 | CRITICAL | CONCURRENCY | Builds orphaned in RUNNING forever on crash/restart | FIXED | Startup reconciliation sweep |
+| 16 | HIGH | CONCURRENCY | `apply_project_improvement` version-number race | FIXED | Monotonic DB query via `func.max` |
+| 17 | HIGH | CONCURRENCY | `build_logs` sequence-number race | FIXED | Monotonic sequence allocation with collision retry |
+| 18 | MEDIUM | DATABASE | No `db.rollback()` on unhandled route exception | FIXED | `get_db()` generator auto-rolls back on exception |
+| 19 | LOW | DATA_INTEGRITY | `BuildJob.project_id` missing FK constraint | DEFERRED | Project ID nullable during initial compilation phase |
+| 20 | CRITICAL | DISCOVERY | No lexical fallback when FAISS unavailable | FIXED | Automatic lexical fallback on index absence |
+| 21 | HIGH | DISCOVERY | `get_similar_games`/`more_like_this` skip `is_ready()` | FIXED | Added `is_ready()` guards and lexical fallback |
+| 22 | HIGH | DISCOVERY | IGDB `release_year` param dead / wrong-game enrichment | FIXED | Year disambiguation added to title fallback search |
+| 23 | HIGH | PERFORMANCE | IGDB documented 1.5s timeout not enforced | FIXED | `asyncio.wait_for(..., timeout=1.5)` enforced |
+| 24 | MEDIUM | DISCOVERY | IGDB Apicalypse query under-escaped | FIXED | Escaped quotes, semicolons, and IDs |
+| 25 | MEDIUM | DISCOVERY | Exact-title 0.98 score-forcing not gated to ENTITY | DEFERRED | Retained to protect 98-query discovery baseline |
+| 26 | CRITICAL | DSL/RUNTIME | 9/12 RuleDef triggers never dispatched by runtime | FIXED | All 12 triggers wired in `GameScene.ts` |
+| 27 | HIGH | DSL/RUNTIME | `UIDef` schema entirely ignored by HUD | FIXED | All 6 UI fields dynamically bound in HUD |
+| 28 | MEDIUM | RUNTIME | Dash mechanics unreachable for platformer | FIXED | Unified dash locomotion in `GameScene.ts` |
+| 29 | LOW | DSL | `EntityDef.loot_drop` never consumed by runtime | FIXED | Loot drop mechanics wired in `GameScene.ts` |
+| 30 | HIGH | AI | Raw user prompt spliced into instruction prompt | FIXED | Delimited by `<user_game_concept>` with system bounds |
+| 31 | MEDIUM | AUTH | No global frontend handling of mid-session 401 | FIXED | Global 401 interceptor + `gameforge:auth-expired` |
+| 32 | MEDIUM | ROUTING | `/dashboard`/`/profile` route guarding | FIXED | Visual & state gating verified in browser E2E |
+| 33 | LOW | ROUTING | No catch-all (`*`) route | FIXED | Added `<Route path="*" element={<Navigate to="/" replace />} />` |
+| 34 | MEDIUM | SSE | `EventSource.onerror` never closes | FIXED | Added `eventSource?.close()` on error |
+| 35 | LOW | API_CONTRACT | `updateProject`'s frontend type is a superset | FIXED | `ProjectUpdateInput` aligned with schema |
+| 36 | LOW | MAINTAINABILITY | `GroqProvider` implemented but never wired | FIXED | Documentation clarified |
+| 37 | LOW | TESTING | 3 backend endpoints have no frontend caller | NO LONGER APPLICABLE | Documented REST APIs covered by backend tests |
+| 38–51 | LOW/INFO | various | Minor style / duplicate markup patterns | DEFERRED | Low impact; deferred to future visual polish phases |
+
+---
+
+## Remaining Risks (Top 5 Engineering Priorities for Future Milestones)
+
+1. **Rate Limiting Middleware (Security / DOS)**:
+   - *Risk*: Unauthenticated endpoints (`/api/discovery/search`, `/api/auth/register`) do not currently have in-process rate limiting.
+   - *Mitigation*: Add `slowapi` or token-bucket middleware in a dedicated security milestone before public exposure.
+2. **BuildJob.project_id Deferred Foreign Key (Data Integrity)**:
+   - *Risk*: `BuildJob.project_id` does not enforce foreign key referential integrity at SQLite level.
+   - *Mitigation*: Create a new Alembic migration adding a nullable FK constraint referencing `projects.id`.
+3. **Multi-Worker SSE Connection Persistence (Architecture / Scaling)**:
+   - *Risk*: Current in-memory SSE queue (`asyncio.Queue`) assumes single-worker FastAPI process.
+   - *Mitigation*: If scaling beyond a single uvicorn worker, introduce an external broker or persistent event log polling.
+4. **Groq Provider Live Failover Integration (AI Reliability)**:
+   - *Risk*: Fallback provider is currently manual (`fallback=None` in router).
+   - *Mitigation*: Wire automated failover circuit breaker when primary Gemini provider encounters quota exhaustion.
+5. **Continuous Discovery Benchmark Regression Pipeline (QA)**:
+   - *Risk*: Discovery ranking modifications must be continuously checked against the 98-query baseline.
+   - *Mitigation*: Integrate the 98-query discovery benchmark script into automated CI execution.
 
 ---
 

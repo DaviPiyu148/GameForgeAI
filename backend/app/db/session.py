@@ -30,9 +30,12 @@ Base = declarative_base()
 
 
 def get_db() -> Generator[Session, None, None]:
-    """FastAPI dependency for database sessions."""
+    """FastAPI dependency for database sessions with automatic rollback on unhandled exception."""
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

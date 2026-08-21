@@ -26,6 +26,16 @@ export interface GameProject {
   updatedAt?: string;
 }
 
+export interface ProjectUpdateInput {
+  title?: string;
+  genre?: string;
+  prompt?: string;
+  parameters?: BuildParams;
+  designSpec?: GameDesignSpec;
+  gameDsl?: GameDSL;
+  runtimeMetadata?: RuntimeMetadata;
+}
+
 export interface UserProfile {
   id: string;
   username: string;

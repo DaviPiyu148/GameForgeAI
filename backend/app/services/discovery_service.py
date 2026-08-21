@@ -93,30 +93,35 @@ class DiscoveryService:
                 results=[],
             )
 
-        if not self.index_manager.is_ready():
-            logger.error("DiscoveryService: FAISS index is not initialized or index file missing.")
-            raise RuntimeError("Discovery vector index is not available. Please ensure the index is built.")
+        top_k = max(request.limit * 5, 50)
+        semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
 
         # 1. Deterministic Query Understanding
         parsed_query = self.query_parser.parse(raw_prompt)
         logger.info("Parsed query '%s' as %s (target=%s)", raw_prompt, parsed_query.query_type, parsed_query.target_entity)
 
-        # 2. Semantic Retrieval via SentenceTransformer + FAISS
-        # For SIMILARITY queries, if a target game was identified, embed its rich semantic profile
-        if parsed_query.query_type == "SIMILARITY" and parsed_query.target_game:
-            embed_text = parsed_query.target_game.get("semantic_profile") or parsed_query.target_game.get("title")
+        # 2. Semantic Retrieval via SentenceTransformer + FAISS (if index ready)
+        if self.index_manager.is_ready():
+            try:
+                # For SIMILARITY queries, if a target game was identified, embed its rich semantic profile
+                if parsed_query.query_type == "SIMILARITY" and parsed_query.target_game:
+                    embed_text = parsed_query.target_game.get("semantic_profile") or parsed_query.target_game.get("title")
+                else:
+                    embed_text = parsed_query.clean_search_query or raw_prompt
+
+                query_vec = self.embedder.embed_query(embed_text)
+                raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(query_vec, top_k=top_k)
+
+                for gid, score in raw_sem_matches:
+                    game = self.catalog_manager.get_game(gid)
+                    if game is not None:
+                        semantic_candidates.append((game, score))
+            except Exception as e:
+                logger.warning(f"DiscoveryService: Semantic search failed, falling back to lexical: {e}")
         else:
-            embed_text = parsed_query.clean_search_query or raw_prompt
-
-        query_vec = self.embedder.embed_query(embed_text)
-        top_k = max(request.limit * 5, 50)
-        raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(query_vec, top_k=top_k)
-
-        semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
-        for gid, score in raw_sem_matches:
-            game = self.catalog_manager.get_game(gid)
-            if game is not None:
-                semantic_candidates.append((game, score))
+            logger.warning("DiscoveryService: FAISS index is not initialized or index file missing; using lexical fallback.")
+            if not self.lexical_index:
+                raise RuntimeError("Discovery vector index and lexical catalog are both unavailable.")
 
         # 3. Lexical Retrieval over Full Catalog (121k+ records)
         lexical_candidates: List[Tuple[Dict[str, Any], float, Dict[str, Any]]] = []
@@ -175,17 +180,22 @@ class DiscoveryService:
             extracted_player_modes=seed_game.get("player_modes", []),
         )
 
-        # Semantic retrieval with seed profile
-        query_vec = self.embedder.embed_query(semantic_profile)
         top_k = max(limit * 5, 50)
-        raw_sem = self.index_manager.search(query_vec, top_k=top_k)
-
         semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
-        for gid, score in raw_sem:
-            if str(gid) != str(seed_game.get("id")):  # Exclude seed game from similarity results
-                game = self.catalog_manager.get_game(gid)
-                if game:
-                    semantic_candidates.append((game, score))
+
+        # Semantic retrieval with seed profile (if index ready)
+        if self.index_manager.is_ready():
+            try:
+                query_vec = self.embedder.embed_query(semantic_profile)
+                raw_sem = self.index_manager.search(query_vec, top_k=top_k)
+
+                for gid, score in raw_sem:
+                    if str(gid) != str(seed_game.get("id")):  # Exclude seed game from similarity results
+                        game = self.catalog_manager.get_game(gid)
+                        if game:
+                            semantic_candidates.append((game, score))
+            except Exception as e:
+                logger.warning(f"DiscoveryService: Semantic search failed for similar games, using lexical fallback: {e}")
 
         # Lexical search using seed tags and genres
         lexical_query = f"{title} {' '.join(seed_game.get('genres', []))} {' '.join(seed_game.get('tags', [])[:3])}"
@@ -243,15 +253,21 @@ class DiscoveryService:
             target_game=seed_games[0],
         )
 
-        query_vec = self.embedder.embed_query(combined_profiles[:1000])
         top_k = max(request.limit * 5, 50)
-        raw_sem = self.index_manager.search(query_vec, top_k=top_k)
+        semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
 
-        semantic_candidates = [
-            (self.catalog_manager.get_game(gid), score)
-            for gid, score in raw_sem
-            if str(gid) not in seed_ids and self.catalog_manager.get_game(gid) is not None
-        ]
+        if self.index_manager.is_ready():
+            try:
+                query_vec = self.embedder.embed_query(combined_profiles[:1000])
+                raw_sem = self.index_manager.search(query_vec, top_k=top_k)
+
+                semantic_candidates = [
+                    (self.catalog_manager.get_game(gid), score)
+                    for gid, score in raw_sem
+                    if str(gid) not in seed_ids and self.catalog_manager.get_game(gid) is not None
+                ]
+            except Exception as e:
+                logger.warning(f"DiscoveryService: Semantic search failed for more_like_this, using lexical fallback: {e}")
 
         lexical_candidates: List[Tuple[Dict[str, Any], float, Dict[str, Any]]] = []
         if self.lexical_index:

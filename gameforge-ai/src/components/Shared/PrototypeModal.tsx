@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameDSL, Archetype, PlaytestSummary, PlaytestAnalysis, PlaytestRecommendation } from '../../runtime/types';
 import type { GameProject } from '../../types';
@@ -57,12 +57,12 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [isApplyingImprovement, setIsApplyingImprovement] = useState(false);
   const [improvementSuccess, setImprovementSuccess] = useState<string | null>(null);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       onClose();
     }, 250);
-  };
+  }, [onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,7 +72,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosing]);
+  }, [isClosing, handleClose]);
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && !isClosing) {

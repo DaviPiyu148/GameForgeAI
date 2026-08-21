@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import uuid
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
@@ -12,10 +13,37 @@ from app.api.discovery import router as discovery_router
 from app.api.auth import router as auth_router
 from app.api.saved_discoveries import router as saved_discoveries_router
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle context manager: sweep database on startup to reconcile any interrupted builds."""
+    from app.db.session import SessionLocal
+    from app.repositories.build_repo import build_repository
+    from sqlalchemy.exc import OperationalError
+    db = SessionLocal()
+    try:
+        reconciled = build_repository.reconcile_orphaned_builds(db)
+        if reconciled > 0:
+            import logging
+            logging.getLogger("gameforge").info(
+                f"Reconciled {reconciled} orphaned build(s) to ERROR state on startup."
+            )
+    except OperationalError:
+        # Table not created yet (e.g. in test setup before Base.metadata.create_all)
+        pass
+    except Exception as e:
+        import logging
+        logging.getLogger("gameforge").warning(f"Startup orphan reconciliation skipped: {e}")
+    finally:
+        db.close()
+    yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="GameForge AI Modular Monolith API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration
@@ -86,30 +114,6 @@ app.include_router(projects_router, prefix="/api")
 app.include_router(builds_router, prefix="/api")
 app.include_router(discovery_router, prefix="/api")
 app.include_router(saved_discoveries_router, prefix="/api")  # B7: /api/saved-discoveries/*
-
-
-@app.on_event("startup")
-def startup_orphan_reconciliation():
-    """Sweep database on startup to reconcile any interrupted builds."""
-    from app.db.session import SessionLocal
-    from app.repositories.build_repo import build_repository
-    from sqlalchemy.exc import OperationalError
-    db = SessionLocal()
-    try:
-        reconciled = build_repository.reconcile_orphaned_builds(db)
-        if reconciled > 0:
-            import logging
-            logging.getLogger("gameforge").info(
-                f"Reconciled {reconciled} orphaned build(s) to ERROR state on startup."
-            )
-    except OperationalError:
-        # Table not created yet (e.g. in test setup before Base.metadata.create_all)
-        pass
-    except Exception as e:
-        import logging
-        logging.getLogger("gameforge").warning(f"Startup orphan reconciliation skipped: {e}")
-    finally:
-        db.close()
 
 
 @app.get("/")

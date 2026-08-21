@@ -192,9 +192,10 @@ class IGDBEnrichmentService:
                 "Accept": "application/json",
             }
 
+            clean_uid = steam_app_id.replace('"', '').replace(';', '')
             # 1. Search IGDB external_games by steam category (category 1 = Steam)
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                query_body = f'fields game, uid, category; where category = 1 & uid = "{steam_app_id}"; limit 1;'
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                query_body = f'fields game, uid, category; where category = 1 & uid = "{clean_uid}"; limit 1;'
                 res = await client.post(IGDB_EXTERNAL_GAMES_URL, headers=headers, content=query_body)
                 
                 igdb_game_id = None
@@ -203,15 +204,26 @@ class IGDBEnrichmentService:
                     if external_records and len(external_records) > 0:
                         igdb_game_id = external_records[0].get("game")
 
-                # 2. Fallback: search by exact normalized title if external_games missed
+                # 2. Fallback: search by normalized title if external_games missed
                 if not igdb_game_id:
-                    clean_t = title.replace('"', '\\"')
-                    title_query = f'fields id, name; search "{clean_t}"; limit 1;'
-                    res_title = await client.post(IGDB_GAMES_URL, headers=headers, content=title_query)
-                    if res_title.status_code == 200:
-                        title_records = res_title.json()
-                        if title_records and len(title_records) > 0:
-                            igdb_game_id = title_records[0].get("id")
+                    clean_t = title.replace('"', '\\"').replace(';', ' ').strip()
+                    if clean_t:
+                        title_query = f'fields id, name, release_dates.y; search "{clean_t}"; limit 5;'
+                        res_title = await client.post(IGDB_GAMES_URL, headers=headers, content=title_query)
+                        if res_title.status_code == 200:
+                            title_records = res_title.json()
+                            if title_records and len(title_records) > 0:
+                                # Disambiguate by release_year if available
+                                matched_record = title_records[0]
+                                if release_year > 0:
+                                    for rec in title_records:
+                                        rec_years = [
+                                            rd.get("y") for rd in rec.get("release_dates", []) if rd.get("y")
+                                        ]
+                                        if release_year in rec_years:
+                                            matched_record = rec
+                                            break
+                                igdb_game_id = matched_record.get("id")
 
                 if not igdb_game_id:
                     enrichment = GameEnrichment(status="NOT_FOUND")
@@ -310,7 +322,10 @@ class IGDBEnrichmentService:
         ]
 
         try:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=1.5,
+            )
             for g, res in zip(missing, results):
                 gid = str(g.get("external_id") or g.get("id"))
                 if isinstance(res, GameEnrichment):

@@ -67,6 +67,17 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
     const response = await fetch(url, config);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        try {
+          if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            window.dispatchEvent(new CustomEvent('gameforge:auth-expired'));
+          }
+        } catch {
+          // localStorage unavailable
+        }
+      }
+
       let errorCode = 'HTTP_ERROR';
       let errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
       let requestId: string | undefined;

@@ -176,9 +176,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [state.currentBuildParams, state.currentPrompt]);
 
-  // Cleanup SSE on unmount
+  // Cleanup SSE and global auth-expired listener on unmount
   useEffect(() => {
+    const handleAuthExpired = () => {
+      authStorage.clearToken();
+      setState((s) => ({
+        ...s,
+        user: null,
+        authStatus: 'UNAUTHENTICATED',
+        myGames: [],
+        savedDiscoveries: [],
+      }));
+    };
+
+    window.addEventListener('gameforge:auth-expired', handleAuthExpired);
+
     return () => {
+      window.removeEventListener('gameforge:auth-expired', handleAuthExpired);
       if (unsubscribeSseRef.current) {
         unsubscribeSseRef.current();
         unsubscribeSseRef.current = null;
@@ -527,6 +541,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAppContext = () => {
   const context = useContext(AppContext);
   if (context === undefined) {

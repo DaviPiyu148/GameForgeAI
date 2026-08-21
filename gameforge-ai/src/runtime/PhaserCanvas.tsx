@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import type { GameDSL, GameState, PlaytestSummary } from './types';
 import { GameScene } from './GameScene';
@@ -25,7 +25,7 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
     onPlaytestCompleteRef.current = onPlaytestComplete;
   }, [onPlaytestComplete]);
 
-  const handleRestart = () => {
+  const handleRestart = useCallback(() => {
     if (gameRef.current) {
       gameRef.current.scene.stop('GameScene');
       gameRef.current.scene.start('GameScene', {
@@ -46,9 +46,9 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
         containerRef.current?.querySelector('canvas')?.focus();
       }, 50);
     }
-  };
+  }, [gameDsl, seed]);
 
-  const handleTogglePause = () => {
+  const handleTogglePause = useCallback(() => {
     if (gameRef.current) {
       const scene = gameRef.current.scene.getScene('GameScene');
       if (scene) {
@@ -61,7 +61,7 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
         }
       }
     }
-  };
+  }, [gameState]);
 
   // Keyboard shortcut listener for P (Pause/Resume) and R (Restart)
   useEffect(() => {
@@ -80,7 +80,7 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, gameDsl, seed]);
+  }, [handleTogglePause, handleRestart]);
 
   useEffect(() => {
     if (!containerRef.current) return;

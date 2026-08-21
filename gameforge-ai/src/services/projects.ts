@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { GameProject } from '../types';
+import type { GameProject, ProjectUpdateInput } from '../types';
 
 interface ProjectListApiResponse {
   projects: GameProject[];
@@ -26,7 +26,8 @@ export const projectService = {
   /**
    * Update permitted fields on a project.
    */
-  async updateProject(id: string, data: Partial<GameProject>): Promise<GameProject> {
+  async updateProject(id: string, data: ProjectUpdateInput): Promise<GameProject> {
     return await apiClient.patch<GameProject>(`/projects/${id}`, data);
   },
 };
+
