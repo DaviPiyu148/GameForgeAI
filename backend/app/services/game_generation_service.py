@@ -251,7 +251,12 @@ class GameGenerationService:
 
             if raw_provider == "gemini":
                 human_provider = "Google Gemini"
-                human_model = "Gemma 4 31B" if "gemma" in model_id.lower() else model_id
+                if "gemini" in model_id.lower():
+                    human_model = "Gemini 3 Flash Preview" if "flash" in model_id.lower() else model_id
+                elif "gemma" in model_id.lower():
+                    human_model = "Gemma 4 31B"
+                else:
+                    human_model = model_id
             elif raw_provider == "groq":
                 human_provider = "Groq"
                 human_model = "Llama 3.1 8B" if "llama-3.1" in model_id.lower() else model_id

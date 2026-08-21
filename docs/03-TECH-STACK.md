@@ -23,7 +23,7 @@
 - In-memory sliding window rate limiting
 
 ## AI
-- Primary Provider: Google Gemini (Gemma 4 31B, API identifier: `gemma-4-31b-it`, OpenAI-compatible REST API)
+- Primary Provider: Google Gemini (Gemini 3 Flash Preview, API identifier: `gemini-3-flash-preview`, OpenAI-compatible REST API)
 - Fallback Provider: Groq (Llama 3.1 8B, API identifier: `llama-3.1-8b-instant`, infrastructure availability fallback only)
 - Provider abstraction & router (`AIProviderRouter`)
 - Structured JSON output with Pydantic validation & bounded repair

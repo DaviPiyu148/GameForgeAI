@@ -102,7 +102,9 @@ export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalPro
                   <div className="flex justify-between border-b border-outline-variant/20 pb-1">
                     <span>AI Model:</span>
                     <span className="text-primary font-bold">
-                      {project.runtimeMetadata.model.includes('gemma-4-31b-it')
+                      {project.runtimeMetadata.model.includes('gemini-3-flash-preview')
+                        ? 'Gemini 3 Flash Preview'
+                        : project.runtimeMetadata.model.includes('gemma-4-31b-it')
                         ? 'Gemma 4 31B'
                         : project.runtimeMetadata.model}
                     </span>

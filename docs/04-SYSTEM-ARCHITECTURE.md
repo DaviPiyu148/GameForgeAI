@@ -14,7 +14,7 @@ FastAPI Modular API
    +-- Project Service ----------> SQLite (Projects, ProjectVersions, PlaytestSessions)
    +-- Build Service ------------> BuildJob / BuildLog SSE Dispatcher
    +-- Discovery Service --------> FAISS Dense Vector Index + BM25 Lexical Normalization
-   +-- AI Service ---------------> Hosted Gemini Provider (gemma-4-31b-it)
+   +-- AI Service ---------------> Hosted Gemini Provider (gemini-3-flash-preview)
    +-- Game Generation Service --> Dual Schema & Gameplay Quality Validator
                                        |
                                        v
@@ -27,7 +27,7 @@ FastAPI Modular API
 
 ## Game Generation V2 Pipeline
 1. **User Idea / Prompt** submitted to `POST /api/builds` with real configuration parameters (Profile preset, Visual density, Physics complexity, Logic modules).
-2. **AI Game Design**: Gemini (`gemma-4-31b-it`) generates dual structured payload: `GameDesignSpec` (gameplay pillars, objectives, rationale) and `GameDSL` (schema v2.0 primitives).
+2. **AI Game Design**: Gemini (`gemini-3-flash-preview`) generates dual structured payload: `GameDesignSpec` (gameplay pillars, objectives, rationale) and `GameDSL` (schema v2.0 primitives).
 3. **Dual Validation**:
    - **Schema Validation**: Pydantic v2 type and bound checks + script injection detection.
    - **Gameplay Quality Validation**: Deterministic clearance, reachability, win/loss rule fairness, and speed checks.

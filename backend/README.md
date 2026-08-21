@@ -37,7 +37,7 @@ backend/
 │   ├── ai/                   # AI Provider abstraction & prompts
 │   │   ├── __init__.py
 │   │   ├── provider.py       # AIProvider abstract class & AIError taxonomy
-│   │   ├── hosted_provider.py # GeminiProvider (gemma-4-31b-it), GroqProvider, AIProviderRouter
+│   │   ├── hosted_provider.py # GeminiProvider (gemini-3-flash-preview), GroqProvider, AIProviderRouter
 │   │   └── prompts.py        # System, generation, and repair prompt templates
 │   ├── generation/           # Game DSL schemas & validation
 │   │   ├── __init__.py

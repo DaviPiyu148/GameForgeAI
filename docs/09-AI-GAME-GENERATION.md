@@ -32,7 +32,7 @@ REBUILD / VERSION PROTOTYPE (v1 → v2 → v3)
 ```
 
 ## Provider Abstraction & Model Invariants
-- **Active Provider**: Google Gemini (Gemma 4 31B, identifier: `gemma-4-31b-it`).
+- **Active Provider**: Google Gemini (Gemini 3 Flash Preview, identifier: `gemini-3-flash-preview`).
 - **Safety Boundary**: The model outputs structured JSON only (`GameDesignSpec` + `GameDSL`).
 - **Zero Arbitrary Execution**: Never generate raw JavaScript, never use `eval()` or `new Function()`.
 - **Compiler Logs**: Real structured build progress emitted via SSE.

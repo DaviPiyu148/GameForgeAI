@@ -38,7 +38,7 @@ class BaseHostedProvider(AIProvider):
     def _clean_json_text(self, text: str) -> str:
         """Strip thought tags, markdown codeblock wrappers, and extract clean JSON."""
         cleaned = text.strip()
-        # 1. Remove reasoning/thought tags (e.g. <thought>...</thought> emitted by Gemma 4 31B)
+        # 1. Remove reasoning/thought tags (e.g. <thought>...</thought> emitted by reasoning models)
         cleaned = re.sub(r"<(?:thought|think)>.*?</(?:thought|think)>", "", cleaned, flags=re.DOTALL | re.IGNORECASE).strip()
         # 2. Strip markdown codeblocks
         if cleaned.startswith("```"):
@@ -141,7 +141,12 @@ class BaseHostedProvider(AIProvider):
                 raise ModelInvalidResponseError("Model output did not parse into a top-level JSON object.")
 
             provider_display = "Google Gemini" if self.provider_name == "gemini" else self.provider_name.capitalize()
-            model_display = "Gemma 4 31B" if "gemma" in self.model.lower() else self.model
+            if "gemini" in self.model.lower():
+                model_display = "Gemini 3 Flash Preview" if "flash" in self.model.lower() else self.model
+            elif "gemma" in self.model.lower():
+                model_display = "Gemma 4 31B"
+            else:
+                model_display = self.model
 
             meta = {
                 "provider": self.provider_name,
@@ -171,7 +176,7 @@ class GeminiProvider(BaseHostedProvider):
         timeout: Optional[float] = None,
     ):
         resolved_key = api_key if api_key is not None else (settings.GEMINI_API_KEY or settings.AI_API_KEY)
-        resolved_model = model if model is not None else (settings.GEMINI_MODEL or settings.AI_MODEL or "gemma-4-31b-it")
+        resolved_model = model if model is not None else (settings.GEMINI_MODEL or settings.AI_MODEL or "gemini-3-flash-preview")
         resolved_url = base_url if base_url is not None else (settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai")
 
         super().__init__(
@@ -209,7 +214,7 @@ class RotatingGeminiProvider(AIProvider):
         timeout: Optional[float] = None,
     ):
         self._keys: List[str] = [k for k in (api_keys if api_keys is not None else settings.gemini_api_key_pool()) if k]
-        self.model = model or (settings.GEMINI_MODEL or settings.AI_MODEL or "gemma-4-31b-it")
+        self.model = model or (settings.GEMINI_MODEL or settings.AI_MODEL or "gemini-3-flash-preview")
         self.base_url = (base_url or settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
         self.timeout = timeout or settings.AI_TIMEOUT_SECONDS
         self._index = 0
@@ -311,7 +316,7 @@ class HostedOpenAIProvider(BaseHostedProvider):
 class AIProviderRouter(AIProvider):
     """
     Provider Router:
-    - Primary: Google Gemini (Gemma 4 31B: `gemma-4-31b-it`), rotating across every
+    - Primary: Google Gemini (Gemini 3 Flash Preview: `gemini-3-flash-preview`), rotating across every
       configured `GEMINI_API_KEY`/`GEMINI_API_KEYS` if more than one key is set.
     - Optional Fallback: Groq (if explicitly injected, otherwise none)
     """

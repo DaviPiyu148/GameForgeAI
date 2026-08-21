@@ -37,7 +37,7 @@ async def test_gemini_missing_api_key_raises_configuration_error():
 
 @pytest.mark.asyncio
 async def test_gemini_valid_structured_response_parsing(monkeypatch):
-    """Test clean parsing of valid JSON output from Gemini provider with gemma-4-31b-it model payload."""
+    """Test clean parsing of valid JSON output from Gemini provider with gemini-3-flash-preview model payload."""
     expected_dict = {
         "schema_version": "1.0",
         "metadata": {
@@ -108,17 +108,17 @@ async def test_gemini_valid_structured_response_parsing(monkeypatch):
 
     provider = GeminiProvider(
         api_key="test-gemini-key",
-        model="gemma-4-31b-it",
+        model="gemini-3-flash-preview",
     )
-    assert provider.model == "gemma-4-31b-it"
+    assert provider.model == "gemini-3-flash-preview"
     result, meta = await provider.generate_structured_with_meta("System", "User")
     assert result == expected_dict
     assert meta["provider"] == "gemini"
-    assert meta["model"] == "gemma-4-31b-it"
+    assert meta["model"] == "gemini-3-flash-preview"
     assert meta["provider_display_name"] == "Google Gemini"
-    assert meta["model_display_name"] == "Gemma 4 31B"
+    assert meta["model_display_name"] == "Gemini 3 Flash Preview"
     assert meta["fallback_used"] is False
-    assert sent_payload.get("model") == "gemma-4-31b-it"
+    assert sent_payload.get("model") == "gemini-3-flash-preview"
     assert sent_headers.get("Authorization") == "Bearer test-gemini-key"
 
 
@@ -143,7 +143,7 @@ async def test_gemini_markdown_codeblock_stripping(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_gemini_thought_tags_stripping(monkeypatch):
-    """Test that <thought>...</thought> tags from Gemma are cleanly stripped by GeminiProvider."""
+    """Test that <thought>...</thought> tags from reasoning models are cleanly stripped by GeminiProvider."""
     expected_dict = {"schema_version": "1.0", "test": "clean"}
     raw_with_thoughts = f"<thought>\nThinking about the game design...\n</thought>\n{json.dumps(expected_dict)}"
 
@@ -251,13 +251,13 @@ async def test_router_with_gemini_primary(monkeypatch):
 
     monkeypatch.setattr(httpx.AsyncClient, "post", mock_gemini_post)
 
-    primary = GeminiProvider(api_key="test-key-123", model="gemma-4-31b-it")
+    primary = GeminiProvider(api_key="test-key-123", model="gemini-3-flash-preview")
     router = AIProviderRouter(primary=primary)
 
     result, meta = await router.generate_structured_with_meta("System", "User")
     assert result == expected_dsl
     assert meta["provider"] == "gemini"
-    assert meta["model"] == "gemma-4-31b-it"
+    assert meta["model"] == "gemini-3-flash-preview"
     assert meta["fallback_used"] is False
 
 

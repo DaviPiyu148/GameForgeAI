@@ -14,7 +14,7 @@ async def test_generation():
     
     prompt = "Cyberpunk neon survival arena with roaming drone enemies and health crystals"
     
-    print("Requesting Game DSL generation from Google Gemini (Gemma 4 31B: gemma-4-31b-it)...")
+    print("Requesting Game DSL generation from Google Gemini (Gemini 3 Flash Preview: gemini-3-flash-preview)...")
     start_time = asyncio.get_event_loop().time()
     try:
         result = await service.generate_game_dsl(

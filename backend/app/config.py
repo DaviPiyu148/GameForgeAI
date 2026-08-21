@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # deployment spread requests across multiple keys/projects to stay under each
     # key's individual rate limit rather than being bottlenecked by one key.
     GEMINI_API_KEYS: Optional[str] = None
-    GEMINI_MODEL: str = "gemma-4-31b-it"
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
 
     # Groq Fallback Provider
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
     # Generic AI settings (mapped dynamically)
-    AI_MODEL: str = "gemma-4-31b-it"
+    AI_MODEL: str = "gemini-3-flash-preview"
     AI_API_KEY: Union[str, None] = None
     AI_BASE_URL: Union[str, None] = None
 

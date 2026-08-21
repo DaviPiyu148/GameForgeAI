@@ -12,7 +12,7 @@ backend/
     models/           # SQLAlchemy 2.0 ORM models (User, Project, ProjectVersion, PlaytestSession, BuildJob, BuildLog)
     repositories/     # Data access boundaries
     services/         # Business logic (ProjectService, BuildService, GameGenerationService, DiscoveryService, AuthService)
-    ai/               # AI prompts & provider router (Gemini Gemma 4 31B: gemma-4-31b-it)
+    ai/               # AI prompts & provider router (Gemini 3 Flash Preview: gemini-3-flash-preview)
     generation/       # GameDSL, GameDesignSpec, GameplayQualityValidator, PRNG & Procedural logic
     search/           # Hybrid semantic (FAISS) + lexical (BM25) discovery with IGDB enrichment
     runtime/          # Capability matrix & compatibility validator

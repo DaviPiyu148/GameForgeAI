@@ -109,7 +109,7 @@ B0–B7 + Discovery 2.0–2.2 + Game Generation V2 fully operational:
   - `GET /api/projects/{id}/versions`: List version history.
 
 ## AI Provider Invariants
-Active Provider: Google Gemini (Gemma 4 31B: `gemma-4-31b-it`). Zero arbitrary script execution. Closed capability set.
+Active Provider: Google Gemini (Gemini 3 Flash Preview: `gemini-3-flash-preview`). Zero arbitrary script execution. Closed capability set.
 
 ## State Ownership
 - `users`: Backend database (`users` table).
