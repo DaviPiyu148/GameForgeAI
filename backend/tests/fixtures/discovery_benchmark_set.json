@@ -1,0 +1,688 @@
+[
+  {
+    "id": "q01",
+    "prompt": "cyberpunk",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Cyberpunk 2077", "cyberpunkdreams", "Silicon Dreams"],
+    "description": "Topic search for cyberpunk genre"
+  },
+  {
+    "id": "q02",
+    "prompt": "cyberpunk 2077",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Cyberpunk 2077"],
+    "description": "Exact entity search for Cyberpunk 2077"
+  },
+  {
+    "id": "q03",
+    "prompt": "stardew valley",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Stardew Valley"],
+    "description": "Exact entity search for Stardew Valley"
+  },
+  {
+    "id": "q04",
+    "prompt": "stardew",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Stardew Valley"],
+    "description": "Alias search for Stardew Valley"
+  },
+  {
+    "id": "q05",
+    "prompt": "witcher 3",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["The Witcher 3: Wild Hunt"],
+    "description": "Alias search for Witcher 3"
+  },
+  {
+    "id": "q06",
+    "prompt": "elden ring",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["ELDEN RING"],
+    "description": "Exact entity search for Elden Ring"
+  },
+  {
+    "id": "q07",
+    "prompt": "terraria",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Terraria"],
+    "description": "Exact entity search for Terraria"
+  },
+  {
+    "id": "q08",
+    "prompt": "hollow knight",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Hollow Knight"],
+    "description": "Exact entity search for Hollow Knight"
+  },
+  {
+    "id": "q09",
+    "prompt": "hades",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Hades"],
+    "description": "Exact entity search for Hades"
+  },
+  {
+    "id": "q10",
+    "prompt": "subnautica",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Subnautica"],
+    "description": "Exact entity search for Subnautica"
+  },
+  {
+    "id": "q11",
+    "prompt": "valheim",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Valheim"],
+    "description": "Exact entity search for Valheim"
+  },
+  {
+    "id": "q12",
+    "prompt": "deep rock galactic",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Deep Rock Galactic"],
+    "description": "Exact entity search for Deep Rock Galactic"
+  },
+  {
+    "id": "q13",
+    "prompt": "factorio",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Factorio"],
+    "description": "Exact entity search for Factorio"
+  },
+  {
+    "id": "q14",
+    "prompt": "rimworld",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["RimWorld"],
+    "description": "Exact entity search for RimWorld"
+  },
+  {
+    "id": "q15",
+    "prompt": "slay the spire",
+    "expected_query_type": "ENTITY",
+    "expected_landmarks": ["Slay the Spire"],
+    "description": "Exact entity search for Slay the Spire"
+  },
+  {
+    "id": "q16",
+    "prompt": "games like Stardew Valley",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Stardew Valley", "Terraria", "Farm Together 2", "Wildermyth"],
+    "description": "Similarity query for games like Stardew Valley"
+  },
+  {
+    "id": "q17",
+    "prompt": "similar to Cyberpunk 2077",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Cyberpunk 2077"],
+    "description": "Similarity query for Cyberpunk 2077"
+  },
+  {
+    "id": "q18",
+    "prompt": "more like Hades",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Hades"],
+    "description": "Similarity query for Hades"
+  },
+  {
+    "id": "q19",
+    "prompt": "games like Terraria",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Terraria"],
+    "description": "Similarity query for Terraria"
+  },
+  {
+    "id": "q20",
+    "prompt": "games like Subnautica",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Subnautica"],
+    "description": "Similarity query for Subnautica"
+  },
+  {
+    "id": "q21",
+    "prompt": "games like Slay the Spire",
+    "expected_query_type": "SIMILARITY",
+    "expected_landmarks": ["Slay the Spire"],
+    "description": "Similarity query for Slay the Spire"
+  },
+  {
+    "id": "q22",
+    "prompt": "soulslike",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["DARK SOULS™ III", "ELDEN RING", "ARMORED CORE™ VI FIRES OF RUBICON™", "REMNANT II®"],
+    "description": "Topic search for soulslike"
+  },
+  {
+    "id": "q23",
+    "prompt": "roguelike",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Hades", "Dead Cells", "The Binding of Isaac: Rebirth", "Risk of Rain 2"],
+    "description": "Topic search for roguelike"
+  },
+  {
+    "id": "q24",
+    "prompt": "metroidvania",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Hollow Knight", "Dead Cells"],
+    "description": "Topic search for metroidvania"
+  },
+  {
+    "id": "q25",
+    "prompt": "deckbuilder",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Slay the Spire"],
+    "description": "Topic search for deckbuilder"
+  },
+  {
+    "id": "q26",
+    "prompt": "farming game",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Stardew Valley", "Farming Simulator", "Pure Farming 2018"],
+    "description": "Topic search for farming game"
+  },
+  {
+    "id": "q27",
+    "prompt": "city builder",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Cities: Skylines", "Frostpunk", "Manor Lords", "Townscaper"],
+    "description": "Topic search for city builder"
+  },
+  {
+    "id": "q28",
+    "prompt": "survival horror",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Resident Evil", "Dead Space", "Signalis"],
+    "description": "Topic search for survival horror"
+  },
+  {
+    "id": "q29",
+    "prompt": "tower defense",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Bloons TD", "Kingdom Rush", "Plants vs. Zombies"],
+    "description": "Topic search for tower defense"
+  },
+  {
+    "id": "q30",
+    "prompt": "sandbox",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Terraria", "Garry's Mod", "People Playground"],
+    "description": "Topic search for sandbox"
+  },
+  {
+    "id": "q31",
+    "prompt": "cozy farming simulator",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Stardew Valley", "Garden In!", "Cozy Grove", "Farm Together 2"],
+    "description": "Concept search for cozy farming simulator"
+  },
+  {
+    "id": "q32",
+    "prompt": "cozy simulator",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Garden Life: A Cozy Simulator", "Cozy Time", "Tavern Manager Simulator"],
+    "description": "Concept search for cozy simulator"
+  },
+  {
+    "id": "q33",
+    "prompt": "space survival",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Subnautica", "No Man's Sky", "The Pioneers: Surviving Desolation", "Tin Can"],
+    "description": "Concept search for space survival"
+  },
+  {
+    "id": "q34",
+    "prompt": "co-op roguelike",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Risk of Rain 2", "Deep Rock Galactic", "Rogue Glitch Ultra", "Sven Co-op"],
+    "description": "Mixed search for co-op roguelike"
+  },
+  {
+    "id": "q35",
+    "prompt": "cyberpunk open world RPG",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Cyberpunk 2077"],
+    "description": "Mixed search for cyberpunk open world RPG"
+  },
+  {
+    "id": "q36",
+    "prompt": "2D pixel art action platformer",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Dead Cells", "Hollow Knight", "Celeste", "Katana ZERO"],
+    "description": "Concept search for 2D pixel art action platformer"
+  },
+  {
+    "id": "q37",
+    "prompt": "relaxing underwater exploration and crafting",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Subnautica", "ABZU", "Dave the Diver"],
+    "description": "Concept search for underwater crafting"
+  },
+  {
+    "id": "q38",
+    "prompt": "factory automation and logistics",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Factorio", "Satisfactory", "Dyson Sphere Program", "Mindustry"],
+    "description": "Concept search for factory automation"
+  },
+  {
+    "id": "q39",
+    "prompt": "dark fantasy dungeon crawler with permadeath",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Darkest Dungeon", "DARK SOULS™ III", "ELDEN RING"],
+    "description": "Concept search for dark fantasy dungeon crawler"
+  },
+  {
+    "id": "q40",
+    "prompt": "colony management on an alien planet",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["RimWorld", "Surviving Mars", "Oxygen Not Included"],
+    "description": "Concept search for colony management on alien planet"
+  },
+  {
+    "id": "q41",
+    "prompt": "turn-based tactical strategy with grid combat",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Into the Breach", "XCOM", "Battle Brothers", "Divinity: Original Sin 2"],
+    "description": "Concept search for tactical grid combat"
+  },
+  {
+    "id": "q42",
+    "prompt": "fast-paced rhythm action game",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Crypt of the NecroDancer", "Hi-Fi RUSH", "BPM: BULLETS PER MINUTE"],
+    "description": "Concept search for rhythm action"
+  },
+  {
+    "id": "q43",
+    "prompt": "post-apocalyptic open world survival",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Fallout", "Rust", "DayZ", "Project Zomboid"],
+    "description": "Concept search for post-apocalyptic open world"
+  },
+  {
+    "id": "q44",
+    "prompt": "detective investigation murder mystery",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Disco Elysium", "Return of the Obra Dinn", "Shadows of Doubt"],
+    "description": "Concept search for detective murder mystery"
+  },
+  {
+    "id": "q45",
+    "prompt": "top-down twin stick shooter with upgrades",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Enter the Gungeon", "Synthetik", "Nuclear Throne"],
+    "description": "Concept search for twin-stick shooter"
+  },
+  {
+    "id": "q46",
+    "prompt": "chill puzzle game with cozy atmosphere",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Dorfromantik", "Unpacking", "Townscaper", "A Short Hike"],
+    "description": "Concept search for chill puzzle game"
+  },
+  {
+    "id": "q47",
+    "prompt": "hardcore medieval sword combat simulator",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Kingdom Come: Deliverance", "Chivalry 2", "Mordhau", "Mount & Blade"],
+    "description": "Concept search for medieval sword combat"
+  },
+  {
+    "id": "q48",
+    "prompt": "stealth ninja assassination game",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Mark of the Ninja", "Sekiro", "Aragami", "Shadow Tactics"],
+    "description": "Concept search for stealth ninja game"
+  },
+  {
+    "id": "q49",
+    "prompt": "space trading and combat simulation",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Elite Dangerous", "X4: Foundations", "No Man's Sky", "Everspace"],
+    "description": "Concept search for space trading and combat"
+  },
+  {
+    "id": "q50",
+    "prompt": "card battler roguelike with branching paths",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Slay the Spire", "Monster Train", "Inscryption"],
+    "description": "Concept search for card battler roguelike"
+  },
+  {
+    "id": "q51",
+    "prompt": "single-player story-rich psychological horror",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["SOMA", "Alan Wake", "Signalis", "Silent Hill"],
+    "description": "Concept search for psychological horror"
+  },
+  {
+    "id": "q52",
+    "prompt": "4 player co-op zombie horde shooter",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Left 4 Dead 2", "Killing Floor 2", "Warhammer: Vermintide 2"],
+    "description": "Mixed search for 4 player co-op zombie shooter"
+  },
+  {
+    "id": "q53",
+    "prompt": "bullet hell arena survival with auto-shooting",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Vampire Survivors", "Brotato", "20 Minutes Till Dawn", "Halls of Torment"],
+    "description": "Concept search for auto-shooter survivor arena"
+  },
+  {
+    "id": "q54",
+    "prompt": "cute life simulation with animal neighbors",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Animal Crossing", "Cozy Grove", "Castaway Paradise", "Stardew Valley"],
+    "description": "Concept search for cute animal life sim"
+  },
+  {
+    "id": "q55",
+    "prompt": "deep sea oceanic survival with submarines",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Subnautica", "Barotrauma", "Iron Lung"],
+    "description": "Concept search for deep sea submarine survival"
+  },
+  {
+    "id": "q56",
+    "prompt": "2D physics destruction sandbox",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Noita", "People Playground", "Besiege", "Teardown"],
+    "description": "Concept search for physics destruction sandbox"
+  },
+  {
+    "id": "q57",
+    "prompt": "isometric action RPG loot grinder",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Grim Dawn", "Path of Exile", "Diablo", "Torchlight"],
+    "description": "Concept search for ARPG loot grinder"
+  },
+  {
+    "id": "q58",
+    "prompt": "historical grand strategy empire management",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Crusader Kings III", "Europa Universalis IV", "Hearts of Iron IV", "Civilization"],
+    "description": "Concept search for grand strategy empire"
+  },
+  {
+    "id": "q59",
+    "prompt": "difficult precision platformer with instant respawn",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Celeste", "Super Meat Boy", "The End is Nigh"],
+    "description": "Concept search for precision platformer"
+  },
+  {
+    "id": "q60",
+    "prompt": "procedural voxel open world crafting and mining",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Minecraft", "Vintage Story", "Cube World", "Terraria"],
+    "description": "Concept search for voxel open world crafting"
+  },
+  {
+    "id": "q61",
+    "prompt": "cyberpunk immersive sim with hacking and choices",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Deus Ex", "Cyberpunk 2077", "System Shock"],
+    "description": "Mixed search for cyberpunk immersive sim"
+  },
+  {
+    "id": "q62",
+    "prompt": "whimsical wholesome narrative adventure",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["A Short Hike", "Chicory: A Colorful Tale", "To the Moon"],
+    "description": "Concept search for whimsical wholesome adventure"
+  },
+  {
+    "id": "q63",
+    "prompt": "xyzzy nonexistent quantum unicorn hyperspace game 99999",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": [],
+    "description": "Synthetic no-match / low relevance test query"
+  },
+  {
+    "id": "ml_en01",
+    "prompt": "cozy farming simulator",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Stardew Valley", "Farming Simulator", "Garden Life", "Coral Island", "Sun Haven"],
+    "description": "English concept search for cozy farming (Stardew Valley has Cyrillic/Russian source metadata)"
+  },
+  {
+    "id": "ml_en02",
+    "prompt": "2D crafting sandbox survival",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Terraria", "Starbound", "Necesse", "Core Keeper", "Don't Starve"],
+    "description": "English concept search for 2D crafting survival (Terraria has Cyrillic/Russian source metadata)"
+  },
+  {
+    "id": "ml_en03",
+    "prompt": "hand drawn 2D metroidvania insect adventure",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Hollow Knight", "Ori and the Blind Forest", "Ender Lilies", "Blasphemous"],
+    "description": "English concept search for hand drawn insect metroidvania (Hollow Knight has Chinese source metadata)"
+  },
+  {
+    "id": "ml_en04",
+    "prompt": "dark fantasy action RPG open world",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["ELDEN RING", "DARK SOULS™ III", "The Witcher 3: Wild Hunt", "Dragon's Dogma"],
+    "description": "English concept search for dark fantasy ARPG (Elden Ring has Spanish/multilingual source metadata)"
+  },
+  {
+    "id": "ml_en05",
+    "prompt": "alien ocean underwater survival",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Subnautica", "Subnautica: Below Zero", "Breathedge", "Barotrauma"],
+    "description": "English concept search for alien ocean survival (Subnautica has multilingual tags)"
+  },
+  {
+    "id": "ml_en06",
+    "prompt": "automation factory logistics belt management",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Factorio", "Satisfactory", "Dyson Sphere Program", "Mindustry"],
+    "description": "English concept search for factory automation logistics"
+  },
+  {
+    "id": "ml_en07",
+    "prompt": "colony simulator story generator with storytelling AI",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["RimWorld", "Dwarf Fortress", "Going Medieval", "Clanfolk"],
+    "description": "English concept search for colony sim story generator"
+  },
+  {
+    "id": "ml_en08",
+    "prompt": "deckbuilder roguelike ascending tower",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Slay the Spire", "Monster Train", "Inscryption", "Vault of the Void"],
+    "description": "English concept search for deckbuilder roguelike"
+  },
+  {
+    "id": "ml_en09",
+    "prompt": "fast-paced roguelite hack and slash Greek underworld",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Hades", "Hades II", "Dead Cells", "Curse of the Dead Gods"],
+    "description": "English concept search for Greek underworld roguelite"
+  },
+  {
+    "id": "ml_en10",
+    "prompt": "futuristic dystopian cyberpunk RPG in a neon city",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Cyberpunk 2077", "Deus Ex", "Cloudpunk", "The Ascent", "Shadowrun"],
+    "description": "English concept search for futuristic cyberpunk RPG"
+  },
+  {
+    "id": "ml_en11",
+    "prompt": "infinite procedurally generated space exploration and mining",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["No Man's Sky", "Astroneer", "Elite Dangerous", "Starbound", "Space Engineers"],
+    "description": "English concept search for procedural space exploration"
+  },
+  {
+    "id": "ml_en12",
+    "prompt": "challenging grimdark soulslike boss battles",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["ELDEN RING", "DARK SOULS™ III", "Lies of P", "Lords of the Fallen"],
+    "description": "English concept search for soulslike boss battles"
+  },
+  {
+    "id": "ml_en13",
+    "prompt": "pixel art indie farming community life sim",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Stardew Valley", "Sun Haven", "Roots of Pacha", "Moonstone Island"],
+    "description": "English concept search for pixel farming life sim"
+  },
+  {
+    "id": "ml_en14",
+    "prompt": "dark gothic roguelike dungeon crawler turn based",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Darkest Dungeon", "Darkest Dungeon® II", "Warsim", "Fear & Hunger"],
+    "description": "English concept search for dark gothic dungeon crawler"
+  },
+  {
+    "id": "ml_en15",
+    "prompt": "viking survival exploration co-op base building",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Valheim", "Tribes of Midgard", "Visingr", "Frozenheim"],
+    "description": "English concept search for viking survival building"
+  },
+  {
+    "id": "ml_en16",
+    "prompt": "co-op space dwarf mining bugs extraction shooter",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Deep Rock Galactic", "Deep Rock Galactic: Survivor", "Helldivers 2", "Space Beast Terror Fright"],
+    "description": "English concept search for dwarf mining bugs shooter"
+  },
+  {
+    "id": "ml_en17",
+    "prompt": "subterranean 2D exploration with bosses and mining",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Terraria", "Core Keeper", "SteamWorld Dig 2", "Caveblazers"],
+    "description": "English concept search for subterranean 2D exploration"
+  },
+  {
+    "id": "ml_en18",
+    "prompt": "isometric ARPG hack and slash loot progression",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Grim Dawn", "Path of Exile", "Last Epoch", "Torchlight II", "Titan Quest"],
+    "description": "English concept search for isometric ARPG hack and slash"
+  },
+  {
+    "id": "ml_en19",
+    "prompt": "cooperative zombie survival horde shooter",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Left 4 Dead 2", "Killing Floor 2", "Back 4 Blood", "World War Z"],
+    "description": "English concept search for cooperative zombie horde shooter"
+  },
+  {
+    "id": "ml_en20",
+    "prompt": "relaxing town building with cute animals",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Stardew Valley", "Townscaper", "Dorfromantik", "Tiny Glade"],
+    "description": "English concept search for relaxing building cute animals"
+  },
+  {
+    "id": "ml_ru01",
+    "prompt": "уютный симулятор фермы",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Stardew Valley", "Farming Simulator", "Garden Life", "Coral Island", "Sun Haven"],
+    "description": "Russian query for cozy farming simulator"
+  },
+  {
+    "id": "ml_ru02",
+    "prompt": "2D песочница крафтинг выживание",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Terraria", "Starbound", "Necesse", "Core Keeper", "Don't Starve"],
+    "description": "Russian query for 2D sandbox crafting survival"
+  },
+  {
+    "id": "ml_ru03",
+    "prompt": "ролевая игра открытый мир",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["The Witcher 3: Wild Hunt", "ELDEN RING", "Cyberpunk 2077", "The Elder Scrolls V: Skyrim"],
+    "description": "Russian query for open world RPG"
+  },
+  {
+    "id": "ml_ru04",
+    "prompt": "метроидвания жуки",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Hollow Knight", "Ori and the Blind Forest", "Blasphemous"],
+    "description": "Russian query for metroidvania bugs/insects"
+  },
+  {
+    "id": "ml_ru05",
+    "prompt": "кооперативный рогалик",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Risk of Rain 2", "Gunfire Reborn", "Roboquest", "Heroes of Hammerwatch", "Spelunky 2"],
+    "description": "Russian query for co-op roguelike"
+  },
+  {
+    "id": "ml_ru06",
+    "prompt": "киберпанк рпг",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Cyberpunk 2077", "Deus Ex", "Cloudpunk", "The Ascent", "Shadowrun"],
+    "description": "Russian query for cyberpunk RPG"
+  },
+  {
+    "id": "ml_ru07",
+    "prompt": "симулятор фабрики автоматизация",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Factorio", "Satisfactory", "Dyson Sphere Program", "Mindustry"],
+    "description": "Russian query for factory automation simulator"
+  },
+  {
+    "id": "ml_ru08",
+    "prompt": "космическое выживание",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["No Man's Sky", "Astroneer", "Space Engineers", "Breathedge", "Subnautica"],
+    "description": "Russian query for space survival"
+  },
+  {
+    "id": "ml_ru09",
+    "prompt": "карточный рогалик",
+    "expected_query_type": "TOPIC_TAG",
+    "expected_landmarks": ["Slay the Spire", "Monster Train", "Inscryption", "Across the Obelisk"],
+    "description": "Russian query for card deckbuilder roguelike"
+  },
+  {
+    "id": "ml_ru10",
+    "prompt": "тактическая пошаговая рпг",
+    "expected_query_type": "CONCEPT",
+    "expected_landmarks": ["Divinity: Original Sin 2", "XCOM 2", "Wartales", "Battle Brothers", "Tactics Ogre"],
+    "description": "Russian query for tactical turn based RPG"
+  },
+  {
+    "id": "ml_mix01",
+    "prompt": "cozy ферма game",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Stardew Valley", "Farming Simulator", "Garden Life", "Coral Island", "Sun Haven"],
+    "description": "Mixed English-Russian query for cozy farming game"
+  },
+  {
+    "id": "ml_mix02",
+    "prompt": "2D выживание building",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Terraria", "Starbound", "Necesse", "Core Keeper", "Don't Starve"],
+    "description": "Mixed English-Russian query for 2D survival building"
+  },
+  {
+    "id": "ml_mix03",
+    "prompt": "open world экшен RPG",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["ELDEN RING", "The Witcher 3: Wild Hunt", "Cyberpunk 2077", "Dragon's Dogma"],
+    "description": "Mixed English-Russian query for open world action RPG"
+  },
+  {
+    "id": "ml_mix04",
+    "prompt": "space симулятор фабрика",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Factorio", "Dyson Sphere Program", "Satisfactory", "Kerbal Space Program"],
+    "description": "Mixed English-Russian query for space simulator factory"
+  },
+  {
+    "id": "ml_mix05",
+    "prompt": "co-op рогалик dungeon",
+    "expected_query_type": "MIXED",
+    "expected_landmarks": ["Risk of Rain 2", "Gunfire Reborn", "Heroes of Hammerwatch", "Enter the Gungeon"],
+    "description": "Mixed English-Russian query for co-op roguelike dungeon"
+  }
+]

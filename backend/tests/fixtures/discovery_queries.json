@@ -1,0 +1,97 @@
+[
+  {
+    "id": "q1_relaxing_puzzle",
+    "prompt": "short relaxing single-player puzzle game",
+    "expected_tags_or_genres": ["Puzzle", "Relaxing", "Singleplayer"],
+    "expected_modes": ["Single-player"],
+    "type": "genre_and_mood"
+  },
+  {
+    "id": "q2_cyberpunk_coop",
+    "prompt": "cyberpunk survival game with co-op",
+    "expected_tags_or_genres": ["Cyberpunk", "Survival", "Co-op"],
+    "expected_modes": ["Co-op", "Multi-player"],
+    "type": "mechanics_and_mode"
+  },
+  {
+    "id": "q3_roguelike_deckbuilder",
+    "prompt": "2D roguelike deckbuilder",
+    "expected_tags_or_genres": ["Roguelike", "Deckbuilding", "Card Game", "2D"],
+    "type": "genre_mechanics"
+  },
+  {
+    "id": "q4_tactical_scifi",
+    "prompt": "hard tactical sci-fi turn-based game",
+    "expected_tags_or_genres": ["Tactical", "Sci-fi", "Turn-Based", "Strategy"],
+    "type": "theme_and_pace"
+  },
+  {
+    "id": "q5_cozy_farming",
+    "prompt": "cozy farming game without combat",
+    "expected_tags_or_genres": ["Farming Sim", "Casual", "Relaxing", "Agriculture"],
+    "type": "mood_and_theme"
+  },
+  {
+    "id": "q6_fast_paced_fps",
+    "prompt": "fast-paced retro arena shooter with multiplayer",
+    "expected_tags_or_genres": ["FPS", "Shooter", "Retro", "Fast-Paced", "Arena Shooter"],
+    "expected_modes": ["Multi-player", "Online PvP"],
+    "type": "mechanics_and_mode"
+  },
+  {
+    "id": "q7_stealth_ninja",
+    "prompt": "stealth assassination ninja game in feudal japan",
+    "expected_tags_or_genres": ["Stealth", "Ninja", "Historical", "Action"],
+    "type": "setting_and_mechanics"
+  },
+  {
+    "id": "q8_space_mining",
+    "prompt": "space exploration crafting and base building",
+    "expected_tags_or_genres": ["Space", "Exploration", "Crafting", "Building", "Sandbox"],
+    "type": "mechanics_and_theme"
+  },
+  {
+    "id": "q9_psychological_horror",
+    "prompt": "atmospheric psychological horror story rich single-player",
+    "expected_tags_or_genres": ["Psychological Horror", "Horror", "Story Rich", "Atmospheric"],
+    "expected_modes": ["Single-player"],
+    "type": "mood_and_narrative"
+  },
+  {
+    "id": "q10_grid_puzzle",
+    "prompt": "minimalist sokoban grid puzzle",
+    "expected_tags_or_genres": ["Puzzle", "Minimalist", "Grid-Based"],
+    "type": "subgenre"
+  },
+  {
+    "id": "q11_physics_destruction",
+    "prompt": "voxel physics destruction sandbox",
+    "expected_tags_or_genres": ["Physics", "Destruction", "Sandbox", "Voxel"],
+    "type": "mechanics"
+  },
+  {
+    "id": "q12_rhythm_music",
+    "prompt": "fast electronic music rhythm game",
+    "expected_tags_or_genres": ["Rhythm", "Music", "Great Soundtrack"],
+    "type": "audio_and_pace"
+  },
+  {
+    "id": "q13_free_multiplayer_card",
+    "prompt": "free to play multiplayer competitive card game",
+    "expected_tags_or_genres": ["Free to Play", "Card Game", "PvP", "Competitive"],
+    "expected_modes": ["Multi-player", "Online PvP"],
+    "type": "pricing_and_mode"
+  },
+  {
+    "id": "q14_gibberish_nomatch",
+    "prompt": "xyzqwk999zzzaaa non-existent hypothetical game concept",
+    "expected_tags_or_genres": [],
+    "type": "no_match"
+  },
+  {
+    "id": "q15_nonsense_symbols",
+    "prompt": "#$%^&*()_+ arbitrary random glyphs",
+    "expected_tags_or_genres": [],
+    "type": "no_match"
+  }
+]

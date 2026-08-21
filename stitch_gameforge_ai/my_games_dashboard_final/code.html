@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GameForge AI - My Games</title>
+<script type="text/javascript" nonce="8fce776d0da440b18d080ce6e6a" src="//local.adguard.org?ts=1786458332737&amp;type=content-script&amp;dmn=contribution.usercontent.google.com&amp;url=https%3A%2F%2Fcontribution.usercontent.google.com%2Fdownload%3Fc%3DCgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzAwMDY1OGM2NmY5ZWQ2MDgwNzc5ODRlNzk3Mzc4Y2Q3EgsSBxCT-KLd6wEYAZIBJAoKcHJvamVjdF9pZBIWQhQxMjE1NzQ3NTE2NzQ2MzI1NzQwMA%26filename%3D%26opi%3D89354086%26authuser%3D2&amp;app=chrome.exe&amp;css=3&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1&amp;stealth=1&amp;st-dnt"></script><script type="text/javascript" nonce="8fce776d0da440b18d080ce6e6a" src="//local.adguard.org?ts=1786458332737&amp;name=Disable%20AMP&amp;name=AdGuard%20Extra&amp;name=Web%20of%20Trust&amp;type=user-script"></script><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#46dcce",
+                        "secondary-container": "#c9005b",
+                        "on-surface-variant": "#cbc3d7",
+                        "inverse-primary": "#006a62",
+                        "surface-container-high": "#272a32",
+                        "surface-dim": "#10131a",
+                        "terminal-header": "#1e2233",
+                        "surface-container-highest": "#32353d",
+                        "surface-container": "#1d1f27",
+                        "on-tertiary-fixed": "#271900",
+                        "on-primary-container": "#006059",
+                        "inverse-on-surface": "#2d3038",
+                        "on-primary-fixed": "#00201d",
+                        "tertiary-fixed": "#ffdea9",
+                        "primary": "#6ffdee",
+                        "tertiary-container": "#fec14b",
+                        "outline": "#859491",
+                        "tertiary-fixed-dim": "#f9bc47",
+                        "on-secondary-fixed": "#3f0018",
+                        "tertiary": "#ffe4b9",
+                        "on-surface": "#e1e2ec",
+                        "on-error": "#690005",
+                        "scanline-overlay": "rgba(255, 255, 255, 0.05)",
+                        "on-tertiary": "#422d00",
+                        "secondary-fixed-dim": "#ffb1c2",
+                        "surface-variant": "#32353d",
+                        "surface-container-lowest": "#0b0e15",
+                        "surface-tint": "#46dcce",
+                        "surface-bright": "#363941",
+                        "secondary": "#ffb1c2",
+                        "on-secondary": "#66002b",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "primary-container": "#4ce0d2",
+                        "on-primary-fixed-variant": "#00504a",
+                        "secondary-fixed": "#ffd9df",
+                        "primary-fixed": "#69f8ea",
+                        "on-tertiary-container": "#714f00",
+                        "outline-variant": "#3c4947",
+                        "surface-container-low": "#191b23",
+                        "background": "#10131a",
+                        "surface": "#10131a",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "on-background": "#e1e2ec",
+                        "on-secondary-fixed-variant": "#8f003f",
+                        "terminal-bg": "#10131a",
+                        "on-secondary-container": "#ffdbe1",
+                        "on-error-container": "#ffdad6",
+                        "on-primary": "#003733",
+                        "inverse-surface": "#e1e2ec"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-margin": "24px",
+                        "stack-sm": "8px",
+                        "gutter": "16px",
+                        "base": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["\"Press Start 2P\""],
+                        "headline-lg-mobile": ["\"Press Start 2P\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "label-mono-sm": ["JetBrains Mono"],
+                        "headline-lg": ["\"Press Start 2P\""],
+                        "body-md": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["32px", { "lineHeight": "1.4", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["16px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "label-mono": ["12px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "label-mono-sm": ["10px", { "lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .scanlines {
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+        .glow-primary {
+            box-shadow: 0 0 15px rgba(76, 224, 210, 0.3);
+        }
+        .hover\:glow-primary:hover {
+            box-shadow: 0 0 15px rgba(76, 224, 210, 0.5);
+        }
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.95; }
+            50% { opacity: 1; }
+            100% { opacity: 0.95; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen relative overflow-x-hidden selection:bg-primary selection:text-on-primary">
+<!-- Scanline Overlay -->
+<div class="fixed inset-0 scanlines z-50 pointer-events-none opacity-50 mix-blend-overlay"></div>
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-container-margin py-4 bg-background/80 backdrop-blur-md border-b border-primary/30 shadow-[0_0_15px_rgba(76,224,210,0.3)]">
+<div class="flex items-center gap-gutter">
+<span class="font-display-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tighter">GAMEFORGE AI</span>
+</div>
+<div class="hidden md:flex items-center gap-gutter">
+<a class="font-label-mono text-label-mono text-on-surface-variant hover:text-primary transition-colors hover:glow-primary hover:text-primary-fixed-dim" href="#">DISCOVER</a>
+<a class="font-label-mono text-label-mono text-on-surface-variant hover:text-primary transition-colors hover:glow-primary hover:text-primary-fixed-dim" href="#">BUILD</a>
+<a class="font-label-mono text-label-mono text-primary border-b-2 border-primary pb-1 transition-colors hover:glow-primary hover:text-primary-fixed-dim" href="#">MY GAMES</a>
+<a class="font-label-mono text-label-mono text-on-surface-variant hover:text-primary transition-colors hover:glow-primary hover:text-primary-fixed-dim" href="#">PROFILE</a>
+</div>
+<div class="flex items-center gap-stack-md">
+<div class="hidden md:block">
+<!-- Search on Right (Implicitly handled by spacing) -->
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" data-icon="search">search</span>
+</div>
+<button class="bg-primary text-on-primary font-label-mono text-label-mono px-4 py-2 rounded-DEFAULT hover:bg-primary-fixed transition-all duration-200 active:scale-95 shadow-[0_0_10px_rgba(76,224,210,0.2)] hover:shadow-[0_0_15px_rgba(76,224,210,0.5)]">BUILD A GAME</button>
+<img alt="User Profile Avatar" class="w-8 h-8 rounded-full border border-primary/30 object-cover" data-alt="A small, stylized avatar profile picture of a retro-futuristic hacker or cyberpunk character. High contrast, neon colors, dark background, pixel art or stylized illustration aesthetic fitting a gritty tech terminal UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXizk9xwPOrI_JXz3BznSSmMRivyQZHy3bM8ulULNYqwnFpQ5u7IK0hYhqDc1g8FAgqeI8IJzzjSv-xPl9VdT6-FdeSFB3GFE95z47GQNWVNTDapLn8I74WQIUgKLnycC5FLt1_ZOEjAOlaTvxPzzAHvAJXNBtsukJXkcNGWXegx1hH_2VHAJYFdFnQKFHpiixfdph077eNQbms7JM1ILiLQT8Oi1bzSAbBu8jaQ-jvHVIfNyRuxC4Ow"/>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-stack-lg px-container-margin max-w-7xl mx-auto flex flex-col gap-stack-lg">
+<!-- Header -->
+<header class="flex flex-col gap-base border-l-4 border-primary pl-4 py-1">
+<h1 class="font-display-lg text-headline-lg-mobile md:text-display-lg text-on-surface uppercase tracking-tight">MY_GAMES_DASHBOARD</h1>
+<p class="font-label-mono text-label-mono text-on-surface-variant uppercase">Your generated prototypes and saved discoveries.</p>
+</header>
+<!-- GENERATED BY YOU Section -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center gap-stack-sm border-b border-outline-variant pb-2">
+<span class="material-symbols-outlined text-secondary" data-icon="terminal" data-weight="fill" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<h2 class="font-label-mono text-label-mono text-secondary uppercase tracking-widest">GENERATED BY YOU</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<!-- Game Card: NEON SWARM -->
+<div class="bg-surface-container-low border border-primary/50 rounded-DEFAULT p-gutter flex flex-col gap-stack-md relative overflow-hidden group hover:border-primary transition-colors glow-primary">
+<div class="absolute top-0 right-0 p-2 opacity-10 font-label-mono text-label-mono-sm pointer-events-none group-hover:opacity-20 transition-opacity">
+                        SYS.ID: 0x8A7F2<br/>MEM_ADDR: 0x00FF
+                    </div>
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-display-lg text-headline-lg-mobile md:text-headline-lg text-primary uppercase">NEON SWARM</h3>
+<div class="flex items-center gap-stack-sm mt-1">
+<span class="font-label-mono text-label-mono-sm text-outline border border-outline px-1 rounded-sm">&gt; v1.3</span>
+<span class="font-label-mono text-label-mono-sm text-on-surface-variant">2D Survival</span>
+<span class="font-label-mono text-label-mono-sm text-outline ml-4">Last Modified: Today, 14:32</span>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-primary/10 border border-primary/30 px-2 py-1 rounded-sm">
+<div class="w-2 h-2 rounded-full bg-primary crt-flicker"></div>
+<span class="font-label-mono text-label-mono-sm text-primary uppercase">PLAYABLE</span>
+</div>
+</div>
+<div class="h-32 w-full bg-surface-dim border border-outline-variant rounded-sm overflow-hidden relative">
+<div class="bg-cover bg-center w-full h-full opacity-80 group-hover:opacity-100 transition-opacity mix-blend-luminosity hover:mix-blend-normal" data-alt="A screenshot from a retro 2D top-down survival game called NEON SWARM. Dark, gritty sci-fi environment filled with glowing neon green and cyan insect-like alien enemies. High contrast, scanlines visible, 8-bit or 16-bit pixel art style, high octane chaotic action." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB251LgE4SNj_egROo2BFiVDCW10UvFtwtE-aAwzjvR2yv1PAPAOT1R52C3VEyxob9hje1v6Xtqkfv0nwl0eWkgtKdxxHHpjySu2KV9bzC46b_OSLMo3fT3W5bdOR1HyyPRG3wRY3KvBUVI9lIzhty0lfzIaOQrsNaCt3MIxhmTJoKPKyBivMbZhKE3ocdquaty26X4lecBqUSUC1pjsf_LxxGh6E-NTMl--dvtAEpMx_HEUxOs9sMoSA')"></div>
+</div>
+<div class="flex gap-stack-sm mt-auto">
+<button class="flex-1 bg-primary text-on-primary font-label-mono text-label-mono py-2 rounded-sm hover:bg-primary-fixed transition-colors uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)]">PLAY</button>
+<button class="flex-1 border border-primary text-primary font-label-mono text-label-mono py-2 rounded-sm hover:bg-primary/10 transition-colors uppercase">MODIFY</button>
+<button class="flex-1 flex justify-center items-center gap-1 border border-outline-variant text-on-surface-variant font-label-mono text-label-mono rounded-sm hover:text-primary hover:border-primary transition-colors uppercase">
+<span class="material-symbols-outlined text-[16px]" data-icon="info">info</span> Details
+</button>
+</div>
+</div>
+<!-- Game Card: VOID DRIFT -->
+<div class="bg-surface-container-low border border-tertiary/50 rounded-DEFAULT p-gutter flex flex-col gap-stack-md relative overflow-hidden group hover:border-tertiary transition-colors shadow-[0_0_15px_rgba(255,228,185,0.1)] hover:shadow-[0_0_15px_rgba(255,228,185,0.2)]">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-display-lg text-headline-lg-mobile md:text-headline-lg text-tertiary uppercase">VOID DRIFT</h3>
+<div class="flex items-center gap-stack-sm mt-1">
+<span class="font-label-mono text-label-mono-sm text-outline border border-outline px-1 rounded-sm">&gt; v0.8</span>
+<span class="font-label-mono text-label-mono-sm text-on-surface-variant">Racing</span>
+<span class="font-label-mono text-label-mono-sm text-outline ml-4">Last Modified: Yesterday</span>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-tertiary/10 border border-tertiary/30 px-2 py-1 rounded-sm">
+<span class="material-symbols-outlined text-[14px] text-tertiary animate-spin" data-icon="sync">sync</span>
+<span class="font-label-mono text-label-mono-sm text-tertiary uppercase">COMPILING</span>
+</div>
+</div>
+<div class="h-32 w-full bg-surface-dim border border-outline-variant rounded-sm overflow-hidden relative flex items-center justify-center">
+<div class="absolute inset-0 bg-surface-dim opacity-90 z-10 flex flex-col items-center justify-center gap-2">
+<div class="w-3/4 h-1 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-2/3 animate-pulse"></div>
+</div>
+<span class="font-label-mono text-label-mono-sm text-tertiary">BUILDING ASSETS... 66%</span>
+</div>
+<div class="bg-cover bg-center w-full h-full opacity-30 mix-blend-luminosity" data-alt="Concept art for a futuristic racing game called VOID DRIFT. Sleek, angular anti-gravity racing vehicles speeding through a dark, brutalist sci-fi tunnel lit by stark amber and yellow neon strips. Motion blur, high octane, cyberpunk racing aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBaNrZItax4TFpRah9tuQC1gg5q81yj8i2o_tTdMzSxVuucjYXsRKI6iGBxmNSPz7OsL8rACRsovuLHqq1LxFC68yTCBf2-BdYCUE7XGixHpSTPb3mcpvOkmHKXZxX_gZ9EsrkJ1M7a2PDyzX7QKtjPmJb0Yyl9DJmQjU_3eYbyDY2drrCeFy-bzNu0Vh6lOypl2hf-iRXdCy2_AxjnJfPR8J7bnz-aDpmUcbF9V9DSKPC1nYs-FmUzNA')"></div>
+</div>
+<div class="flex gap-stack-sm mt-auto">
+<button class="flex-1 bg-surface-variant text-on-surface-variant font-label-mono text-label-mono py-2 rounded-sm cursor-not-allowed uppercase opacity-50">PLAY</button>
+<button class="flex-1 border border-outline-variant text-on-surface-variant font-label-mono text-label-mono py-2 rounded-sm cursor-not-allowed uppercase opacity-50">MODIFY</button>
+<button class="flex-1 flex justify-center items-center gap-1 border border-tertiary/50 text-tertiary font-label-mono text-label-mono rounded-sm hover:bg-tertiary/10 transition-colors uppercase">
+<span class="material-symbols-outlined text-[16px]" data-icon="info">info</span> Details
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- SAVED DISCOVERIES Section -->
+<section class="flex flex-col gap-stack-md mt-stack-md">
+<div class="flex items-center gap-stack-sm border-b border-outline-variant pb-2">
+<span class="material-symbols-outlined text-secondary" data-icon="bookmark" data-weight="fill" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+<h2 class="font-label-mono text-label-mono text-secondary uppercase tracking-widest">SAVED DISCOVERIES</h2>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-gutter">
+<!-- Cartridge Card 1 -->
+<div class="bg-surface-container border-2 border-outline-variant rounded-sm flex flex-col group hover:border-secondary transition-colors relative overflow-hidden">
+<div class="h-4 bg-outline-variant w-full flex gap-1 px-2 items-center group-hover:bg-secondary transition-colors">
+<div class="w-1 h-1 bg-background rounded-full"></div>
+<div class="w-1 h-1 bg-background rounded-full"></div>
+</div>
+<div class="p-3 flex flex-col gap-2 h-full">
+<div class="flex justify-between items-center">
+<span class="font-label-mono text-label-mono-sm text-secondary">Match: 95%</span>
+<span class="font-label-mono text-label-mono-sm text-outline">Saved: Oct 12</span>
+</div>
+<div class="aspect-video bg-surface-dim border border-outline-variant overflow-hidden">
+<div class="bg-cover bg-center w-full h-full opacity-70 group-hover:opacity-100 transition-opacity" data-alt="Pixel art screenshot of a retro platformer game. A small knight character standing in front of a dark, gothic castle entrance. Moody lighting, deep purples and magenta hues, 8-bit classic console aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBPbsqAe4gOblSGjOfq2RVqIt0vWZuD6PAr-5-YH01yyEPXlBdOaiiePiNBLUh5AGKbm4DV9MM3lZDnhg5QSFzjUuIl5Vu141g2z0vFJ3M_MGq_8JTgxjU1q2YWwVH97Un5wacHtDYiaccXfdIxiEtioqpV5Dt5fqFBlIQHh0K6h3vqXkXz-J9IzRrKd3AvtwU1wrVk2Tci5-hAwlBMPa9zM1ByZRr1d3_TqDk0N3heKBHh0_5TAjFtJQ')"></div>
+</div>
+<h4 class="font-label-mono text-label-mono text-on-surface uppercase truncate mt-1">CASTLE RUNNER</h4>
+<div class="flex justify-between items-center mt-auto">
+<span class="font-label-mono text-label-mono-sm text-outline">By @DevZero</span>
+<div class="w-2 h-2 rounded-full bg-outline"></div>
+</div>
+</div>
+</div>
+<!-- Cartridge Card 2 -->
+<div class="bg-surface-container border-2 border-outline-variant rounded-sm flex flex-col group hover:border-primary transition-colors relative overflow-hidden">
+<div class="h-4 bg-outline-variant w-full flex gap-1 px-2 items-center group-hover:bg-primary transition-colors">
+<div class="w-1 h-1 bg-background rounded-full"></div>
+<div class="w-1 h-1 bg-background rounded-full"></div>
+</div>
+<div class="p-3 flex flex-col gap-2 h-full">
+<div class="flex justify-between items-center">
+<span class="font-label-mono text-label-mono-sm text-primary">Match: 88%</span>
+<span class="font-label-mono text-label-mono-sm text-outline">Saved: Oct 10</span>
+</div>
+<div class="aspect-video bg-surface-dim border border-outline-variant overflow-hidden">
+<div class="bg-cover bg-center w-full h-full opacity-70 group-hover:opacity-100 transition-opacity" data-alt="Screenshot of a top-down tactical shooter game. Stark, minimalist white lines on a black background, vector graphics style. A triangular player ship shooting lasers at geometric enemies. Arcade classic vibe." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC4OvpSOhKYAfFRxoxh6rYDP90tHUYoItoi3XlLHXhR8TVjPNpuH7HVAHZDKkeFkpSg0DMT2dXoxo47O14_C4XB9OenIiiA03aQJ8XiSLD8lvFOCHhV_R26v5h1JJao0UlXwvE4vDocHqWGHXSXenYvx7YBeHyqOq-dBSMOfERkgnhL_SDPXVF7ziCUVfZY8ez2jBTyuel5SBfXzRyaIniIwu11ctc-Waub1uuRhZSsrNBhz8pMi0rr3w')"></div>
+</div>
+<h4 class="font-label-mono text-label-mono text-on-surface uppercase truncate mt-1">VECTOR STRIKE</h4>
+<div class="flex justify-between items-center mt-auto">
+<span class="font-label-mono text-label-mono-sm text-outline">By @ArcadeAI</span>
+<div class="w-2 h-2 rounded-full bg-primary crt-flicker shadow-[0_0_5px_rgba(76,224,210,0.8)]"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-stack-lg px-container-margin flex flex-col md:flex-row justify-between items-center gap-gutter bg-surface-dim border-t border-outline-variant mt-auto">
+<span class="font-display-lg text-headline-lg-mobile text-tertiary uppercase">© 2026 GAMEFORGE AI // CORE_V1.0.2</span>
+<div class="flex gap-gutter">
+<a class="font-label-mono-sm text-label-mono-sm text-outline hover:text-tertiary hover:text-tertiary-fixed-dim transition-colors uppercase" href="#">API_DOCS</a>
+<a class="font-label-mono-sm text-label-mono-sm text-outline hover:text-tertiary hover:text-tertiary-fixed-dim transition-colors uppercase" href="#">SYSTEM_STATUS</a>
+<a class="font-label-mono-sm text-label-mono-sm text-outline hover:text-tertiary hover:text-tertiary-fixed-dim transition-colors uppercase" href="#">LEGAL</a>
+</div>
+</footer>
+</body></html>
