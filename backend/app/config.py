@@ -9,7 +9,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "GameForge API"
     APP_ENV: str = "development"
     DATABASE_URL: str = "sqlite:///./gameforge.db"
+    DB_ECHO_SQL: bool = False
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173"]
+
+    # Hugging Face Settings (Optional - higher rate limits & authenticated hub downloads)
+    HF_TOKEN: Optional[str] = None
 
     # AI Hosted Provider Settings
     AI_PROVIDER: str = "gemini"

@@ -189,11 +189,10 @@ class BuildRepository:
                     "error_message": "Build interrupted by server restart or worker termination.",
                     "completed_at": now,
                 },
-                synchronize_session="fetch",
+                synchronize_session=False,
             )
         )
-        if count > 0:
-            db.commit()
+        db.commit()
         return count
 
 

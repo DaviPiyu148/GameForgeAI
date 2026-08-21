@@ -6,6 +6,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,10 +17,14 @@ class QueryEmbedder:
     _instance: Optional["QueryEmbedder"] = None
     _lock = threading.Lock()
 
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2", token: Optional[str] = None):
         self.model_name = model_name
-        logger.info(f"Loading QueryEmbedder model: {model_name}")
-        self.model = SentenceTransformer(model_name)
+        hf_token = token or settings.HF_TOKEN
+        logger.info(f"Loading QueryEmbedder model: {model_name} (authenticated={'yes' if hf_token else 'no'})")
+        if hf_token:
+            self.model = SentenceTransformer(model_name, token=hf_token)
+        else:
+            self.model = SentenceTransformer(model_name)
         if hasattr(self.model, "get_embedding_dimension"):
             self.dimension = self.model.get_embedding_dimension()
         else:

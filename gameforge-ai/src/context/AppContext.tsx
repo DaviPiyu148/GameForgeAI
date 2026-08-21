@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type {
   AppState,
@@ -79,9 +79,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const unsubscribeSseRef = useRef<(() => void) | null>(null);
+  const authHydrationStartedRef = useRef(false);
 
   // 1. Backend Project Hydration
-  const refreshProjects = async () => {
+  const refreshProjects = useCallback(async () => {
     const token = authStorage.getToken();
     if (!token) {
       setState((s) => ({ ...s, myGames: [], isProjectsLoading: false }));
@@ -104,10 +105,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         projectsError: 'Could not load projects from backend.',
       }));
     }
-  };
+  }, []);
 
   // 2. Backend Saved Discoveries Hydration
-  const refreshSavedDiscoveries = async () => {
+  const refreshSavedDiscoveries = useCallback(async () => {
     const token = authStorage.getToken();
     if (!token) {
       setState((s) => ({ ...s, savedDiscoveries: [], isSavedDiscoveriesLoading: false }));
@@ -129,10 +130,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isSavedDiscoveriesLoading: false,
       }));
     }
-  };
+  }, []);
 
   // 2B. Backend Progress & Level Hydration
-  const refreshProgress = async () => {
+  const refreshProgress = useCallback(async () => {
     const token = authStorage.getToken();
     if (!token) {
       setState((s) => ({ ...s, progress: null }));
@@ -148,10 +149,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.warn('Failed to load progress from backend API', err);
     }
-  };
+  }, []);
 
   // 2C. Backend Genre Preferences Hydration
-  const refreshPreferences = async () => {
+  const refreshPreferences = useCallback(async () => {
     const token = authStorage.getToken();
     if (!token) {
       setState((s) => ({ ...s, preferences: null }));
@@ -163,25 +164,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.warn('Failed to load preferences from backend API', err);
     }
-  };
+  }, []);
 
   // 2D. Profile Picture Upload & Delete
-  const uploadAvatar = async (file: File): Promise<string> => {
+  const uploadAvatar = useCallback(async (file: File): Promise<string> => {
     const res = await profileService.uploadAvatar(file);
     setState((s) => ({
       ...s,
       user: s.user ? { ...s.user, avatar_url: res.avatar_url } : null,
     }));
     return res.avatar_url;
-  };
+  }, []);
 
-  const deleteAvatar = async (): Promise<void> => {
+  const deleteAvatar = useCallback(async (): Promise<void> => {
     await profileService.deleteAvatar();
     setState((s) => ({
       ...s,
       user: s.user ? { ...s.user, avatar_url: null } : null,
     }));
-  };
+  }, []);
 
   // 3. Initial Auth Hydration from /api/auth/me
   useEffect(() => {
@@ -191,6 +192,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState((s) => ({ ...s, authStatus: 'UNAUTHENTICATED', user: null }));
         return;
       }
+
+      if (authHydrationStartedRef.current) return;
+      authHydrationStartedRef.current = true;
 
       setState((s) => ({ ...s, authStatus: 'LOADING' }));
       try {
@@ -210,6 +214,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {
         console.warn('Auth token invalid or expired; resetting session', err);
         authStorage.clearToken();
+        authHydrationStartedRef.current = false;
         setState((s) => ({
           ...s,
           user: null,
@@ -223,7 +228,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     initAuth();
-  }, []);
+  }, [refreshProjects, refreshSavedDiscoveries, refreshProgress, refreshPreferences]);
 
   // 4. Persist ONLY local drafts (Prompt, Build Params) - NEVER user or saved data
   useEffect(() => {
@@ -290,6 +295,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const login = async (data: LoginRequest) => {
     const res = await authService.login(data);
     const postAction = state.postAuthAction;
+    authHydrationStartedRef.current = true;
     setState((s) => ({
       ...s,
       user: res.user,
@@ -298,7 +304,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       authModalReason: undefined,
       postAuthAction: null,
     }));
-    await Promise.all([refreshProjects(), refreshSavedDiscoveries()]);
+    await Promise.all([
+      refreshProjects(),
+      refreshSavedDiscoveries(),
+      refreshProgress(),
+      refreshPreferences(),
+    ]);
     if (postAction) {
       postAction();
     }
@@ -308,6 +319,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const register = async (data: RegisterRequest) => {
     const res = await authService.register(data);
     const postAction = state.postAuthAction;
+    authHydrationStartedRef.current = true;
     setState((s) => ({
       ...s,
       user: res.user,
@@ -316,7 +328,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       authModalReason: undefined,
       postAuthAction: null,
     }));
-    await Promise.all([refreshProjects(), refreshSavedDiscoveries()]);
+    await Promise.all([
+      refreshProjects(),
+      refreshSavedDiscoveries(),
+      refreshProgress(),
+      refreshPreferences(),
+    ]);
     if (postAction) {
       postAction();
     }
@@ -325,12 +342,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Logout Handler
   const logout = () => {
     authService.logout();
+    authHydrationStartedRef.current = false;
     setState((s) => ({
       ...s,
       user: null,
       authStatus: 'UNAUTHENTICATED',
       myGames: [],
       savedDiscoveries: [],
+      progress: null,
+      preferences: null,
       // Also clear build/error state: without this, a previous session's build
       // error/logs (e.g. state.lastError, state.compilerLogs) remained fully visible
       // via #/status/error to whoever uses the app next on the same device, since

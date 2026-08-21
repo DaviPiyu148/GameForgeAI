@@ -17,6 +17,5 @@ data/processed/*.json
 data/processed/*.npy
 data/processed/*.faiss
 data/processed/*.bin
-data/*.faiss
-data/*.npy
-data/*.csv
+# User uploads
+data/uploads/

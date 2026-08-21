@@ -33,10 +33,12 @@ export default function ProfilePage() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialFetchDoneRef = useRef(false);
 
-  // Refresh progress and preferences on mount if authenticated
+  // Refresh progress and preferences once on mount if authenticated
   useEffect(() => {
-    if (state.authStatus === 'AUTHENTICATED') {
+    if (state.authStatus === 'AUTHENTICATED' && !initialFetchDoneRef.current) {
+      initialFetchDoneRef.current = true;
       refreshProgress();
       refreshPreferences();
     }
