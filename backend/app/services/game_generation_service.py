@@ -180,6 +180,7 @@ class GameGenerationService:
         physics: int = 80,
         modules: List[str] = None,
         inspiration: Optional[Dict[str, Any]] = None,
+        personalization: Optional[Dict[str, Any]] = None,
         emit_log: Optional[Callable[[str, str], None]] = None,
         set_status: Optional[Callable[[str], None]] = None,
     ) -> GenerationResult:
@@ -218,6 +219,7 @@ class GameGenerationService:
             physics=physics,
             modules=active_mods,
             inspiration=inspiration,
+            personalization=personalization,
         )
 
         raw_output: Dict[str, Any]

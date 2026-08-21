@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from sqlalchemy.orm import Session
 
 from app.models.preference import UserGenrePreference
@@ -119,7 +119,7 @@ class PreferenceService:
     ) -> None:
         """
         Record behavioral interaction signal for user across identified genres.
-        Applies incremental weight update to UserGenrePreference table.
+        Applies logarithmic diminishing returns scaling to prevent single-genre runaway.
         """
         if not raw_genres_or_tags or weight <= 0:
             return
@@ -141,7 +141,10 @@ class PreferenceService:
             )
 
             if pref:
-                pref.score = round(pref.score + weight, 2)
+                # Diminishing returns scaling: high existing scores grow more slowly
+                diminishing_factor = 1.0 / (1.0 + 0.04 * pref.score)
+                gain = weight * diminishing_factor
+                pref.score = round(pref.score + gain, 2)
                 pref.interaction_count += 1
                 pref.last_interaction_at = now
             else:
@@ -155,11 +158,17 @@ class PreferenceService:
                 db.add(pref)
 
         db.commit()
-        logger.debug("Recorded preference signal for user %s: genres=%s weight=%.1f source=%s", user_id, list(canonical_genres), weight, source)
+        logger.debug(
+            "Recorded preference signal for user %s: genres=%s weight=%.1f source=%s",
+            user_id,
+            list(canonical_genres),
+            weight,
+            source,
+        )
 
     @classmethod
     def get_preferences(cls, db: Session, user_id: str) -> UserPreferencesResponse:
-        """Calculate and return calibrated genre affinity distribution for user."""
+        """Calculate and return calibrated Game DNA genre affinity distribution for user."""
         prefs = (
             db.query(UserGenrePreference)
             .filter(UserGenrePreference.user_id == user_id)
@@ -170,19 +179,25 @@ class PreferenceService:
         total_interactions = sum(p.interaction_count for p in prefs)
         total_score = sum(p.score for p in prefs)
 
-        if not prefs or total_score <= 0.5:
+        # Minimum data threshold for forming Game DNA: at least 2 interactions and 3.0 total score
+        has_sufficient = len(prefs) > 0 and total_interactions >= 2 and total_score >= 3.0
+
+        if not prefs or not has_sufficient:
             return UserPreferencesResponse(
                 user_id=user_id,
                 top_genres=[],
                 total_interactions=total_interactions,
                 strongest_match=None,
+                recent_interest=None,
+                confidence_level="LOW",
+                summary_headline=None,
                 has_sufficient_data=False,
             )
 
         items: List[GenreAffinityItem] = []
         for p in prefs:
             pct = round((p.score / total_score) * 100.0, 1)
-            if pct >= 28.0:
+            if pct >= 25.0:
                 tier = "High"
             elif pct >= 12.0:
                 tier = "Moderate"
@@ -199,21 +214,64 @@ class PreferenceService:
                 )
             )
 
-        # Determine descriptive title for strongest affinity
+        # Determine recent interest by latest interaction timestamp
+        most_recent_pref = max(
+            prefs,
+            key=lambda p: p.last_interaction_at if p.last_interaction_at else datetime.min.replace(tzinfo=timezone.utc),
+            default=None,
+        )
+        recent_genre = most_recent_pref.genre if most_recent_pref else None
+
+        # Determine confidence level
+        if total_interactions >= 6 and total_score >= 12.0:
+            confidence = "HIGH"
+        else:
+            confidence = "MODERATE"
+
+        # Determine descriptive title and summary headline
         top_genre = items[0].genre if items else None
         strongest = None
-        if top_genre and len(items) >= 2 and items[0].percentage >= 35.0:
+        headline = None
+        if top_genre and len(items) >= 2 and items[0].percentage >= 40.0:
+            strongest = f"{top_genre} Specialist"
+            headline = f"{top_genre} & {items[1].genre} Focus"
+        elif top_genre and len(items) >= 2:
             strongest = f"{top_genre} & {items[1].genre} Enthusiast"
+            headline = f"{top_genre} / {items[1].genre}"
         elif top_genre:
             strongest = f"{top_genre} Explorer"
+            headline = f"{top_genre} Focus"
 
         return UserPreferencesResponse(
             user_id=user_id,
-            top_genres=items[:6],  # Top 6 genres
+            top_genres=items[:6],  # Top 6 ranked genres
             total_interactions=total_interactions,
             strongest_match=strongest,
-            has_sufficient_data=total_interactions >= 2,
+            recent_interest=recent_genre,
+            confidence_level=confidence,
+            summary_headline=headline,
+            has_sufficient_data=True,
         )
+
+    @classmethod
+    def get_generation_context(cls, db: Session, user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        """
+        Extract concise, structured Game DNA context for LLM generation prompt.
+        Returns None if user is unauthenticated or has insufficient data.
+        """
+        if not user_id:
+            return None
+
+        prefs = cls.get_preferences(db, user_id)
+        if not prefs.has_sufficient_data:
+            return None
+
+        return {
+            "preferred_genres": [item.genre for item in prefs.top_genres[:3]],
+            "confidence": prefs.confidence_level.lower(),
+            "recent_interest": prefs.recent_interest,
+            "has_sufficient_data": True,
+        }
 
 
 preference_service = PreferenceService()

@@ -330,6 +330,15 @@ class BuildService:
                         )
                     )
 
+            # Extract structured Game DNA personalization if authenticated user has sufficient activity
+            personalization = None
+            if user_id:
+                try:
+                    from app.services.preference_service import preference_service
+                    personalization = preference_service.get_generation_context(db, user_id)
+                except Exception as pe:
+                    logger.warning("Failed to fetch personalization context for user %s: %s", user_id, pe)
+
             # Execute AI generation pipeline
             result = await self.generation_service.generate_game_dsl(
                 prompt=build.prompt,
@@ -337,6 +346,7 @@ class BuildService:
                 art_density=build.art_density,
                 physics=build.physics,
                 modules=build.modules if isinstance(build.modules, list) else [],
+                personalization=personalization,
                 emit_log=emit_log,
                 set_status=set_status,
             )

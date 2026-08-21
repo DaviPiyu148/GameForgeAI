@@ -40,6 +40,9 @@ class UserPreferencesResponse(BaseModel):
     top_genres: List[GenreAffinityItem] = Field(default_factory=list)
     total_interactions: int = Field(default=0, ge=0)
     strongest_match: Optional[str] = None
+    recent_interest: Optional[str] = None
+    confidence_level: str = Field(default="LOW")  # "LOW", "MODERATE", "HIGH"
+    summary_headline: Optional[str] = None
     has_sufficient_data: bool = False
 
 

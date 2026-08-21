@@ -40,6 +40,12 @@ const BuilderPage = () => {
   // Derive history uniquely from past generated games
   const promptHistory = Array.from(new Set(state.myGames.map(g => g.prompt))).filter(Boolean);
 
+  // Derive active Game DNA summary if available
+  const userGameDNA =
+    state.preferences?.has_sufficient_data && state.preferences.top_genres.length > 0
+      ? state.preferences.top_genres.slice(0, 3).map(g => g.genre).join(' • ')
+      : null;
+
   return (
     <div className="min-h-screen bg-surface flex flex-col antialiased text-on-surface select-none relative overflow-hidden">
       {/* Nav - uses custom builder nav matching reference */}
@@ -58,6 +64,15 @@ const BuilderPage = () => {
                   <span className="material-symbols-outlined text-sm text-primary">terminal</span>
                   <span className="font-mono text-xs text-primary font-bold tracking-wider uppercase">Natural Logic Editor</span>
                   <span className="bg-primary/10 border border-primary/30 text-primary font-mono text-[9px] px-1.5 py-0.5 rounded-xs ml-2">PROMPT MODE</span>
+                  {userGameDNA && (
+                    <div
+                      className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary text-[10px] font-mono ml-2"
+                      title="AI generation subtly incorporates your Game DNA preferences as secondary flavor"
+                    >
+                      <span className="material-symbols-outlined text-xs">genetics</span>
+                      <span>Personalized: {userGameDNA}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <button 
@@ -123,7 +138,15 @@ const BuilderPage = () => {
 
               {/* Editor Footer */}
               <div className="px-4 py-3 border-t border-primary/20 bg-terminal-header flex justify-between items-center">
-                <div className="text-primary/60 font-mono text-[10px]">TOKENS: {state.currentPrompt.length} / 8192</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-primary/60 font-mono text-[10px]">TOKENS: {state.currentPrompt.length} / 8192</div>
+                  {userGameDNA && (
+                    <div className="hidden md:inline-flex items-center gap-1 font-mono text-[10px] text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/20">
+                      <span className="material-symbols-outlined text-[12px] text-primary">auto_awesome</span>
+                      <span>Using Game DNA</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {state.buildStatus === 'COMPILING' && (
                     <button

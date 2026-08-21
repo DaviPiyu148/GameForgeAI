@@ -156,12 +156,40 @@ async def more_like_this(
 async def get_build_inspiration(
     steam_app_id: str,
     service: DiscoveryService = Depends(get_discovery_service),
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ) -> BuildInspirationResponse:
     """
     Extract structured blueprint inspiration parameters from a discovered game.
     """
     try:
-        return service.get_build_inspiration(steam_app_id)
+        inspiration = service.get_build_inspiration(steam_app_id)
+
+        # Track preference signal and XP for authenticated users
+        if current_user and db:
+            try:
+                progression_service.grant_xp(
+                    db=db,
+                    user_id=current_user.id,
+                    event_type="BUILD_SIMILAR",
+                    source_ref=steam_app_id,
+                )
+
+                signal_tags = [inspiration.inferred_archetype, inspiration.inferred_theme]
+                if inspiration.suggested_modules:
+                    signal_tags.extend(inspiration.suggested_modules)
+
+                preference_service.record_signal(
+                    db=db,
+                    user_id=current_user.id,
+                    raw_genres_or_tags=signal_tags,
+                    weight=4.0,
+                    source="build_similar",
+                )
+            except Exception as pe:
+                logger.warning(f"Failed to record build inspiration telemetry for user {current_user.id}: {pe}")
+
+        return inspiration
     except KeyError as ke:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ke))
     except Exception as e:

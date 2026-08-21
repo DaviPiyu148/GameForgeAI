@@ -91,6 +91,9 @@ export interface UserPreferencesData {
   top_genres: GenreAffinityItem[];
   total_interactions: number;
   strongest_match?: string | null;
+  recent_interest?: string | null;
+  confidence_level?: 'LOW' | 'MODERATE' | 'HIGH';
+  summary_headline?: string | null;
   has_sufficient_data: boolean;
 }
 

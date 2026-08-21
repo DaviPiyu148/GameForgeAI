@@ -307,53 +307,139 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (col-span-1): Preferences & Saved Discoveries */}
         <div className="space-y-6">
-          {/* Personalized Genre Affinity Profile */}
+          {/* YOUR GAME DNA Section */}
           <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
-            <div className="flex items-center justify-between mb-4">
+            {/* Header with Telemetry / Confidence badge */}
+            <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">psychology</span>
-                <h2 className="font-display text-lg uppercase tracking-wide">Genre Affinity</h2>
+                <span className="material-symbols-outlined text-primary text-xl">genetics</span>
+                <h2 className="font-display text-lg uppercase tracking-wide">Your Game DNA</h2>
               </div>
-              <span className="font-mono text-[10px] text-on-surface-variant uppercase">Telemetry</span>
+              {state.authStatus === 'AUTHENTICATED' && preferencesData?.has_sufficient_data ? (
+                <span className="font-mono text-[10px] text-primary border border-primary/40 bg-primary/10 px-2 py-0.5 rounded-sm uppercase tracking-wider font-bold">
+                  {preferencesData.confidence_level || 'MODERATE'} CONFIDENCE
+                </span>
+              ) : (
+                <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">
+                  Telemetry
+                </span>
+              )}
             </div>
 
+            {/* Subtitle */}
+            <p className="font-mono text-[11px] text-on-surface-variant mb-4">
+              Based on your GameForge activity
+            </p>
+
             {state.authStatus !== 'AUTHENTICATED' ? (
-              <div className="p-4 border border-outline-variant bg-surface-container text-center font-mono text-xs text-on-surface-variant">
-                Sign in to build your personalized genre profile through gameplay and discovery.
+              <div className="p-5 border border-outline-variant bg-surface-container text-center space-y-3 font-mono text-xs text-on-surface-variant">
+                <span className="material-symbols-outlined text-3xl text-on-surface-variant/50">lock</span>
+                <p>Sign in to build your personalized Game DNA through gameplay and discovery.</p>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login', 'Sign in to access your Game DNA.')}
+                  className="px-4 py-2 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded-sm btn-interactive glow-cyan cursor-pointer"
+                >
+                  Sign In
+                </button>
               </div>
-            ) : !preferencesData || preferencesData.top_genres.length === 0 ? (
-              <div className="p-4 border border-outline-variant bg-surface-container text-center font-mono text-xs text-on-surface-variant space-y-2">
-                <p>No behavioral telemetry recorded yet.</p>
-                <p className="text-[10px]">Search games, save favorites, and generate prototypes to reveal your genre affinity profile.</p>
+            ) : !preferencesData || !preferencesData.has_sufficient_data || preferencesData.top_genres.length === 0 ? (
+              /* Low-Data Forming State */
+              <div className="p-5 border border-outline-variant/60 bg-surface-container text-center font-mono text-xs space-y-3 rounded-sm">
+                <div className="w-10 h-10 mx-auto rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-xl">radar</span>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-white font-bold uppercase text-xs">Your Game DNA is still forming</h3>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Search, save, and build games to discover your preferences.
+                  </p>
+                </div>
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="px-3 py-1.5 border border-outline-variant hover:border-primary text-on-surface hover:text-primary text-[10px] uppercase font-bold rounded transition-colors cursor-pointer"
+                  >
+                    Search Games
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/build')}
+                    className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary text-[10px] uppercase font-bold rounded transition-colors cursor-pointer"
+                  >
+                    Build Prototype
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="space-y-3.5">
-                {preferencesData.strongest_match && (
-                  <div className="p-2.5 bg-primary/10 border border-primary/30 rounded-sm flex items-center justify-between">
-                    <span className="font-mono text-xs text-primary font-bold uppercase">Strongest Affinity</span>
-                    <span className="font-mono text-xs text-primary">{preferencesData.strongest_match}</span>
-                  </div>
-                )}
-
-                {preferencesData.top_genres.map((g) => (
-                  <div key={g.genre} className="space-y-1">
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-on-surface font-semibold">{g.genre}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-on-surface-variant px-1.5 py-0.2 rounded bg-surface-container-highest border border-outline-variant/40">
-                          {g.affinity_tier}
-                        </span>
-                        <span className="text-primary font-bold">{g.percentage}%</span>
+              /* Active Game DNA Representation */
+              <div className="space-y-4">
+                {/* Highlight Callouts Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {preferencesData.strongest_match && (
+                    <div className="p-2.5 bg-primary/10 border border-primary/30 rounded-sm space-y-0.5">
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-primary uppercase font-bold">
+                        <span className="material-symbols-outlined text-xs">stars</span>
+                        <span>Strongest Match</span>
+                      </div>
+                      <div className="font-mono text-xs text-white font-bold truncate">
+                        {preferencesData.strongest_match}
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container-highest rounded-xs overflow-hidden border border-outline-variant/30">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-300"
-                        style={{ width: `${g.percentage}%` }}
-                      />
+                  )}
+                  {preferencesData.recent_interest && (
+                    <div className="p-2.5 bg-secondary/10 border border-secondary/30 rounded-sm space-y-0.5">
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-secondary uppercase font-bold">
+                        <span className="material-symbols-outlined text-xs">history</span>
+                        <span>Recent Interest</span>
+                      </div>
+                      <div className="font-mono text-xs text-white font-bold truncate">
+                        {preferencesData.recent_interest}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+
+                {/* Ranked Genre Affinity Bars */}
+                <div className="space-y-3 pt-1">
+                  {preferencesData.top_genres.map((g, idx) => (
+                    <div key={g.genre} className="space-y-1">
+                      <div className="flex justify-between items-center text-xs font-mono">
+                        <span className="text-on-surface font-semibold flex items-center gap-1.5">
+                          <span className="text-on-surface-variant text-[10px]">#{idx + 1}</span>
+                          <span>{g.genre}</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-on-surface-variant px-1.5 py-0.2 rounded bg-surface-container-highest border border-outline-variant/40">
+                            {g.affinity_tier}
+                          </span>
+                          <span className="text-primary font-bold">{g.percentage}%</span>
+                        </div>
+                      </div>
+                      <div className="w-full h-2 bg-surface-container-highest rounded-xs overflow-hidden border border-outline-variant/30">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            idx === 0
+                              ? 'bg-gradient-to-r from-primary/70 via-primary to-primary-bright shadow-[0_0_8px_rgba(76,224,210,0.4)]'
+                              : idx === 1
+                              ? 'bg-gradient-to-r from-secondary/70 to-secondary'
+                              : 'bg-gradient-to-r from-tertiary/70 to-tertiary'
+                          }`}
+                          style={{ width: `${Math.max(g.percentage, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Explanatory "How this works" footer */}
+                <div className="pt-3 border-t border-outline-variant/30 flex items-start gap-2 text-[11px] font-mono text-on-surface-variant leading-relaxed">
+                  <span className="material-symbols-outlined text-sm text-primary shrink-0 mt-0.5">info</span>
+                  <p>
+                    GameForge learns from the games you search, save, build, and play to tailor future prototype recommendations.
+                  </p>
+                </div>
               </div>
             )}
           </div>
