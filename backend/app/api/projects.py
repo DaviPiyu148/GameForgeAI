@@ -31,6 +31,8 @@ from app.schemas.improvement import (
     ImprovementApplyRequest,
     ImprovementApplyResponse,
 )
+from app.schemas.blueprint import GameBlueprint
+from app.schemas.remix import RemixApplyRequest, RemixApplyResponse
 from app.services.project_service import (
     PlaytestNotFoundError,
     ProjectNotFoundError,
@@ -315,6 +317,74 @@ async def apply_improvements(
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except Exception as e:
         return make_error_response("IMPROVEMENT_FAILED", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+
+
+@router.get(
+    "/{project_id}/blueprint",
+    response_model=GameBlueprint,
+    status_code=status.HTTP_200_OK,
+    summary="Get the nontechnical-friendly Game Blueprint for a project",
+)
+def get_project_blueprint(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> GameBlueprint:
+    """Derive and return the Game Blueprint (title, genre, core loop, levels, objectives,
+    progression, supported mechanics, finale) for an owned project."""
+    try:
+        return service.get_project_blueprint(db, project_id, current_user.id)
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except ValueError as e:
+        return make_error_response("BLUEPRINT_UNAVAILABLE", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+
+
+@router.post(
+    "/{project_id}/remix",
+    response_model=RemixApplyResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Apply structured remix intents as a new versioned project remix",
+)
+async def apply_remix(
+    project_id: str,
+    data: RemixApplyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> RemixApplyResponse:
+    """Apply approved structured remix intents to create a new immutable project version."""
+    try:
+        remix_res = await service.apply_project_remix(
+            db=db,
+            project_id=project_id,
+            user_id=current_user.id,
+            data=data,
+        )
+
+        try:
+            from app.services.progression_service import progression_service
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="IMPROVE_GAME",
+                source_ref=f"{project_id}_v{remix_res.version_number}",
+            )
+            progression_service.evaluate_milestones(
+                db=db,
+                user_id=current_user.id,
+                trigger_event="IMPROVE_GAME",
+                context={"project_id": project_id, "version": remix_res.version_number, "remix": True},
+            )
+        except Exception as pe:
+            logger.warning(f"Telemetry tracking failed on project remix for user {current_user.id}: {pe}")
+
+        return remix_res
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except Exception as e:
+        return make_error_response("REMIX_FAILED", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
 
 
 @router.get(

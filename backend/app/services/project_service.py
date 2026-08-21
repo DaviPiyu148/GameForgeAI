@@ -24,6 +24,12 @@ from app.schemas.improvement import (
     ImprovementApplyRequest,
     ImprovementApplyResponse,
 )
+from app.schemas.blueprint import GameBlueprint
+from app.schemas.remix import RemixApplyRequest, RemixApplyResponse, REMIX_INTENT_LABELS
+from app.schemas.design_spec import GameDesignSpec
+from app.generation.dsl_models import GameDSL
+from app.generation.validator import validate_game_dsl
+from app.generation.blueprint import build_game_blueprint
 from app.services.game_generation_service import game_generation_service
 
 
@@ -410,6 +416,116 @@ class ProjectService:
             status="SUCCESS",
         )
 
+    def get_project_blueprint(
+        self,
+        db: Session,
+        project_id: str,
+        user_id: str,
+    ) -> GameBlueprint:
+        """Derive and return the nontechnical-friendly Game Blueprint for an owned project."""
+        project = self._get_owned_project(db, project_id, user_id)
+
+        if not project.game_dsl:
+            raise ValueError("Project has no generated Game DSL yet.")
+
+        dsl_val = validate_game_dsl(project.game_dsl)
+        if not dsl_val.is_valid or not dsl_val.dsl:
+            raise ValueError("Stored Game DSL failed validation; cannot derive blueprint.")
+
+        design_spec_obj: Optional[GameDesignSpec] = None
+        spec_source = project.design_spec or (
+            project.game_dsl.get("design_spec") if isinstance(project.game_dsl, dict) else None
+        )
+        if spec_source:
+            try:
+                design_spec_obj = GameDesignSpec.model_validate(spec_source)
+            except Exception:
+                design_spec_obj = None
+
+        return build_game_blueprint(project.id, dsl_val.dsl, design_spec_obj)
+
+    async def apply_project_remix(
+        self,
+        db: Session,
+        project_id: str,
+        user_id: str,
+        data: RemixApplyRequest,
+    ) -> RemixApplyResponse:
+        """Apply structured remix intents to create a new versioned project remix."""
+        project = self._get_owned_project(db, project_id, user_id)
+
+        if not project.game_dsl:
+            raise ValueError("Cannot remix a project without existing Game DSL.")
+
+        current_dsl = project.game_dsl
+        design_spec = project.design_spec or {"title": project.title, "genre": project.genre}
+
+        personalization = None
+        try:
+            from app.services.preference_service import preference_service
+            personalization = preference_service.get_generation_context(db, user_id)
+        except Exception:
+            personalization = None
+
+        result = await game_generation_service.apply_remix(
+            current_dsl=current_dsl,
+            design_spec=design_spec,
+            intents=[i.model_dump(mode="json") for i in data.intents],
+            personalization=personalization,
+        )
+
+        if not result.success or not result.dsl:
+            raise ValueError(f"Remix failed: {result.error_message or 'Invalid DSL'}")
+
+        from sqlalchemy import func
+        max_v = (
+            db.query(func.max(ProjectVersion.version_number))
+            .filter(ProjectVersion.project_id == project.id)
+            .scalar()
+        )
+        new_version_num = max(max_v or 0, project.current_version or 0) + 1
+        new_dsl_dict = result.dsl.model_dump()
+        new_spec_dict = result.design_spec.model_dump() if result.design_spec else project.design_spec
+
+        intent_labels = ", ".join(REMIX_INTENT_LABELS.get(i.type.value, i.type.value) for i in data.intents)
+        change_desc = f"Remix applied: {intent_labels}."
+        clamp_note = result.provider_meta.get("remix_clamped_note") if result.provider_meta else None
+        if clamp_note:
+            change_desc = f"{change_desc} {clamp_note}"
+
+        project.game_dsl = new_dsl_dict
+        project.design_spec = new_spec_dict
+        project.current_version = new_version_num
+        project.updated_at = datetime.now(timezone.utc)
+
+        version_rec = ProjectVersion(
+            project_id=project.id,
+            version_number=new_version_num,
+            game_dsl=new_dsl_dict,
+            design_spec=new_spec_dict,
+            change_summary=change_desc,
+            remix_intent=[i.model_dump(mode="json") for i in data.intents],
+        )
+        db.add(version_rec)
+        db.commit()
+        db.refresh(project)
+
+        blueprint = build_game_blueprint(
+            project.id,
+            GameDSL.model_validate(new_dsl_dict),
+            GameDesignSpec.model_validate(new_spec_dict) if new_spec_dict else None,
+        )
+
+        return RemixApplyResponse(
+            project_id=project.id,
+            version_number=new_version_num,
+            game_dsl=new_dsl_dict,
+            design_spec=new_spec_dict,
+            blueprint=blueprint,
+            change_summary=change_desc,
+            status="SUCCESS",
+        )
+
     def list_project_versions(
         self,
         db: Session,
@@ -433,6 +549,7 @@ class ProjectService:
                 "change_summary": v.change_summary,
                 "created_at": v.created_at,
                 "game_dsl": v.game_dsl,
+                "remix_intent": v.remix_intent,
             }
             for v in versions
         ]

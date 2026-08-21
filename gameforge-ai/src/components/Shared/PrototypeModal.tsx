@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameDSL, Archetype, PlaytestSummary, PlaytestAnalysis, PlaytestRecommendation } from '../../runtime/types';
-import type { GameProject } from '../../types';
+import type { GameProject, GameBlueprint, RemixIntentType } from '../../types';
 import {
   SURVIVAL_FIXTURE,
   SHOOTER_FIXTURE,
@@ -9,7 +9,10 @@ import {
   COLLECTOR_FIXTURE,
 } from '../../runtime/fixtures';
 import { PhaserCanvas } from '../../runtime/PhaserCanvas';
-import { apiClient } from '../../services/api';
+import { apiClient, ApiError } from '../../services/api';
+import { projectService } from '../../services/projects';
+import { GameBlueprintPanel } from './GameBlueprintPanel';
+import { RemixPanel } from './RemixPanel';
 
 // Top-level GameDSL sections a locally-applied improvement patch may target when the
 // backend improvement endpoint is unreachable. Keep in sync with GameDSL (runtime/types.ts).
@@ -56,6 +59,40 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [selectedRecIds, setSelectedRecIds] = useState<string[]>([]);
   const [isApplyingImprovement, setIsApplyingImprovement] = useState(false);
   const [improvementSuccess, setImprovementSuccess] = useState<string | null>(null);
+
+  // Phase 4: Game Blueprint & Remix state
+  const [blueprint, setBlueprint] = useState<GameBlueprint | null>(null);
+  const [isLoadingBlueprint, setIsLoadingBlueprint] = useState(false);
+  const [blueprintError, setBlueprintError] = useState<string | null>(null);
+  const [isRemixPanelOpen, setIsRemixPanelOpen] = useState(false);
+  const [isApplyingRemix, setIsApplyingRemix] = useState(false);
+  const [remixError, setRemixError] = useState<string | null>(null);
+
+  const projectId = project?.id;
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    setIsLoadingBlueprint(true);
+    setBlueprintError(null);
+    projectService
+      .getBlueprint(projectId)
+      .then((bp) => {
+        if (!cancelled) setBlueprint(bp);
+      })
+      .catch((err) => {
+        if (!cancelled) setBlueprintError(err instanceof ApiError ? err.message : 'Unable to load blueprint.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBlueprint(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Refetch whenever the project's version changes (remix or improvement applied)
+    // so the blueprint always reflects the currently playable DSL/design spec.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, currentVersion]);
 
   const handleClose = useCallback(() => {
     setIsClosing(true);
@@ -236,6 +273,37 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     setAiAnalysis(null);
   };
 
+  const handleApplyRemix = async (intents: RemixIntentType[]) => {
+    if (!projectId || intents.length === 0) return;
+    setIsApplyingRemix(true);
+    setRemixError(null);
+
+    try {
+      const data = await projectService.applyRemix(
+        projectId,
+        intents.map((type) => ({ type }))
+      );
+      setCurrentDsl(data.game_dsl);
+      setCurrentVersion(data.version_number);
+      setBlueprint(data.blueprint);
+      setResolvedSeed((prev) => prev + 100);
+      setIsRemixPanelOpen(false);
+      setImprovementSuccess(`Remix applied! Now on Version ${data.version_number}.`);
+      if (onProjectUpdated && project) {
+        onProjectUpdated({
+          ...project,
+          gameDsl: data.game_dsl,
+          designSpec: data.design_spec ?? project.designSpec,
+          currentVersion: data.version_number,
+        });
+      }
+    } catch (err) {
+      setRemixError(err instanceof ApiError ? err.message : 'Remix failed. Please try again.');
+    } finally {
+      setIsApplyingRemix(false);
+    }
+  };
+
   return createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-background/90 backdrop-blur-sm ${
@@ -314,6 +382,34 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
             <button onClick={() => setImprovementSuccess(null)} className="hover:text-white">
               ✕
             </button>
+          </div>
+        )}
+
+        {/* Game Blueprint & Remix (authenticated backend projects only) */}
+        {projectId && (
+          <div className="bg-surface border-b border-primary/20 p-3 flex flex-col gap-2 shrink-0">
+            <GameBlueprintPanel blueprint={blueprint} isLoading={isLoadingBlueprint} error={blueprintError} />
+            {!isRemixPanelOpen ? (
+              <button
+                type="button"
+                onClick={() => setIsRemixPanelOpen(true)}
+                className="self-start px-4 py-1.5 text-xs font-mono font-bold rounded border border-secondary/50 text-secondary hover:bg-secondary/10 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">shuffle</span>
+                <span>REMIX THIS GAME</span>
+              </button>
+            ) : (
+              <RemixPanel
+                isOpen={isRemixPanelOpen}
+                isApplying={isApplyingRemix}
+                error={remixError}
+                onApply={handleApplyRemix}
+                onCancel={() => {
+                  setIsRemixPanelOpen(false);
+                  setRemixError(null);
+                }}
+              />
+            )}
           </div>
         )}
 

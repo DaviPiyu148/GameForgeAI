@@ -262,3 +262,60 @@ CURRENT GAME DSL:
 
 Apply ONLY the approved modifications while strictly preserving schema validity and capability constraints.
 Output the complete updated JSON Game DSL object."""
+
+
+# Natural-language instruction given to the model for each supported remix intent.
+# Keys must match app.schemas.remix.RemixIntentType values exactly.
+REMIX_INTENT_INSTRUCTIONS: Dict[str, str] = {
+    "increase_combat": "Increase combat intensity: add more enemy entities and/or raise enemy fire_rate and damage within safe bounds, without making the game unwinnable.",
+    "increase_exploration": "Increase exploration: add more collectible entities spread further across the world; you may slightly reduce enemy density to make room.",
+    "increase_difficulty": "Increase overall difficulty: raise world.difficulty_scaling and/or enemy damage/health, while keeping the game winnable and fair.",
+    "decrease_difficulty": "Decrease overall difficulty: lower world.difficulty_scaling and/or enemy damage/health, and/or raise player max_health slightly.",
+    "add_levels": "Add up to 2 additional levels/stages continuing the existing campaign's narrative and difficulty progression (the schema hard-caps levels at 5 total -- never exceed it).",
+    "more_story": "Deepen the narrative: expand elevator_pitch, rationale, and progression_phases with richer story beats. Do not add any mechanic outside the existing capability matrix.",
+    "faster_pace": "Increase pacing: raise player speed and dash_speed, and tighten enemy fire_rate; shorten time_limit_seconds where an objective already uses one.",
+    "more_enemies": "Add more enemy entities (the schema hard-caps entities at 30 per level) while preserving player spawn clearance and fairness bounds.",
+    "change_theme": "Change the visual theme (world.theme and design_spec.theme) to a different theme from the supported set, updating color fields to match. Do not alter core mechanics.",
+}
+
+
+def build_remix_prompt(
+    current_dsl: Dict[str, Any],
+    design_spec: Dict[str, Any],
+    intents: List[Dict[str, Any]],
+    personalization: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Build prompt instructing the model to remix an existing game per structured intents."""
+    intent_lines = "\n".join(
+        f"- {REMIX_INTENT_INSTRUCTIONS.get(i.get('type'), i.get('type'))} (requested strength: {i.get('strength', 0.5)})"
+        for i in intents
+    )
+    dsl_str = json.dumps(current_dsl, indent=2)
+    spec_str = json.dumps(design_spec, indent=2)
+
+    personalization_text = ""
+    if personalization and personalization.get("has_sufficient_data"):
+        preferred = personalization.get("preferred_genres", [])
+        if preferred:
+            personalization_text = f"""
+PLAYER GAME DNA (Secondary subtle motif guidance ONLY; the REMIX REQUESTS above ALWAYS take absolute precedence):
+- Preferred Motifs: {", ".join(preferred[:3])}
+"""
+
+    return f"""Remix the following existing game according to the approved structured remix requests.
+
+REMIX REQUESTS (apply ALL of these; they take absolute precedence over any other guidance):
+{intent_lines}
+{personalization_text}
+CURRENT GAME DESIGN SPEC:
+{spec_str}
+
+CURRENT GAME DSL:
+{dsl_str}
+
+RULES:
+- Apply ONLY the requested remix changes plus the minimum supporting edits needed to keep the game coherent and fair.
+- Preserve schema validity and the existing capability matrix (Game DSL Schema v3.0). Never invent fields outside the schema.
+- Hard caps you must respect: entities <= 30 per level/top-level, rules <= 20 top-level / 15 per level, levels <= 5 total.
+- Never remove the player's ability to win, and never remove the primary objective.
+- Output a single JSON object with the same top-level shape as generation output: {{"design_spec": {{...}}, "dsl": {{...}}}}."""

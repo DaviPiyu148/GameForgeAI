@@ -1,5 +1,12 @@
 import { apiClient } from './api';
-import type { GameProject, ProjectUpdateInput } from '../types';
+import type {
+  GameProject,
+  ProjectUpdateInput,
+  GameBlueprint,
+  RemixIntent,
+  RemixApplyResponse,
+  ProjectVersionSummary,
+} from '../types';
 
 interface ProjectListApiResponse {
   projects: GameProject[];
@@ -28,6 +35,27 @@ export const projectService = {
    */
   async updateProject(id: string, data: ProjectUpdateInput): Promise<GameProject> {
     return await apiClient.patch<GameProject>(`/projects/${id}`, data);
+  },
+
+  /**
+   * Fetch the nontechnical-friendly Game Blueprint for a project.
+   */
+  async getBlueprint(id: string): Promise<GameBlueprint> {
+    return await apiClient.get<GameBlueprint>(`/projects/${id}/blueprint`);
+  },
+
+  /**
+   * Apply structured remix intents, creating a new immutable project version.
+   */
+  async applyRemix(id: string, intents: RemixIntent[]): Promise<RemixApplyResponse> {
+    return await apiClient.post<RemixApplyResponse>(`/projects/${id}/remix`, { intents });
+  },
+
+  /**
+   * List revision history (including remix provenance) for a project.
+   */
+  async getVersions(id: string): Promise<ProjectVersionSummary[]> {
+    return await apiClient.get<ProjectVersionSummary[]>(`/projects/${id}/versions`);
   },
 };
 

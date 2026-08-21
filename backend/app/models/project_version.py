@@ -25,6 +25,11 @@ class ProjectVersion(Base):
     game_dsl = Column(JSON, nullable=False)
     design_spec = Column(JSON, nullable=True)
     change_summary = Column(Text, nullable=True)
+    # Structured remix intent(s) (see app.schemas.remix.RemixIntent) that produced
+    # this version, if it was created via the Remix flow. Null for organic builds
+    # (v1) and AI-improvement-driven versions -- this column is Remix-specific
+    # provenance, not a general-purpose version-source field.
+    remix_intent = Column(JSON, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

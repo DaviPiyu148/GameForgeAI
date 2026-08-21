@@ -57,3 +57,28 @@ Acts as an intermediate structured design layer between natural-language user co
 - **Telemetry Recorder**: Tracks in-game events (`SESSION_START`, `DAMAGE_TAKEN`, `ENEMY_DEFEATED`, `ITEM_COLLECTED`, `OBJECTIVE_COMPLETED`, `CHECKPOINT_REACHED`, `GAME_WON`, `GAME_LOST`, `SCORE_CHANGED`).
 - **AI Playtest Analysis**: Post-game critique returns structured ratings (`fun_rating`, `difficulty_rating`, `clarity_rating`), strengths, problems, and actionable recommendations.
 - **Iterative Improvement**: User selects recommendations, Gemini patches existing DSL, project bumps version (`current_version = 2`), and prototype hot-reloads without full regeneration.
+
+## Game Blueprint (Phase 4)
+`GET /api/projects/{id}/blueprint` derives a nontechnical-friendly `GameBlueprint` purely
+from the project's already-validated `GameDesignSpec` + `GameDSL` — a computed
+projection, never a second source of truth. `supported_mechanics` is allowlist-derived
+(`backend/app/generation/blueprint.py`): a mechanic name only appears when its predicate
+against the real DSL is true (e.g. `"Dash Mobility"` iff `player.dash_speed > 0`). This
+is the enforcement mechanism preventing the blueprint from ever claiming a capability the
+runtime can't back — `"Vehicles"`, `"Boss Fights"`, and `"Wanted System"` never appear;
+those belong to later roadmap phases (5/6).
+
+## Remix (Phase 4)
+`POST /api/projects/{id}/remix` accepts 1-3 structured `RemixIntent` objects from a closed
+catalog (`app/schemas/remix.py`): `increase_combat, increase_exploration,
+increase_difficulty, decrease_difficulty, add_levels, more_story, faster_pace,
+more_enemies, change_theme`. Duplicate or mutually-exclusive intents (e.g.
+`increase_difficulty` + `decrease_difficulty`) are rejected with HTTP 422 before any AI
+call. `GameGenerationService.apply_remix()` reuses the exact same schema validation,
+`GameplayQualityValidator`, `ReachabilityValidator` repair pass, and bounded AI repair
+loop as fresh generation — a remix is held to the identical safety bar. `add_levels` is
+clamped server-side to the existing 5-level schema cap rather than silently dropped.
+Game DNA personalization is passed into the remix prompt strictly as secondary flavor;
+the explicit remix request always takes precedence. Every successful remix creates a new
+immutable `ProjectVersion` (never mutates prior versions), recording the structured
+intent(s) that produced it in the new `remix_intent` column.

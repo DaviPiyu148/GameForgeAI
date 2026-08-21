@@ -61,13 +61,14 @@ Keep these distinct:
 - `ai_analysis`: JSON, nullable (Cached AI Playtest Critique output)
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 
-### ProjectVersion (SQLAlchemy Model: `project_versions`, G12)
+### ProjectVersion (SQLAlchemy Model: `project_versions`, G12, extended Phase 4)
 - `id`: String(36) (Primary Key, server-generated UUID)
 - `project_id`: String(36), non-null, indexed (FK to `projects.id` with `ondelete="CASCADE"`)
 - `version_number`: Integer, non-null, default: `1`
 - `game_dsl`: JSON, non-null
 - `design_spec`: JSON, nullable
 - `change_summary`: Text, nullable
+- `remix_intent`: JSON, nullable (Phase 4: structured `RemixIntent` list that produced this version via `POST /projects/{id}/remix`; `null` for organic builds and AI-improvement-patched versions)
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 
 ### BuildJob (SQLAlchemy Model: `build_jobs`, B2, extended B3 & B7)

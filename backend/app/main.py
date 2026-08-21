@@ -59,10 +59,31 @@ app.add_middleware(
 )
 
 
+def _sanitize_validation_error_details(errors: list) -> list:
+    """
+    Pydantic v2 embeds the raw exception object under `ctx.error` for any custom
+    `@field_validator` that raises a bare ValueError/AssertionError (e.g. the DSL's
+    script-injection checks or Remix's mutually-exclusive-intents check). That raw
+    exception object is not JSON-serializable, so `JSONResponse` would crash while
+    trying to render `details` -- turning a clean 422 into an unhandled 500. Strip
+    it down to its string form; the human-readable message is already in `msg`.
+    """
+    sanitized = []
+    for err in errors:
+        err = dict(err)
+        ctx = err.get("ctx")
+        if isinstance(ctx, dict) and "error" in ctx:
+            ctx = dict(ctx)
+            ctx["error"] = str(ctx["error"])
+            err["ctx"] = ctx
+        sanitized.append(err)
+    return sanitized
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Format Pydantic validation errors into structured error envelope."""
-    error_details = exc.errors()
+    error_details = _sanitize_validation_error_details(exc.errors())
     first_error = error_details[0] if error_details else {}
     msg = f"{first_error.get('loc', ['field'])[-1]}: {first_error.get('msg', 'Invalid input')}"
     if "/builds" in request.url.path:

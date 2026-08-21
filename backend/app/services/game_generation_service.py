@@ -10,6 +10,7 @@ from app.ai.prompts import (
     build_repair_prompt,
     build_playtest_analysis_prompt,
     build_improvement_prompt,
+    build_remix_prompt,
 )
 from app.ai.provider import (
     AIConfigurationError,
@@ -635,6 +636,167 @@ class GameGenerationService:
                 error_code="PATCH_FAILED",
                 error_message=f"Failed to apply improvements: {str(exc)}",
             )
+
+    def _apply_reachability_repair(self, dsl: GameDSL) -> GameDSL:
+        """
+        Run deterministic spawn/entity reachability repair across the top-level world
+        and every campaign level. Mirrors the repair pass generate_game_dsl() runs on
+        a freshly generated DSL, reused here so a remixed DSL is held to the exact
+        same spatial-feasibility bar as fresh generation.
+        """
+        from app.generation.reachability import ReachabilityValidator
+
+        reach_res = ReachabilityValidator.validate_and_repair_level(
+            world=dsl.world,
+            spawn_x=dsl.player.spawn_x,
+            spawn_y=dsl.player.spawn_y,
+            player_width=dsl.player.width,
+            player_height=dsl.player.height,
+            entities=dsl.entities,
+            jump_power=dsl.player.jump_power,
+            gravity=dsl.world.gravity,
+            archetype=dsl.metadata.archetype,
+        )
+        if reach_res.repaired:
+            if reach_res.repaired_spawn:
+                dsl.player.spawn_x, dsl.player.spawn_y = reach_res.repaired_spawn
+            dsl.entities = reach_res.repaired_entities
+
+        for lvl in dsl.levels:
+            lvl_world = lvl.world or dsl.world
+            lvl_spawn_x = lvl.spawn_x if lvl.spawn_x is not None else dsl.player.spawn_x
+            lvl_spawn_y = lvl.spawn_y if lvl.spawn_y is not None else dsl.player.spawn_y
+            lvl_reach = ReachabilityValidator.validate_and_repair_level(
+                world=lvl_world,
+                spawn_x=lvl_spawn_x,
+                spawn_y=lvl_spawn_y,
+                player_width=dsl.player.width,
+                player_height=dsl.player.height,
+                entities=lvl.entities,
+                objective=lvl.objective,
+                jump_power=dsl.player.jump_power,
+                gravity=lvl_world.gravity,
+                archetype=dsl.metadata.archetype,
+            )
+            if lvl_reach.repaired:
+                if lvl_reach.repaired_spawn:
+                    lvl.spawn_x, lvl.spawn_y = lvl_reach.repaired_spawn
+                lvl.entities = lvl_reach.repaired_entities
+
+        return dsl
+
+    def _validate_remix_candidate(
+        self, raw_output: Dict[str, Any]
+    ) -> Tuple[Optional[GameDSL], Optional[Dict[str, Any]], List[str]]:
+        """
+        Run a remix candidate through the same schema + gameplay-quality gate as
+        fresh generation, then reachability-repair on success. Returns
+        (validated_and_repaired_dsl_or_None, spec_dict_or_None, errors).
+        """
+        cand_spec, cand_dsl_raw = self._extract_spec_and_dsl(raw_output)
+        val_res = validate_game_dsl(cand_dsl_raw)
+        if not (val_res.is_valid and val_res.dsl):
+            return None, cand_spec, val_res.errors
+
+        quality_res = GameplayQualityValidator.validate(val_res.dsl)
+        if not quality_res.is_valid:
+            return None, cand_spec, quality_res.errors
+
+        repaired_dsl = self._apply_reachability_repair(val_res.dsl)
+        return repaired_dsl, cand_spec, []
+
+    async def apply_remix(
+        self,
+        current_dsl: Any,
+        design_spec: Any,
+        intents: List[Dict[str, Any]],
+        personalization: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> GenerationResult:
+        """
+        Apply structured remix intents (see app.schemas.remix.RemixIntentType) to
+        produce a new GameDesignSpec + GameDSL, held to the same validation, quality,
+        and reachability-repair pipeline as fresh generation, with a bounded AI
+        repair loop identical in shape to generate_game_dsl()'s.
+        """
+        spec_dict = design_spec.model_dump() if hasattr(design_spec, "model_dump") else (design_spec if isinstance(design_spec, dict) else {})
+        dsl_dict = current_dsl.model_dump() if hasattr(current_dsl, "model_dump") else (current_dsl if isinstance(current_dsl, dict) else {})
+        dsl_copy = copy.deepcopy(dsl_dict)
+        spec_copy = copy.deepcopy(spec_dict)
+
+        # add_levels is clamped server-side to the hard schema cap (5) regardless of
+        # what the AI proposes -- never silently drop an over-cap request without
+        # saying so in the returned change summary.
+        existing_level_count = len(dsl_copy.get("levels") or [])
+        clamp_note: Optional[str] = None
+        if existing_level_count >= 5:
+            filtered = [i for i in intents if i.get("type") != "add_levels"]
+            if len(filtered) != len(intents):
+                clamp_note = "Level cap (5) already reached; 'Add Levels' request was skipped."
+            intents = filtered
+
+        prompt = build_remix_prompt(dsl_copy, spec_copy, intents, personalization=personalization)
+
+        def _result(dsl: GameDSL, cand_spec: Optional[Dict[str, Any]], attempts: int) -> GenerationResult:
+            parsed_spec = None
+            if cand_spec:
+                try:
+                    parsed_spec = GameDesignSpec.model_validate(cand_spec)
+                except Exception:
+                    parsed_spec = None
+            return GenerationResult(
+                success=True,
+                dsl=dsl,
+                design_spec=parsed_spec,
+                attempts_used=attempts,
+                provider_meta={"remix_clamped_note": clamp_note} if clamp_note else {},
+            )
+
+        current_errors: List[str] = []
+        try:
+            raw_output = await self.provider.generate_structured(
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=prompt,
+            )
+            dsl, cand_spec, errors = self._validate_remix_candidate(raw_output)
+            if dsl is not None:
+                return _result(dsl, cand_spec, 1)
+            current_errors = errors
+            last_candidate: Any = raw_output
+        except Exception as exc:
+            current_errors = [str(exc)]
+            last_candidate = dsl_copy
+
+        # Bounded repair loop, reusing the same repair-prompt infrastructure as
+        # fresh generation (capped at settings.AI_MAX_RETRIES attempts).
+        for attempt in range(1, self.max_retries + 1):
+            repair_prompt = build_repair_prompt(last_candidate, current_errors)
+            try:
+                repaired_output = await self.provider.generate_structured(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=repair_prompt,
+                )
+            except Exception as exc:
+                return GenerationResult(
+                    success=False,
+                    error_code="REMIX_PROVIDER_ERROR",
+                    error_message=str(exc),
+                    attempts_used=attempt + 1,
+                )
+
+            dsl, cand_spec, rep_errors = self._validate_remix_candidate(repaired_output)
+            if dsl is not None:
+                return _result(dsl, cand_spec, attempt + 1)
+
+            last_candidate = repaired_output
+            current_errors = rep_errors
+
+        return GenerationResult(
+            success=False,
+            error_code="REMIX_REPAIR_EXHAUSTED",
+            error_message="Failed to produce a valid remixed Game DSL after maximum repair attempts.",
+            attempts_used=self.max_retries + 1,
+        )
 
 
 # Authoritative Singleton Service Instance

@@ -264,6 +264,84 @@ export interface DiscoverySearchResponse {
   results: DiscoverySearchResult[];
 }
 
+// --- Phase 4: Game Blueprint & Remix ---
+export interface BlueprintObjective {
+  level_number?: number | null;
+  type: string;
+  description: string;
+}
+
+export interface GameBlueprint {
+  project_id: string;
+  title: string;
+  genre: string;
+  archetype: string;
+  player_fantasy: string;
+  theme: string;
+  core_loop: string;
+  estimated_session_length: string;
+  level_count: number;
+  world_area_count: number;
+  objectives: BlueprintObjective[];
+  progression: string[];
+  encounter_types: string[];
+  enemy_variety: number;
+  finale: string;
+  supported_mechanics: string[];
+}
+
+// Closed vocabulary of supported remix intents. Deliberately excludes "Add Boss"
+// and "More Vehicles" -- those runtime capabilities don't exist until later phases
+// (boss/finale system, living-world vehicles), so offering them here would display
+// a capability the game can't actually deliver.
+export type RemixIntentType =
+  | 'increase_combat'
+  | 'increase_exploration'
+  | 'increase_difficulty'
+  | 'decrease_difficulty'
+  | 'add_levels'
+  | 'more_story'
+  | 'faster_pace'
+  | 'more_enemies'
+  | 'change_theme';
+
+export const REMIX_INTENT_LABELS: Record<RemixIntentType, string> = {
+  increase_combat: 'More Combat',
+  increase_exploration: 'More Exploration',
+  increase_difficulty: 'Harder',
+  decrease_difficulty: 'Easier',
+  add_levels: 'Add 2 Levels',
+  more_story: 'More Story',
+  faster_pace: 'Faster Pace',
+  more_enemies: 'More Enemies',
+  change_theme: 'Different Theme',
+};
+
+export interface RemixIntent {
+  type: RemixIntentType;
+  strength?: number;
+}
+
+export interface RemixApplyResponse {
+  project_id: string;
+  version_number: number;
+  game_dsl: GameDSL;
+  design_spec?: GameDesignSpec | null;
+  blueprint: GameBlueprint;
+  change_summary: string;
+  status: string;
+}
+
+export interface ProjectVersionSummary {
+  id: string;
+  project_id: string;
+  version_number: number;
+  change_summary?: string | null;
+  created_at: string;
+  game_dsl: GameDSL;
+  remix_intent?: RemixIntent[] | null;
+}
+
 export interface BuildInspirationResponse {
   source_game_id: string;
   title: string;

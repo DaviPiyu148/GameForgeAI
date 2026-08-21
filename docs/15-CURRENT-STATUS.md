@@ -1,10 +1,45 @@
 # 15 — Current Status
 
 ## Date
-2026-08-18 baseline
+2026-08-22
 
 ## Current Phase
-Forensic Audit Bug Fix & Regression Phase (Complete)
+Phase 4 — AI Game Blueprint + Remix (Complete). First of the Phases 4-8 master
+product expansion (Blueprint/Remix -> Advanced Generation -> Living World -> AI
+Director -> Monetization/BYOK). Phases 5-8 not started.
+
+## Since the 2026-08-18 Baseline (previously undocumented here)
+- **Discovery Visual Experience V1** (commit `9d83d0b`)
+- **Game DNA & Personalization V1** (commit `29f7379`): behavioral genre-affinity
+  tracking (`preference_service`), fed into generation/remix prompts strictly as
+  secondary flavor context, never overriding explicit user intent.
+- **Product Expansion V1** (commit `0e89b21`): `GameDSL` schema v3.0 multi-level
+  campaign support (`levels: List[LevelDef]`, capped at 5), deterministic
+  reachability validator/repair pass, avatar service.
+- **Creator Progression V1** (commit `3765d5a`): server-authoritative XP, creator
+  levels, milestones, activity rewards, profile progression UI.
+- **Gemini API Key Rotation** (commit `60de2d9`): `RotatingGeminiProvider` rotates
+  round-robin across a configurable pool of Gemini API keys (`GEMINI_API_KEY` +
+  comma-separated `GEMINI_API_KEYS`), spreading load and transparently routing
+  around a rate-limited (429) or rejected (401/403) key within the same request.
+- **Phase 4 — AI Game Blueprint + Remix**: see below.
+
+## Phase 4 Summary
+- `GET /api/projects/{id}/blueprint`: derives a nontechnical `GameBlueprint` purely
+  from already-validated `GameDesignSpec` + `GameDSL` data (`app/generation/blueprint.py`).
+  `supported_mechanics` is allowlist-derived from real DSL predicates only —
+  capabilities that don't exist yet (vehicles, boss fights, wanted systems) can never
+  appear, by construction.
+- `POST /api/projects/{id}/remix`: closed 9-type structured `RemixIntentType` catalog
+  (no free-form prose patches). Reuses the exact validation/quality/reachability/
+  bounded-repair pipeline as fresh generation. Creates a new immutable
+  `ProjectVersion` (never mutates history), recording the intent(s) that produced it.
+- Frontend: `GameBlueprintPanel` and `RemixPanel` wired into the existing
+  `PrototypeModal` — no new primary route.
+- Verification: 284/284 backend tests pass; frontend `tsc`/`oxlint`/`build` clean;
+  single Alembic head (`f6a7b8c9d0e1`). Browser E2E not performed this phase.
+
+## Prior: Forensic Audit Bug Fix & Regression Phase (Complete, 2026-08-18 baseline)
 
 ## Summary of Completed Forensic Fixes
 - **Security**: CRIT-02 valid Argon2 dummy hash (anti-timing attack), CRIT-01 short-lived SSE credentials (`POST /api/builds/{id}/sse-token`) eliminating bearer tokens from URLs.
