@@ -19,14 +19,17 @@ set "VENV_PYTHON=%BACKEND_DIR%\.venv\Scripts\python.exe"
 set "BACKEND_PORT=8000"
 set "FRONTEND_PORT=5173"
 
+:: Suppress HuggingFace cache symlink noise on Windows
+set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
+
 :: 1. Python virtual environment check
-echo [1/4] Checking Python virtual environment ...
+echo [1/5] Checking Python virtual environment ...
 if not exist "%VENV_PYTHON%" (
     echo  [ERROR] Python virtual environment not found at:
-    echo          %VENV_PYTHON%
+    echo          "%VENV_PYTHON%"
     echo.
     echo  Setup instructions:
-    echo          cd backend
+    echo          cd /d "%BACKEND_DIR%"
     echo          python -m venv .venv
     echo          .venv\Scripts\pip install -r requirements.txt
     echo.
@@ -35,8 +38,22 @@ if not exist "%VENV_PYTHON%" (
 )
 echo       OK (Python venv found)
 
-:: 2. Node / npm check
-echo [2/4] Checking Node / npm ...
+:: 2. Environment (.env) configuration check
+echo [2/5] Checking backend configuration (.env) ...
+if not exist "%BACKEND_DIR%\.env" (
+    if exist "%BACKEND_DIR%\.env.example" (
+        echo       .env missing -- creating from .env.example ...
+        copy "%BACKEND_DIR%\.env.example" "%BACKEND_DIR%\.env" >nul
+        echo       Created "%BACKEND_DIR%\.env" with default settings.
+    ) else (
+        echo  [WARN] No .env or .env.example found in backend directory.
+    )
+) else (
+    echo       OK (.env found)
+)
+
+:: 3. Node / npm check & frontend dependencies
+echo [3/5] Checking Node.js ^& frontend dependencies ...
 where npm >nul 2>&1 || (
     echo  [ERROR] npm not found in PATH.
     echo          Please install Node.js 18+ from https://nodejs.org
@@ -44,10 +61,7 @@ where npm >nul 2>&1 || (
     pause
     exit /b 1
 )
-echo       OK (npm found)
 
-:: 3. Frontend dependencies check
-echo [3/4] Checking frontend dependencies ...
 if not exist "%FRONTEND_DIR%\node_modules" (
     echo       node_modules missing -- running npm install ...
     pushd "%FRONTEND_DIR%"
@@ -59,38 +73,40 @@ if not exist "%FRONTEND_DIR%\node_modules" (
     )
     popd
 )
-echo       OK (node_modules ready)
+echo       OK (Node ^& node_modules ready)
 
-:: 4. Database migrations
-echo [4/4] Checking database schema ^& migrations ...
+:: 4. Database schema & migrations
+echo [4/5] Checking database schema ^& migrations ...
 pushd "%BACKEND_DIR%"
 "%VENV_PYTHON%" -m alembic upgrade head || (
     echo  [WARN] Alembic upgrade returned non-zero. Check DB configuration if errors occur.
 )
 popd
-echo       OK (Database ready)
+echo       OK (Database ready at single head)
 
-:: Kill any stale processes listening on target ports
-echo.
-echo Clearing ports %BACKEND_PORT% and %FRONTEND_PORT% ...
+:: 5. Port conflict clearance
+echo [5/5] Checking ports %BACKEND_PORT% and %FRONTEND_PORT% ...
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":%BACKEND_PORT% .*LISTENING"') do (
+    echo       Clearing stale process %%P on port %BACKEND_PORT% ...
     taskkill /F /PID %%P >nul 2>&1
 )
 for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":%FRONTEND_PORT% .*LISTENING"') do (
+    echo       Clearing stale process %%P on port %FRONTEND_PORT% ...
     taskkill /F /PID %%P >nul 2>&1
 )
+echo       OK (Ports clear)
 
 :: Launch Backend in dedicated window
 echo.
 echo Starting Backend API (http://127.0.0.1:%BACKEND_PORT%) ...
-start "GameForge AI ^| Backend" cmd /k "color 0A && title GameForge AI ^| Backend [:%BACKEND_PORT%] && cd /d "%BACKEND_DIR%" && "%VENV_PYTHON%" -m uvicorn app.main:app --host 127.0.0.1 --port %BACKEND_PORT% --reload"
+start "GameForge AI ^| Backend" cmd /k "color 0A && title GameForge AI ^| Backend [:%BACKEND_PORT%] && cd /d ^"%BACKEND_DIR%^" && ^"%VENV_PYTHON%^" -m uvicorn app.main:app --host 127.0.0.1 --port %BACKEND_PORT% --reload"
 
 :: Brief pause so backend binds before Vite starts
-timeout /t 3 /nobreak >nul
+timeout /t 2 /nobreak >nul
 
 :: Launch Frontend in dedicated window
 echo Starting Frontend UI (http://127.0.0.1:%FRONTEND_PORT%) ...
-start "GameForge AI ^| Frontend" cmd /k "color 0B && title GameForge AI ^| Frontend [:%FRONTEND_PORT%] && cd /d "%FRONTEND_DIR%" && npm run dev -- --host 127.0.0.1 --port %FRONTEND_PORT%"
+start "GameForge AI ^| Frontend" cmd /k "color 0B && title GameForge AI ^| Frontend [:%FRONTEND_PORT%] && cd /d ^"%FRONTEND_DIR%^" && npm run dev -- --host 127.0.0.1 --port %FRONTEND_PORT%"
 
 :: Health-check loop (max ~30 s)
 echo.
@@ -113,7 +129,7 @@ echo  Backend is healthy and responding!
 :open
 echo.
 echo Opening GameForge AI in default browser ...
-start "" "http://127.0.0.1:%FRONTEND_PORT%/"
+start "" "http://127.0.0.1:%FRONTEND_PORT%/#/"
 
 echo.
 echo  ==========================================
@@ -121,7 +137,13 @@ echo   GameForge AI Services Running
 echo  ------------------------------------------
 echo   Backend API  : http://127.0.0.1:%BACKEND_PORT%
 echo   API Docs     : http://127.0.0.1:%BACKEND_PORT%/docs
-echo   Frontend App : http://127.0.0.1:%FRONTEND_PORT%
+echo   Frontend App : http://127.0.0.1:%FRONTEND_PORT%/#/
+echo.
+echo   Core Features:
+echo   - Discovery  : Lexical + Semantic Search
+echo   - Builder    : AI Game Compilation + Phaser
+echo   - Game DNA   : Preferences Telemetry
+echo   - Creator XP : Levels, Badges, Milestones
 echo.
 echo   Close the server terminal windows to stop services.
 echo  ==========================================
