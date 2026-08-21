@@ -153,5 +153,42 @@ c3d4e5f6a7b8 (single head verified)
 
 ---
 
-## 13. Final Verdict
-**PASS** — The complete vertical flow (User Prompt → Builder → Compilation → Project Persistence → Phaser Canvas → Interactive Controls & HUD → Dashboard & Profile History) alongside all non-generation route and discovery flows is verified and functional with zero console or runtime errors.
+---
+
+## 14. Discovery Visual Experience V1 Verification
+
+Executed on August 21, 2026:
+
+### Scope & Verified Items:
+1. **Artwork & Card Media**:
+   - Fixed-ratio artwork header loaded at the top of each discovery card with smooth gradient scrim.
+   - Fallback icon box displayed gracefully if cover image is missing/broken with zero layout shifts.
+   - Calibrated relevance score badge (e.g. `GOOD MATCH • 76%`) with color-coded styling.
+   - Clean action hierarchy: `Save`, `More`, `Build`.
+
+2. **Storefront Intel & Rich Game Details Modal (`GameDetailsModal`)**:
+   - Clicking `More` on "Neon Chrome" opened the Storefront Intel dialog.
+   - Displays high-resolution hero artwork, release year (`2016`), platforms (`PC`), positive rating summary (`80% Positive (422 reviews)`).
+   - Synopsis and metadata with developer/publisher information.
+   - "WHY THIS MATCHES YOUR QUERY" calibrated relevance progress meter (76%) and match highlights (`✓ Fast-Paced`, `✓ Rogue-lite`).
+   - "AVAILABLE ON STOREFRONTS" section with verified Steam direct link (`https://store.steampowered.com/app/358040/`).
+
+3. **Save Synchronization**:
+   - Clicked "Save Game" inside modal -> button smoothly toggled to "Saved in Collection" with emerald green styling.
+   - Closed modal -> the corresponding card on the search results grid immediately reflected the "Saved" bookmark badge.
+
+4. **Modal State Correctness (Zero Stale Data)**:
+   - Reopened the modal on a second card ("Rogue Stormers").
+   - Verified that the modal exclusively rendered Rogue Stormers' hero art, title, release year, platforms, and synopsis with zero stale data from the previous game.
+
+5. **Build Similar Pipeline Handoff**:
+   - Clicked "Build Similar" from the modal.
+   - Modal cleanly closed and navigated immediately to `/#/build`.
+   - The Builder prompt was pre-populated with inspiration derived from Rogue Stormers (`A 2D sci-fi platformer prototype inspired by Rogue Stormers...`).
+
+**Verdict**: **PASS** (100% verified in browser, recorded in `discovery_e2e_verify_1787327194280.webp`).
+
+---
+
+## 15. Final Verdict
+**PASS** — All Discovery Visual Experience V1 features (artwork, rich game details modal, screenshots, storefronts, save synchronization, and build similar handoff) alongside all vertical generation flows are verified in real browser testing with zero console errors.

@@ -315,6 +315,17 @@ class DiscoveryService:
                 if gid in enrichment_map:
                     enrichment = enrichment_map[gid]
                     r.game.enrichment = enrichment
+                    if enrichment.cover_url and (enrichment.cover_url.startswith("http://") or enrichment.cover_url.startswith("https://")):
+                        r.game.cover_image_url = enrichment.cover_url
+                    if enrichment.screenshot_urls:
+                        r.game.screenshots = [
+                            s for s in enrichment.screenshot_urls
+                            if s and (s.startswith("http://") or s.startswith("https://"))
+                        ]
+                    if enrichment.developer:
+                        r.game.developer = enrichment.developer
+                    if enrichment.publisher:
+                        r.game.publisher = enrichment.publisher
                     if enrichment.summary and len(enrichment.summary.strip()) >= 15:
                         r.game.display_description = enrichment.summary.strip()
                         r.game.description = enrichment.summary.strip()

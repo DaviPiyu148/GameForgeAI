@@ -7,6 +7,7 @@ from app.schemas.discovery import (
     DiscoveryFilters,
     DiscoverySearchResult,
     GameDiscoveryItem,
+    StorefrontItem,
 )
 from app.search.lexical import normalize_string, tokenize
 from app.search.query_parser import ParsedQuery
@@ -383,10 +384,28 @@ class Ranker:
             desc_lang = game.get("description_language", "en")
             desc_source = game.get("description_source", "steam")
 
+            source = game.get("source", "steam")
+            ext_id = str(game.get("external_id", game.get("id")))
+
+            cover_image_url = None
+            hero_image_url = None
+            storefronts = []
+            if source == "steam" and ext_id:
+                cover_image_url = f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{ext_id}/header.jpg"
+                hero_image_url = f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{ext_id}/capsule_616x353.jpg"
+                storefronts = [
+                    StorefrontItem(
+                        provider="steam",
+                        name="Steam",
+                        url=f"https://store.steampowered.com/app/{ext_id}/",
+                        platform="PC",
+                    )
+                ]
+
             item = GameDiscoveryItem(
                 id=str(game.get("id")),
-                external_id=str(game.get("external_id", game.get("id"))),
-                source=game.get("source", "steam"),
+                external_id=ext_id,
+                source=source,
                 title=game.get("display_title") or game.get("title", ""),
                 display_title=game.get("display_title") or game.get("title", ""),
                 description=display_desc,
@@ -407,6 +426,10 @@ class Ranker:
                 total_reviews=game.get("total_reviews", 0),
                 positive_percent=game.get("positive_percent", 0.0),
                 review_score_desc=game.get("review_score_desc", ""),
+                cover_image_url=cover_image_url,
+                hero_image_url=hero_image_url,
+                screenshots=[],
+                storefronts=storefronts,
             )
 
             results.append(

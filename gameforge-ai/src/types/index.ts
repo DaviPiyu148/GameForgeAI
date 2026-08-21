@@ -191,6 +191,13 @@ export interface GameEnrichment {
   similar_igdb_ids: number[];
 }
 
+export interface StorefrontItem {
+  provider: string;
+  name: string;
+  url: string;
+  platform?: string;
+}
+
 export interface GameDiscoveryItem {
   id: string;
   external_id: string;
@@ -216,6 +223,12 @@ export interface GameDiscoveryItem {
   positive_percent?: number;
   review_score_desc?: string;
   enrichment?: GameEnrichment;
+  cover_image_url?: string;
+  hero_image_url?: string;
+  screenshots?: string[];
+  storefronts?: StorefrontItem[];
+  developer?: string;
+  publisher?: string;
 }
 
 export interface DiscoverySearchResult {

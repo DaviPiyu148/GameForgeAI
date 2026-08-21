@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { discoveryService } from '../services/discovery';
+import { GameDetailsModal } from '../components/Shared/GameDetailsModal';
 import type { DiscoverySearchResult } from '../types';
 
 const INITIAL_VISIBLE_RESULTS = 12;
@@ -11,6 +12,8 @@ const HomePage = () => {
   const [isListening, setIsListening] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const [selectedGameForDetails, setSelectedGameForDetails] = useState<DiscoverySearchResult | null>(null);
+  const [failedCardImages, setFailedCardImages] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
   const {
     setPrompt,
@@ -279,6 +282,7 @@ const HomePage = () => {
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayedResults.map((result) => {
+              const gameKey = result.game.id || result.game.external_id;
               const matchPct = Math.round(result.score * 100);
               const isSaved = state.savedDiscoveries.some(
                 (sd) => sd.steam_app_id === result.game.external_id
@@ -286,27 +290,41 @@ const HomePage = () => {
               const isStrong = result.score >= 0.85;
               const isGood = result.score >= 0.70 && result.score < 0.85;
               const tierLabel = isStrong ? 'STRONG MATCH' : isGood ? 'GOOD MATCH' : 'POSSIBLE MATCH';
-              const coverUrl = result.game.enrichment?.cover_url;
+
+              const coverUrl =
+                result.game.cover_image_url ||
+                result.game.hero_image_url ||
+                result.game.enrichment?.cover_url ||
+                (result.game.source === 'steam' && result.game.external_id
+                  ? `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${result.game.external_id}/header.jpg`
+                  : null);
+              const hasImageError = Boolean(failedCardImages[gameKey]);
 
               return (
                 <div
-                  key={result.game.id || result.game.external_id}
+                  key={gameKey}
                   className="bg-terminal-bg rounded-lg border border-outline-variant/60 hover:border-primary transition-all p-5 flex flex-col justify-between shadow-xl group hover:shadow-[0_0_20px_rgba(76,224,210,0.2)] overflow-hidden"
                 >
-                  {/* Optional IGDB Media Cover Header */}
-                  {coverUrl && (
-                    <div className="relative h-32 -mx-5 -mt-5 mb-4 overflow-hidden rounded-t-lg bg-surface-container shrink-0">
+                  {/* Fixed Aspect Ratio Artwork Header */}
+                  <div className="relative h-36 -mx-5 -mt-5 mb-4 overflow-hidden rounded-t-lg bg-surface-container shrink-0">
+                    {coverUrl && !hasImageError ? (
                       <img
                         src={coverUrl}
-                        alt={result.game.title}
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
+                        alt={result.game.display_title || result.game.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
+                        onError={() =>
+                          setFailedCardImages((prev) => ({ ...prev, [gameKey]: true }))
+                        }
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-terminal-bg via-terminal-bg/40 to-transparent"></div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-surface-container via-surface to-background flex flex-col items-center justify-center text-on-surface-variant/40 gap-1">
+                        <span className="material-symbols-outlined text-3xl">sports_esports</span>
+                        <span className="font-mono text-[10px] uppercase tracking-wider">GameForge Intel</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-terminal-bg via-terminal-bg/30 to-transparent"></div>
+                  </div>
 
                   {/* Top: Score Badge & Title */}
                   <div className="space-y-3">
@@ -409,16 +427,15 @@ const HomePage = () => {
                       <span>{isSaved ? 'Saved' : 'Save'}</span>
                     </button>
 
-                    {/* More Like This Action */}
+                    {/* More Intel Modal Action */}
                     <button
                       type="button"
-                      onClick={() => handleMoreLikeThis(result.game.external_id || result.game.id, result.game.title)}
-                      disabled={isActionLoading === (result.game.external_id || result.game.id)}
+                      onClick={() => setSelectedGameForDetails(result)}
                       className="flex-1 px-2 py-2 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                      title="Discover games similar to this title"
+                      title="View rich game details, screenshots, and storefront links"
                     >
-                      <span className="material-symbols-outlined text-xs">scatter_plot</span>
-                      <span>{isActionLoading === (result.game.external_id || result.game.id) ? '...' : 'More'}</span>
+                      <span className="material-symbols-outlined text-xs">visibility</span>
+                      <span>More</span>
                     </button>
 
                     {/* Build Similar Action */}
@@ -498,6 +515,27 @@ const HomePage = () => {
             </div>
           </div>
         </section>
+      )}
+
+      {/* 7. Storefront Intel & Rich Game Details Modal */}
+      {selectedGameForDetails && (
+        <GameDetailsModal
+          result={selectedGameForDetails}
+          isSaved={state.savedDiscoveries.some(
+            (sd) => sd.steam_app_id === selectedGameForDetails.game.external_id
+          )}
+          onClose={() => setSelectedGameForDetails(null)}
+          onSave={() => saveDiscovery(selectedGameForDetails.game.external_id)}
+          onBuildSimilar={(res) => {
+            setSelectedGameForDetails(null);
+            handleBuildSimilar(res);
+          }}
+          onMoreLikeThis={handleMoreLikeThis}
+          isActionLoading={
+            isActionLoading ===
+            `build-${selectedGameForDetails.game.external_id || selectedGameForDetails.game.id}`
+          }
+        />
       )}
     </div>
   );

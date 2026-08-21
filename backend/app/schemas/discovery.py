@@ -1,5 +1,26 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class StorefrontItem(BaseModel):
+    """Structured representation of verified game store availability."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    provider: str = Field(..., description="Store provider identifier: steam, epic, gog, playstation, xbox, nintendo, itch")
+    name: str = Field(..., description="Human-readable storefront name, e.g. Steam, Epic Games Store, GOG")
+    url: str = Field(..., description="Direct validated HTTP(S) URL to the game's storefront page")
+    platform: Optional[str] = Field(default="PC", description="Platform, e.g. PC, PlayStation, Xbox, Nintendo Switch")
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        if not v or not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("Storefront URL must be a valid HTTP or HTTPS address.")
+        lower_v = v.lower()
+        if any(bad in lower_v for bad in ["javascript:", "data:", "file:", "vbscript:", "<script"]):
+            raise ValueError("Storefront URL contains prohibited or unsafe scheme.")
+        return v
 
 
 class DiscoveryFilters(BaseModel):
@@ -112,6 +133,14 @@ class GameDiscoveryItem(BaseModel):
     positive_percent: Optional[float] = 0.0
     review_score_desc: Optional[str] = ""
     enrichment: Optional[GameEnrichment] = None
+
+    # Visual Experience V1 fields
+    cover_image_url: Optional[str] = None
+    hero_image_url: Optional[str] = None
+    screenshots: List[str] = Field(default_factory=list)
+    storefronts: List[StorefrontItem] = Field(default_factory=list)
+    developer: Optional[str] = None
+    publisher: Optional[str] = None
 
 
 class DiscoverySearchResult(BaseModel):
