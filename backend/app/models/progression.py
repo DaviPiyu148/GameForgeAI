@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, UniqueConstraint
 from app.db.session import Base
 
 
@@ -62,3 +62,33 @@ class XPEvent(Base):
 
     def __repr__(self) -> str:
         return f"<XPEvent(id='{self.id}', user_id='{self.user_id}', event_type='{self.event_type}', xp={self.xp_amount})>"
+
+
+class UserMilestone(Base):
+    """SQLAlchemy model for persisting server-validated unlocked creator milestones."""
+    __tablename__ = "user_milestones"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
+    user_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    milestone_key = Column(String(50), nullable=False, index=True)
+    title = Column(String(100), nullable=False)
+    description = Column(String(255), nullable=False)
+    icon = Column(String(50), nullable=False)
+    unlocked_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "milestone_key", name="uq_user_milestones_user_key"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<UserMilestone(user_id='{self.user_id}', key='{self.milestone_key}', unlocked_at='{self.unlocked_at}')>"
+

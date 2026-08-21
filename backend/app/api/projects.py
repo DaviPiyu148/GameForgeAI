@@ -131,26 +131,32 @@ def record_playtest(
 ) -> PlaytestSessionResponse:
     """Record playtest summary and telemetry. Enforces ownership."""
     try:
-        session_res = service.create_playtest_session(db, project_id, current_user.id, data)
-
-        # Grant PLAYTEST XP and record preferences
+        session_res = service.create_playtest_session(db, project_id, current_user.id, data)        # Grant PLAYTEST XP and record preferences & milestone evaluation
         try:
             from app.services.progression_service import progression_service
             from app.services.preference_service import preference_service
 
+            is_win = getattr(data, "outcome", "").upper() == "WON"
             progression_service.grant_xp(
                 db=db,
                 user_id=current_user.id,
                 event_type="PLAYTEST",
                 source_ref=session_res.id,
             )
-            if getattr(data, "outcome", "").upper() == "WON":
+            if is_win:
                 progression_service.grant_xp(
                     db=db,
                     user_id=current_user.id,
                     event_type="PLAYTEST_WIN",
                     source_ref=session_res.id,
                 )
+
+            progression_service.evaluate_milestones(
+                db=db,
+                user_id=current_user.id,
+                trigger_event="PLAYTEST_WIN" if is_win else "PLAYTEST",
+                context={"outcome": "WIN" if is_win else "LOSS", "session_id": session_res.id},
+            )
 
             # Retrieve project to get genre
             proj = service.get_project(db, project_id, current_user.id)
@@ -182,7 +188,7 @@ def list_playtests(
     current_user: User = Depends(get_current_user),
     service: ProjectService = Depends(lambda: project_service),
 ) -> List[PlaytestSessionResponse]:
-    """List all playtest sessions recorded for the project."""
+    """List all recorded playtest sessions for a project. Enforces ownership."""
     try:
         return service.list_playtest_sessions(db, project_id, current_user.id)
     except ProjectNotFoundError as e:
@@ -193,16 +199,16 @@ def list_playtests(
     "/{project_id}/playtests/{session_id}",
     response_model=PlaytestSessionResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a specific playtest session",
+    summary="Get single playtest session",
 )
-def get_playtest(
+def get_playtest_session(
     project_id: str,
     session_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     service: ProjectService = Depends(lambda: project_service),
 ) -> PlaytestSessionResponse:
-    """Retrieve a single playtest session by ID with ownership verification."""
+    """Retrieve details and recorded telemetry for a single playtest session."""
     try:
         return service.get_playtest_session(db, project_id, session_id, current_user.id)
     except ProjectNotFoundError as e:
@@ -228,13 +234,32 @@ async def analyze_playtest(
     session_id = payload.get("session_id") if payload else None
     telemetry = payload.get("telemetry") if payload else None
     try:
-        return await service.analyze_playtest_session(
+        analysis_res = await service.analyze_playtest_session(
             db=db,
             project_id=project_id,
             user_id=current_user.id,
             session_id=session_id,
             telemetry_payload=telemetry,
         )
+
+        try:
+            from app.services.progression_service import progression_service
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="AI_ANALYSIS",
+                source_ref=session_id or project_id,
+            )
+            progression_service.evaluate_milestones(
+                db=db,
+                user_id=current_user.id,
+                trigger_event="AI_ANALYSIS",
+                context={"session_id": session_id, "project_id": project_id},
+            )
+        except Exception as pe:
+            logger.warning(f"Telemetry tracking failed on AI analysis for user {current_user.id}: {pe}")
+
+        return analysis_res
     except (ProjectNotFoundError, PlaytestNotFoundError) as e:
         return make_error_response("NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except Exception:
@@ -261,12 +286,31 @@ async def apply_improvements(
 ) -> ImprovementApplyResponse:
     """Apply approved improvement recommendations to create a new project version."""
     try:
-        return await service.apply_project_improvement(
+        imp_res = await service.apply_project_improvement(
             db=db,
             project_id=project_id,
             user_id=current_user.id,
             data=data,
         )
+
+        try:
+            from app.services.progression_service import progression_service
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="IMPROVE_GAME",
+                source_ref=f"{project_id}_v{imp_res.new_version_number}",
+            )
+            progression_service.evaluate_milestones(
+                db=db,
+                user_id=current_user.id,
+                trigger_event="IMPROVE_GAME",
+                context={"project_id": project_id, "version": imp_res.new_version_number},
+            )
+        except Exception as pe:
+            logger.warning(f"Telemetry tracking failed on project improvement for user {current_user.id}: {pe}")
+
+        return imp_res
     except ProjectNotFoundError as e:
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except Exception as e:

@@ -66,15 +66,29 @@ export interface XPEventItem {
   created_at: string;
 }
 
+export interface MilestoneItem {
+  milestone_key: string;
+  title: string;
+  description: string;
+  icon: string;
+  xp_bonus: number;
+  is_unlocked: boolean;
+  unlocked_at?: string | null;
+}
+
 export interface UserProgressData {
   user_id: string;
   total_xp: number;
   current_level: number;
+  creator_title: string;
   current_level_base_xp: number;
   next_level_xp: number;
   xp_into_level: number;
   xp_needed_for_next: number;
   progress_percentage: number;
+  milestones: MilestoneItem[];
+  unlocked_milestone_count: number;
+  total_milestone_count: number;
   recent_events: XPEventItem[];
 }
 

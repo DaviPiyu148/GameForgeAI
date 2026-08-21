@@ -468,17 +468,45 @@ class BuildService:
                     },
                 )
 
-                # Grant COMPLETE_BUILD XP and record genre preference
+                # Grant COMPLETE_BUILD XP and record genre preference and milestone evaluation
                 if user_id:
                     try:
                         from app.services.progression_service import progression_service
                         from app.services.preference_service import preference_service
 
+                        is_campaign = False
+                        stages_cnt = 1
+                        phases_cnt = 0
+                        if result.game_dsl and isinstance(result.game_dsl, dict):
+                            stages_list = result.game_dsl.get("stages") or []
+                            if isinstance(stages_list, list) and len(stages_list) > 1:
+                                is_campaign = True
+                                stages_cnt = len(stages_list)
+
+                        if result.design_spec and isinstance(result.design_spec, dict):
+                            phases_list = result.design_spec.get("progression_phases") or []
+                            if isinstance(phases_list, list):
+                                phases_cnt = len(phases_list)
+                                if phases_cnt > 1:
+                                    is_campaign = True
+
+                        event_type = "COMPLETE_CAMPAIGN" if is_campaign else "COMPLETE_BUILD"
                         progression_service.grant_xp(
                             db=db,
                             user_id=user_id,
-                            event_type="COMPLETE_BUILD",
-                            source_ref=project_res.id,
+                            event_type=event_type,
+                            source_ref=build_id,
+                        )
+
+                        progression_service.evaluate_milestones(
+                            db=db,
+                            user_id=user_id,
+                            trigger_event="COMPLETE_BUILD",
+                            context={
+                                "is_campaign": is_campaign,
+                                "stages_count": stages_cnt,
+                                "phases_count": phases_cnt,
+                            },
                         )
 
                         preference_service.record_signal(

@@ -12,16 +12,31 @@ class XPEventItem(BaseModel):
     created_at: datetime
 
 
+class MilestoneItem(BaseModel):
+    """Creator milestone badge representation."""
+    milestone_key: str
+    title: str
+    description: str
+    icon: str
+    xp_bonus: int = 0
+    is_unlocked: bool = False
+    unlocked_at: Optional[datetime] = None
+
+
 class UserProgressResponse(BaseModel):
     """Server-authoritative user progression and XP status."""
     user_id: str
     total_xp: int = Field(default=0, ge=0)
     current_level: int = Field(default=1, ge=1)
+    creator_title: str = Field(default="Novice Creator")
     current_level_base_xp: int = Field(default=0, ge=0)
     next_level_xp: int = Field(default=100, ge=1)
     xp_into_level: int = Field(default=0, ge=0)
     xp_needed_for_next: int = Field(default=100, ge=1)
     progress_percentage: float = Field(default=0.0, ge=0.0, le=100.0)
+    milestones: List[MilestoneItem] = Field(default_factory=list)
+    unlocked_milestone_count: int = Field(default=0, ge=0)
+    total_milestone_count: int = Field(default=8, ge=1)
     recent_events: List[XPEventItem] = Field(default_factory=list)
 
 

@@ -204,9 +204,9 @@ export default function ProfilePage() {
                 {username}
               </h1>
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 text-tertiary text-sm md:text-base bg-tertiary/10 px-3 py-1.5 rounded-sm border border-tertiary/20 w-fit">
-                  <span className="material-symbols-outlined text-[18px]">star</span>
-                  <span>Level {currentLevel} Architect</span>
+                <div className="flex items-center gap-2 text-tertiary text-sm md:text-base bg-tertiary/10 px-3 py-1.5 rounded-sm border border-tertiary/20 w-fit font-mono">
+                  <span className="material-symbols-outlined text-[18px]">stars</span>
+                  <span>Level {currentLevel} • {progressData?.creator_title || 'Novice Creator'}</span>
                 </div>
                 <span className="font-mono text-xs text-on-surface-variant">{email}</span>
               </div>
@@ -218,6 +218,12 @@ export default function ProfilePage() {
             <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Total XP</div>
               <div className="font-display text-tertiary text-lg font-bold">{progressData?.total_xp || 0}</div>
+            </div>
+            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
+              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Milestones</div>
+              <div className="font-display text-tertiary">
+                {progressData?.unlocked_milestone_count || 0} / {progressData?.total_milestone_count || 8}
+              </div>
             </div>
             <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Saved Items</div>
@@ -252,14 +258,16 @@ export default function ProfilePage() {
 
       {/* Progression & XP Status Panel */}
       {state.authStatus === 'AUTHENTICATED' && (
-        <div className="relative arcade-border bg-surface-container-low p-6 arcade-panel space-y-4">
+        <div className="relative arcade-border bg-surface-container-low p-6 arcade-panel space-y-5">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-tertiary">military_tech</span>
-              <h2 className="font-display text-lg uppercase tracking-wide">Architect Level Progression</h2>
+              <span className="material-symbols-outlined text-tertiary text-xl">military_tech</span>
+              <h2 className="font-display text-lg uppercase tracking-wide">
+                Creator Progression • Level {currentLevel} {progressData?.creator_title || 'Novice Creator'}
+              </h2>
             </div>
-            <div className="font-mono text-xs text-tertiary">
-              Level {currentLevel} • {progressData?.xp_into_level || 0} / {(progressData?.xp_into_level || 0) + (progressData?.xp_needed_for_next || 100)} XP
+            <div className="font-mono text-xs text-tertiary font-bold">
+              {progressData?.xp_into_level || 0} / {(progressData?.xp_into_level || 0) + (progressData?.xp_needed_for_next || 100)} XP
             </div>
           </div>
 
@@ -272,32 +280,105 @@ export default function ProfilePage() {
               />
             </div>
             <div className="flex justify-between text-[11px] font-mono text-on-surface-variant">
-              <span>Current: Level {currentLevel}</span>
+              <span>{progressData?.creator_title || 'Novice Creator'} (Level {currentLevel})</span>
               <span>{progressData?.xp_needed_for_next || 0} XP needed for Level {currentLevel + 1}</span>
             </div>
           </div>
 
           {/* Activity Rewards Breakdown */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
-              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Discovery Search</div>
-              <div className="font-mono text-xs text-primary font-bold mt-1">+10 XP</div>
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 pt-2">
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Search</div>
+              <div className="font-mono text-xs text-primary font-bold mt-0.5">+10 XP</div>
             </div>
-            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
-              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Save Discovery</div>
-              <div className="font-mono text-xs text-secondary font-bold mt-1">+25 XP</div>
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Save Game</div>
+              <div className="font-mono text-xs text-secondary font-bold mt-0.5">+25 XP</div>
             </div>
-            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
-              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Start Build</div>
-              <div className="font-mono text-xs text-tertiary font-bold mt-1">+30 XP</div>
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Build Similar</div>
+              <div className="font-mono text-xs text-primary font-bold mt-0.5">+25 XP</div>
             </div>
-            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
-              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Complete Build</div>
-              <div className="font-mono text-xs text-primary font-bold mt-1">+75 XP</div>
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Build Game</div>
+              <div className="font-mono text-xs text-tertiary font-bold mt-0.5">+50 XP</div>
             </div>
-            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center col-span-2 sm:col-span-1">
-              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Playtest Prototype</div>
-              <div className="font-mono text-xs text-tertiary font-bold mt-1">+50 XP</div>
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Playtest</div>
+              <div className="font-mono text-xs text-tertiary font-bold mt-0.5">+35 XP</div>
+            </div>
+            <div className="p-2 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Playtest Win</div>
+              <div className="font-mono text-xs text-primary font-bold mt-0.5">+50 XP</div>
+            </div>
+          </div>
+
+          {/* Creator Milestones Showcase Grid */}
+          <div className="pt-4 border-t border-outline-variant/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-base">emoji_events</span>
+                <h3 className="font-display text-sm uppercase tracking-wide text-white">Creator Milestones</h3>
+              </div>
+              <span className="font-mono text-[11px] text-tertiary font-bold bg-tertiary/10 border border-tertiary/30 px-2 py-0.5 rounded-sm">
+                {progressData?.unlocked_milestone_count || 0} / {progressData?.total_milestone_count || 8} Unlocked
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {(progressData?.milestones || []).map((m) => (
+                <div
+                  key={m.milestone_key}
+                  className={`p-3 rounded-sm border transition-all relative overflow-hidden flex flex-col justify-between ${
+                    m.is_unlocked
+                      ? 'bg-surface-container border-primary/50 shadow-[0_0_10px_rgba(76,224,210,0.15)]'
+                      : 'bg-surface-container-lowest/50 border-outline-variant/30 opacity-60'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`w-8 h-8 rounded-sm flex items-center justify-center ${
+                          m.is_unlocked
+                            ? 'bg-primary/20 text-primary border border-primary/40'
+                            : 'bg-surface-container-highest text-on-surface-variant border border-outline-variant/40'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-base">{m.icon}</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-xs ${
+                          m.is_unlocked
+                            ? 'text-primary bg-primary/10 border border-primary/30'
+                            : 'text-on-surface-variant bg-surface-container border border-outline-variant/30'
+                        }`}
+                      >
+                        {m.is_unlocked ? 'UNLOCKED' : `+${m.xp_bonus} XP`}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4
+                        className={`font-mono text-xs font-bold ${
+                          m.is_unlocked ? 'text-white' : 'text-on-surface-variant'
+                        }`}
+                      >
+                        {m.title}
+                      </h4>
+                      <p className="text-[11px] font-mono text-on-surface-variant leading-tight mt-0.5">
+                        {m.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {m.is_unlocked && m.unlocked_at && (
+                    <div className="mt-2 pt-2 border-t border-primary/20 text-[10px] font-mono text-primary flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">check_circle</span>
+                      <span>Unlocked {new Date(m.unlocked_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -513,6 +594,67 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
+          {/* Recent Creator Activity Feed */}
+          {state.authStatus === 'AUTHENTICATED' && (
+            <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-tertiary">history</span>
+                  <h2 className="font-display text-lg uppercase tracking-wide">Creator Activity</h2>
+                </div>
+                <span className="font-mono text-xs text-on-surface-variant">Recent Events</span>
+              </div>
+
+              {(!progressData?.recent_events || progressData.recent_events.length === 0) ? (
+                <div className="p-4 border border-outline-variant/50 bg-surface-container text-center font-mono text-xs text-on-surface-variant">
+                  No recent creator events recorded yet. Build and playtest games to earn XP!
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {progressData.recent_events.map((evt) => {
+                    let iconName = 'stars';
+                    let label = evt.event_type.replace(/_/g, ' ');
+                    if (evt.event_type.includes('BUILD')) {
+                      iconName = 'construction';
+                    } else if (evt.event_type.includes('PLAYTEST')) {
+                      iconName = 'sports_esports';
+                    } else if (evt.event_type.includes('SAVE')) {
+                      iconName = 'favorite';
+                    } else if (evt.event_type.includes('SEARCH')) {
+                      iconName = 'search';
+                    } else if (evt.event_type.includes('MILESTONE')) {
+                      iconName = 'emoji_events';
+                    } else if (evt.event_type.includes('ANALYSIS') || evt.event_type.includes('IMPROVE')) {
+                      iconName = 'psychology';
+                    }
+
+                    return (
+                      <div
+                        key={evt.id}
+                        className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm flex items-center justify-between gap-3 text-xs font-mono"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="material-symbols-outlined text-sm text-tertiary shrink-0">{iconName}</span>
+                          <div className="min-w-0">
+                            <div className="text-on-surface font-semibold truncate capitalize">
+                              {label.toLowerCase()}
+                            </div>
+                            <div className="text-[10px] text-on-surface-variant">
+                              {new Date(evt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(evt.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-tertiary font-bold px-1.5 py-0.5 rounded bg-tertiary/10 border border-tertiary/30 shrink-0">
+                          +{evt.xp_amount} XP
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column (col-span-2): Generated Games */}

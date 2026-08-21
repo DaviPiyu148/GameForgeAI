@@ -175,6 +175,13 @@ async def get_build_inspiration(
                     source_ref=steam_app_id,
                 )
 
+                progression_service.evaluate_milestones(
+                    db=db,
+                    user_id=current_user.id,
+                    trigger_event="BUILD_SIMILAR",
+                    context={"source_game_id": steam_app_id},
+                )
+
                 signal_tags = [inspiration.inferred_archetype, inspiration.inferred_theme]
                 if inspiration.suggested_modules:
                     signal_tags.extend(inspiration.suggested_modules)

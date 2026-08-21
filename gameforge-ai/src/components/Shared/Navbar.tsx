@@ -68,7 +68,7 @@ export const Navbar = () => {
             <Link
               to="/profile"
               className="h-8 px-2.5 rounded-sm border border-outline-variant bg-surface-container flex items-center gap-2 text-primary icon-interactive hover:border-primary transition-colors font-mono text-xs"
-              title={`Logged in as ${state.user.username} (Level ${state.user.level || 1})`}
+              title={`Logged in as ${state.user.username} (Level ${state.progress?.current_level || state.user.level || 1} ${state.progress?.creator_title || 'Creator'})`}
             >
               {state.user.avatar_url ? (
                 <img
@@ -81,7 +81,7 @@ export const Navbar = () => {
               )}
               <span className="hidden sm:inline font-bold">{state.user.username}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/40 font-mono font-bold tracking-tight">
-                LVL {state.user.level || 1}
+                LVL {state.progress?.current_level || state.user.level || 1}
               </span>
             </Link>
           ) : (
