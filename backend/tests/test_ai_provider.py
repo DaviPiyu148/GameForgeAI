@@ -8,6 +8,7 @@ from app.ai.hosted_provider import (
     GeminiProvider,
     GroqProvider,
     HostedOpenAIProvider,
+    RotatingGeminiProvider,
 )
 from app.ai.provider import (
     AIConfigurationError,
@@ -258,3 +259,84 @@ async def test_router_with_gemini_primary(monkeypatch):
     assert meta["provider"] == "gemini"
     assert meta["model"] == "gemma-4-31b-it"
     assert meta["fallback_used"] is False
+
+
+# ================================================================
+# RotatingGeminiProvider Tests
+# ================================================================
+
+@pytest.mark.asyncio
+async def test_rotating_provider_no_keys_raises_configuration_error():
+    """An empty key pool raises AIConfigurationError, same as a bare GeminiProvider."""
+    provider = RotatingGeminiProvider(api_keys=[])
+    with pytest.raises(AIConfigurationError):
+        await provider.generate_structured("System", "User")
+
+
+@pytest.mark.asyncio
+async def test_rotating_provider_round_robins_across_successful_calls(monkeypatch):
+    """Successive successful calls should advance through the key pool in order,
+    spreading load rather than reusing the same key every time."""
+    expected_dict = {"schema_version": "1.0", "test": True}
+    seen_keys = []
+
+    async def mock_post(self, url, json=None, headers=None):
+        seen_keys.append(headers.get("Authorization"))
+        return httpx.Response(
+            status_code=200,
+            json={"choices": [{"message": {"content": _json.dumps(expected_dict)}}]},
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b", "key_c"])
+    for _ in range(4):
+        result, meta = await provider.generate_structured_with_meta("System", "User")
+        assert result == expected_dict
+        assert meta["key_pool_size"] == 3
+
+    # 4 calls across a 3-key pool: key_a, key_b, key_c, key_a (round-robin wrap)
+    assert seen_keys == ["Bearer key_a", "Bearer key_b", "Bearer key_c", "Bearer key_a"]
+
+
+@pytest.mark.asyncio
+async def test_rotating_provider_skips_rate_limited_key(monkeypatch):
+    """If the first key in rotation is rate-limited, the next key in the pool is
+    tried within the same request instead of surfacing a hard failure."""
+    expected_dict = {"schema_version": "1.0", "test": "recovered"}
+
+    async def mock_post(self, url, json=None, headers=None):
+        if headers.get("Authorization") == "Bearer key_a":
+            return httpx.Response(status_code=429, text="Rate limit exceeded")
+        return httpx.Response(
+            status_code=200,
+            json={"choices": [{"message": {"content": _json.dumps(expected_dict)}}]},
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b"])
+    result, meta = await provider.generate_structured_with_meta("System", "User")
+    assert result == expected_dict
+    assert meta["provider"] == "gemini"
+
+
+@pytest.mark.asyncio
+async def test_rotating_provider_all_keys_rate_limited_raises(monkeypatch):
+    """When every key in the pool is rate-limited, the provider fails fast with
+    ModelRateLimitedError rather than retrying indefinitely."""
+    async def mock_post(self, url, json=None, headers=None):
+        return httpx.Response(status_code=429, text="Rate limit exceeded")
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b"])
+    with pytest.raises(ModelRateLimitedError):
+        await provider.generate_structured_with_meta("System", "User")
+
+
+@pytest.mark.asyncio
+async def test_router_defaults_to_rotating_gemini_provider():
+    """AIProviderRouter with no explicit primary should default to a RotatingGeminiProvider."""
+    router = AIProviderRouter()
+    assert isinstance(router.primary, RotatingGeminiProvider)

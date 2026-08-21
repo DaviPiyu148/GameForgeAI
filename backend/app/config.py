@@ -22,6 +22,11 @@ class Settings(BaseSettings):
 
     # Primary Generative Provider: Google Gemini
     GEMINI_API_KEY: Optional[str] = None
+    # Additional Gemini API keys for rotation, comma-separated (e.g. "key_a,key_b,key_c").
+    # Combined with GEMINI_API_KEY to form the full rotation pool -- lets a single
+    # deployment spread requests across multiple keys/projects to stay under each
+    # key's individual rate limit rather than being bottlenecked by one key.
+    GEMINI_API_KEYS: Optional[str] = None
     GEMINI_MODEL: str = "gemma-4-31b-it"
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
 
@@ -78,6 +83,27 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    def gemini_api_key_pool(self) -> List[str]:
+        """
+        Ordered, de-duplicated pool of all configured Gemini API keys: `GEMINI_API_KEY`
+        (if set) followed by each key in the comma-separated `GEMINI_API_KEYS` list.
+        Used by RotatingGeminiProvider to round-robin requests across keys.
+        """
+        candidates: List[str] = []
+        if self.GEMINI_API_KEY:
+            candidates.append(self.GEMINI_API_KEY)
+        if self.GEMINI_API_KEYS:
+            candidates.extend(self.GEMINI_API_KEYS.split(","))
+
+        pool: List[str] = []
+        seen = set()
+        for raw in candidates:
+            key = (raw or "").strip()
+            if key and key not in seen:
+                seen.add(key)
+                pool.append(key)
+        return pool
 
 
 settings = Settings()

@@ -1,6 +1,7 @@
+import asyncio
 import json
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from app.ai.provider import (
@@ -182,6 +183,84 @@ class GeminiProvider(BaseHostedProvider):
         )
 
 
+class RotatingGeminiProvider(AIProvider):
+    """
+    Gemini provider that rotates round-robin across a pool of configured API keys.
+
+    Two rate-limit defenses in one:
+    1. Load spreading: each call advances to the next key in the pool, so steady
+       traffic is distributed across keys instead of hammering a single one.
+    2. Reactive rotation: if the key picked for this call comes back rate-limited
+       (HTTP 429) or rejected (401/403 -- e.g. a revoked key), the next key in the
+       pool is tried immediately within the same request, bounded to one attempt
+       per configured key so an exhausted pool still fails fast.
+
+    Degrades to plain single-key GeminiProvider behavior when only one key (or
+    zero) is configured -- existing single-key deployments are unaffected.
+    """
+
+    provider_name = "gemini"
+
+    def __init__(
+        self,
+        api_keys: Optional[List[str]] = None,
+        model: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ):
+        self._keys: List[str] = [k for k in (api_keys if api_keys is not None else settings.gemini_api_key_pool()) if k]
+        self.model = model or (settings.GEMINI_MODEL or settings.AI_MODEL or "gemma-4-31b-it")
+        self.base_url = (base_url or settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
+        self.timeout = timeout or settings.AI_TIMEOUT_SECONDS
+        self._index = 0
+        self._lock = asyncio.Lock()
+
+        # Backward-compatible single-key surface for callers that inspect `.api_key`
+        # directly (e.g. AIProviderRouter's "is a fallback provider configured?" check).
+        self.api_key = self._keys[0] if self._keys else None
+
+    async def _next_key(self) -> str:
+        async with self._lock:
+            key = self._keys[self._index % len(self._keys)]
+            self._index += 1
+        return key
+
+    async def generate_structured(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+        return result
+
+    async def generate_structured_with_meta(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        if not self._keys:
+            raise AIConfigurationError("Gemini API key is not configured on the server.")
+
+        last_error: Optional[AIError] = None
+        for _ in range(len(self._keys)):
+            key = await self._next_key()
+            provider = GeminiProvider(api_key=key, model=self.model, base_url=self.base_url, timeout=self.timeout)
+            try:
+                res, meta = await provider.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+                if len(self._keys) > 1:
+                    meta["key_pool_size"] = len(self._keys)
+                return res, meta
+            except (ModelRateLimitedError, AIConfigurationError) as err:
+                # This specific key is rate-limited or was rejected -- rotate to the
+                # next key in the pool rather than surfacing a hard failure immediately.
+                last_error = err
+                continue
+
+        raise last_error or ModelRateLimitedError("All configured Gemini API keys are rate-limited.")
+
+
 class GroqProvider(BaseHostedProvider):
     """
     Fallback Generative AI Provider: Groq.
@@ -232,7 +311,8 @@ class HostedOpenAIProvider(BaseHostedProvider):
 class AIProviderRouter(AIProvider):
     """
     Provider Router:
-    - Primary: Google Gemini (Gemma 4 31B: `gemma-4-31b-it`)
+    - Primary: Google Gemini (Gemma 4 31B: `gemma-4-31b-it`), rotating across every
+      configured `GEMINI_API_KEY`/`GEMINI_API_KEYS` if more than one key is set.
     - Optional Fallback: Groq (if explicitly injected, otherwise none)
     """
 
@@ -241,7 +321,7 @@ class AIProviderRouter(AIProvider):
         primary: Optional[AIProvider] = None,
         fallback: Optional[AIProvider] = None,
     ):
-        self.primary = primary or GeminiProvider()
+        self.primary = primary or RotatingGeminiProvider()
         self.fallback = fallback
 
     async def generate_structured(
