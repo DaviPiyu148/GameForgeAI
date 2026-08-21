@@ -1,6 +1,8 @@
 import json
 from typing import Any, Dict, List, Optional
 
+from app.generation.scale_tiers import get_scale_budget
+
 
 SYSTEM_PROMPT = """You are GameForge AI's Principal Game Designer & DSL Architect.
 Your task is to transform natural language game concepts into a cohesive, playable 2D game prototype.
@@ -12,8 +14,9 @@ You must generate:
 RULES & BOUNDS:
 1. OUTPUT FORMAT: Output ONLY a single valid JSON object containing {"design_spec": {...}, "dsl": {...}}. Do NOT wrap output in markdown codeblocks. Do NOT include conversational preamble.
 2. SCOPE & BOUNDS:
-   - Entities: 4 to 20 entities maximum.
-   - Rules: 2 to 10 rules maximum.
+   - Entities and Rules per level: bounded by the requested SCALE TIER budget given in the
+     TARGET CONFIGURATION section of the user prompt (hard ceiling regardless of tier: 30
+     entities and 15 rules per level, 20 rules top-level, 5 levels total).
    - World width: 400 to 1920 (default 800)
    - World height: 300 to 1080 (default 600)
    - Player spawn clearance: Player spawn (spawn_x, spawn_y) must be at least 80px away from any hazard or enemy spawn.
@@ -34,6 +37,31 @@ RULES & BOUNDS:
 """
 
 
+def _level_structure_guidance(min_levels: int, max_levels: int) -> str:
+    """
+    Explicit multi-level structural guidance for the tier's expected level count,
+    framed as an INTRODUCTION -> LEARNING -> ESCALATION -> VARIATION -> FINALE arc,
+    compressed to whatever level count the tier actually allows.
+    """
+    if max_levels <= 1:
+        return (
+            "This tier targets a SINGLE level. That one level must play every beat of the "
+            "arc itself: introduce the core interaction quickly with minimal threat, escalate "
+            "pressure through its middle, and resolve with a clear win/lose FINALE moment. "
+            "Mark its \"is_finale\" field true."
+        )
+    return (
+        f"Generate {min_levels} to {max_levels} levels (aim for the top of that range). Structure the "
+        "campaign arc as INTRODUCTION -> LEARNING -> ESCALATION -> VARIATION -> FINALE, compressed to fit "
+        "however many levels you generate: Level 1 is the INTRODUCTION -- teach the core interaction with "
+        "minimal threat. Middle level(s) are LEARNING / ESCALATION / VARIATION -- raise entity density, "
+        "introduce new enemy behaviors, and remix earlier mechanics in new combinations. The LAST level is "
+        "the FINALE -- the culmination/resolution of the game's tension, with the run's highest threat "
+        "density; set its \"is_finale\" field to true in the \"levels\" array. A boss entity (\"is_boss\": "
+        "true) is a strong, optional way to punctuate the FINALE, but is not required."
+    )
+
+
 def build_generation_prompt(
     prompt: str,
     engine: str = "Top-Down Action",
@@ -42,10 +70,21 @@ def build_generation_prompt(
     modules: List[str] = None,
     inspiration: Optional[Dict[str, Any]] = None,
     personalization: Optional[Dict[str, Any]] = None,
+    scale: str = "standard",
 ) -> str:
     """Build user prompt instructing generation of structured GameDesignSpec and GameDSL."""
     mods = modules or []
     mods_str = ", ".join(mods) if mods else "standard mechanics"
+
+    budget = get_scale_budget(scale)
+    min_levels, max_levels = budget.level_count
+    min_entities, max_entities = budget.entities_per_level
+    min_rules, max_rules = budget.rules_per_level
+    scale_guide = (
+        f"{min_entities}-{max_entities} entities per level, {min_rules}-{max_rules} rules per level, "
+        f"{min_levels}-{max_levels} level(s) total"
+    )
+    level_structure_text = _level_structure_guidance(min_levels, max_levels)
 
     # Physics complexity guidance
     if physics <= 35:
@@ -94,6 +133,10 @@ TARGET CONFIGURATION:
 - Physics Complexity ({physics}/100): {physics_guide}
 - Visual Density ({art_density}/100): {density_guide}
 - Active Logic Modules: {mods_str}
+- Scale Tier ({scale}): {scale_guide}
+
+LEVEL STRUCTURE (use the top-level "levels" array, each entry following the LevelDef shape, when generating more than one level):
+{level_structure_text}
 
 SCHEMA REQUIREMENT:
 Output a single JSON object with exact structure:

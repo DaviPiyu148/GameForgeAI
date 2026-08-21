@@ -4,9 +4,35 @@
 2026-08-22
 
 ## Current Phase
-Phase 4 — AI Game Blueprint + Remix (Complete). First of the Phases 4-8 master
-product expansion (Blueprint/Remix -> Advanced Generation -> Living World -> AI
-Director -> Monetization/BYOK). Phases 5-8 not started.
+Phase 5 — Advanced Game Generation + Game Feel (Complete). Second of the Phases
+4-8 master product expansion (Blueprint/Remix -> Advanced Generation -> Living
+World -> AI Director -> Monetization/BYOK). Per explicit user instruction, Phase
+6 (Living World) and later phases will not start until explicitly requested.
+
+## Phase 5 Summary
+- Real server-side scale tiers (`prototype`/`standard`/`campaign`) threaded from
+  `BuilderPage.tsx` through `BuildJob.scale` into `generate_game_dsl()` and the
+  generation prompt -- previously a frontend-only cosmetic dropdown.
+- Floor-only budget validation (`GameplayQualityValidator.validate_scale_budget()`)
+  gives an under-target generation exactly one bounded-repair nudge; still-short
+  results are accepted with a warning rather than hard-failing the build.
+- Fixed the Phaser runtime only ever rendering level 0's visuals: `GameScene.ts`'s
+  new `applyLevelConfig()` is the single source of truth for background/theme,
+  spawn, entities, and HUD text on both initial load and every level transition,
+  so a multi-level campaign now actually looks and plays differently level to
+  level. Entity/player DSL `color` fields are now rendered (previously generated
+  but ignored). Level transitions use a deterministic 200ms fade instead of an
+  instant teleport, plus a bounded spawn-in tween for new entities.
+- Bounded boss/finale support: `EntityDef.is_boss/boss_phases/telegraph_ms` and
+  `LevelDef.is_finale`, all backward-compatible defaults. Boss fairness and
+  telegraph-compatibility are enforced server-side; runtime adds a boss health
+  bar/intro banner, one deterministic phase-2 threshold behavior bump, and a
+  fixed-duration ranged-attack telegraph cue -- no boss AI state machine.
+- Verification: 317/317 backend tests pass (33 new); frontend `tsc`/`oxlint`/`build`
+  clean; single Alembic head (`a2b3c4d5e6f7`), migration applied via `alembic
+  upgrade head`. Browser E2E not performed this phase.
+- Explicitly out of scope: graphical minimap, procedural per-theme texture packs,
+  multi-phase boss AI beyond one threshold bump, a separate World/Area sub-model.
 
 ## Since the 2026-08-18 Baseline (previously undocumented here)
 - **Discovery Visual Experience V1** (commit `9d83d0b`)

@@ -1,83 +1,119 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Phase 4 — AI Game Blueprint + Remix
+Phase 5 — Advanced Game Generation + Game Feel
 
 ## Status
 COMPLETE
 
 ## Objective
-Make AI generation understandable and interactive: show every generated game as a
-structured, nontechnical Game Blueprint, and let a player remix a finished game via
-structured intents (not free-form prose) into a new, immutable project version.
+Make generated games materially larger, more visually distinct, and more polished
+("generated games are too basic" was the standing complaint): real server-side
+scale tiers, genuinely differentiated multi-level runtime behavior, bounded
+boss/finale support, actual rendering of generated color/theme information, and
+stronger transition/spawn feedback.
 
 ## Started
-2026-08-21
+2026-08-22
 
 ---
 
 ## 1. Pre-Implementation
 
 - [x] Read AGENTS.md, TASK.md, docs/*, decisions/*
-- [x] Inspected git status and recent commit history
-- [x] Inspected current backend implementation (GameDesignSpec, GameDSL v3.0 with
-      existing multi-level support, reachability validator, improvement pipeline)
-      and frontend implementation (BuilderPage, PrototypeModal, AppContext) directly
-      rather than trusting stale docs
-- [x] Noted: `docs/09-AI-GAME-GENERATION.md`, `docs/11-IMPLEMENTATION-PHASES.md`, and
-      `docs/15-CURRENT-STATUS.md` were stale relative to code (predated Discovery
-      Visual V1, Game DNA, and Creator Progression) — refreshed as part of this phase
+- [x] Inspected git status/log — confirmed Phase 4 (`b57db6e`) and the Gemini key
+      rotation infra fix (`60de2d9`) were the current HEAD before starting
+- [x] Fresh reconnaissance (2 Explore agents) of the actual runtime/backend state
+      rather than trusting the master roadmap's assumptions. Key findings that
+      changed scope: `GameDSL` already had multi-level support (`levels`, capped
+      at 5) and reachability repair, but the **Phaser runtime only ever rendered
+      level 0** — `advanceToNextLevel()` repositioned entities but never read
+      `LevelDef.theme`/`LevelDef.world`, so multi-level was mechanically real but
+      visually invisible. `EntityDef.color` was generated but never rendered
+      (fixed generic textures regardless of DSL color). `scale` was a
+      frontend-only cosmetic dropdown, never reaching the backend.
 
 ---
 
 ## 2. Implementation Subtasks
 
-- [x] 4.1/4.3 `GameBlueprint` schema (`backend/app/schemas/blueprint.py`) — a computed
-      projection over `GameDesignSpec` + `GameDSL`, never a new source of truth
-- [x] Blueprint derivation (`backend/app/generation/blueprint.py`) — mechanic names
-      are allowlist-derived from real DSL predicates only; "Vehicles"/"Boss Fights"/
-      "Wanted System" are deliberately never emitted (those runtime capabilities
-      belong to later phases 5/6)
-- [x] `GET /api/projects/{id}/blueprint` (ownership-enforced, 404 on cross-user/missing)
-- [x] 4.2 Blueprint UI: `GameBlueprintPanel.tsx`, wired into `PrototypeModal.tsx`
-- [x] 4.4-4.6 Remix: closed `RemixIntentType` catalog (9 types) in
-      `backend/app/schemas/remix.py` — `increase_combat, increase_exploration,
-      increase_difficulty, decrease_difficulty, add_levels, more_story, faster_pace,
-      more_enemies, change_theme`. `add_boss`/`more_vehicles` intentionally excluded
-      (Phase 5/6 capabilities). Duplicate and mutually-exclusive (harder+easier)
-      intents rejected with 422.
-- [x] `build_remix_prompt` (`backend/app/ai/prompts.py`) frames Game DNA personalization
-      as strictly secondary; explicit remix intents always take absolute precedence
-- [x] `GameGenerationService.apply_remix()` reuses the same schema validation,
-      `GameplayQualityValidator`, and `ReachabilityValidator` repair pass as fresh
-      generation, plus a bounded AI repair loop identical in shape to
-      `generate_game_dsl()`'s. `add_levels` is clamped server-side to the existing
-      5-level schema cap with an explicit note in `change_summary` rather than a
-      silent no-op.
-- [x] `ProjectService.apply_project_remix()` creates a new immutable `ProjectVersion`
-      (never mutates prior versions), storing the structured `remix_intent` on that
-      version row (new nullable JSON column, Alembic migration `f6a7b8c9d0e1`)
-- [x] `POST /api/projects/{id}/remix` (ownership-enforced, 400 on AI/validation failure)
-- [x] 4.7 Personalization precedence: remix reuses the existing
-      `preference_service.get_generation_context()` Game DNA context, passed into the
-      prompt only as secondary flavor
-- [x] `RemixPanel.tsx` (max 3 intents, client-side mutual-exclusion guard) wired into
-      `PrototypeModal.tsx`; new version/blueprint refresh reuses the existing
-      `updateGameProject` AppContext action — no new primary route added
-- [x] Related infra fix (separate from Phase 4 scope, already committed as `60de2d9`):
-      Gemini API key rotation (`GEMINI_API_KEYS`, `RotatingGeminiProvider`) to reduce
-      hosted-provider rate-limit failures during generation/remix load
+- [x] PH5.1 Scale Tier Schema — `backend/app/generation/scale_tiers.py` (new):
+      `ScaleBudget` + `get_scale_budget()`, three tiers (prototype/standard/campaign),
+      all strictly inside existing hard schema caps (levels<=5, entities<=30/level,
+      rules<=15/level). `BuildParams.scale: Literal[...] = "standard"`.
+- [x] PH5.2 Scale Plumbing — threaded end-to-end: `BuilderPage.tsx` → `BuildParams`
+      → `POST /builds` → `BuildJob.scale` (new column) → `build_service.py` →
+      `generate_game_dsl(..., scale=...)` → `build_generation_prompt(..., scale=...)`,
+      mirroring the existing `engine`/`art_density`/`physics` flow exactly.
+- [x] PH5.3 Budget Validation — `GameplayQualityValidator.validate_scale_budget()`:
+      floor-only check (level/entity/rule counts below tier minimum). Folded into
+      `generate_game_dsl()`'s existing bounded-repair loop as a **first-attempt-only**
+      soft nudge; a still-under-target DSL after one repair pass is accepted with a
+      `WARNING` log, never a hard failure ("a slightly-off tier is not worth a hard
+      failure").
+- [x] PH5.4 Generation Prompt — `build_generation_prompt()` SCOPE & BOUNDS now uses
+      tier-derived numbers instead of one fixed "4-20 entities" text; added
+      INTRODUCTION → LEARNING → ESCALATION → VARIATION → FINALE structural guidance
+      for multi-level requests. No chain-of-thought requested.
+- [x] PH5.5 Multi-Level Runtime — `GameScene.ts`: extracted `applyLevelConfig()` as
+      the single source of truth for "apply a level" (background/theme, spawn,
+      entities, HUD text), used identically by `create()` and `advanceToNextLevel()`
+      so the two paths cannot drift. Fixed a lifecycle gap found during the audit:
+      `advanceToNextLevel()` now explicitly unregisters cleared enemies from
+      `EntityBehaviorSystem` before destroying them (previously relied on
+      next-frame self-pruning).
+- [x] PH5.6 Level World/Theme — background color is now re-applied on every level
+      transition (previously set once at boot and never touched again); `theme` is
+      logged for now (full per-theme palette swap is out of scope this phase).
+- [x] PH5.7 Entity/Player Color — `EntityDef.color`/`PlayerDef.color` now applied via
+      `.setTint()` on the existing generated textures; fresh per level (no carry-over
+      tint into new entities).
+- [x] PH5.8 Transition/Spawn Effects — level transitions use a deterministic 200ms
+      `fadeOut`→respawn→`fadeIn` (guarded by `isTransitioning` against double-fire,
+      input never disabled); entities/player get a bounded 180ms scale-in spawn tween.
+      HUD `STAGE: n/total` → `LEVEL: n/total`.
+- [x] PH5.9 Boss/Finale Schema — `EntityDef` gains `is_boss` (default `False`),
+      `boss_phases` (1-2, default 1), `telegraph_ms` (0-2000ms, default 0); a
+      `model_validator` requires `health >= 150` when `is_boss`. `LevelDef` gains
+      `is_finale` (default `False`). All defaults preserve full backward
+      compatibility with every pre-Phase-5 DSL (schema 1.0/2.0/3.0).
+      `GameplayQualityValidator` adds boss-fairness (boss health must be
+      `>= max(150, 2x strongest non-boss enemy)` in the same level scope) and
+      telegraph-compatibility (`telegraph_ms > 0` only valid on `ranged_attack`
+      behavior) checks. `build_game_blueprint()`'s finale derivation now prefers an
+      explicit `is_finale=True` level over the "last level" heuristic.
+- [x] PH5.10 Boss Runtime — boss health bar + intro banner (reusing existing HUD/
+      floating-text primitives), destroyed on boss death or level transition. Single
+      deterministic phase-2 behavior bump (1.3x speed/fire-rate) at <=50% health,
+      guarded to fire at most once per boss — no state-machine framework. Ranged
+      telegraph: fixed-duration visual cue (tint flash + "!" cue) before a
+      `ranged_attack` entity's projectile fires when `telegraph_ms > 0`. Purely
+      health/duration-driven — no new randomness source.
+- [x] PH5.11 Tests — 33 new tests: `backend/tests/test_scale_tiers.py` (18),
+      `backend/tests/test_boss_finale.py` (13), `backend/tests/test_dsl.py` (+2).
+- [x] PH5.12 Regression Verification — see below.
+
+## Explicitly out of scope this phase (documented, not silently dropped)
+- Graphical minimap (text `LEVEL: n/total` HUD only, as before).
+- Procedural per-theme texture packs (tint-based recoloring only, no new art).
+- Multi-phase boss AI beyond the single deterministic threshold-based bump.
+- A separate World/Area sub-model distinct from `LevelDef`.
 
 ---
 
 ## 3. Verification
 
 - [x] Backend: `cd backend && .venv\Scripts\python.exe -m pytest tests/ -q` →
-      **284 passed**, 0 failed (includes new `test_blueprint.py`, `test_remix.py`,
-      and the pre-existing `test_ai_provider.py` rotation coverage)
+      **317 passed**, 0 failed (284 pre-existing + 33 new Phase 5 tests). One
+      pre-existing test (`test_generation_success_on_first_attempt`) needed a
+      1-line fixture adjustment (padded to the "prototype" tier's entity floor)
+      since its fixture predated the scale-tier concept — not a functional
+      regression, documented inline in the test.
 - [x] Frontend: `npx tsc --noEmit` → clean; `npx oxlint` → clean; `npm run build` →
-      succeeds (only a pre-existing, unrelated >500kB chunk-size informational warning)
-- [x] Alembic: `alembic heads` → single head (`f6a7b8c9d0e1`)
+      succeeds (only the pre-existing, unrelated >500kB chunk-size informational
+      warning)
+- [x] Alembic: new migration `a2b3c4d5e6f7` (adds `build_jobs.scale`) applied via
+      `alembic upgrade head`; `alembic heads` → single head (`a2b3c4d5e6f7`)
 - [ ] Browser E2E — **NOT PERFORMED** this phase (explicit user instruction: develop
       only, no browser/manual testing this session)
 
@@ -85,9 +121,11 @@ structured intents (not free-form prose) into a new, immutable project version.
 
 ## 4. Documentation
 
-- [x] `docs/09-AI-GAME-GENERATION.md` — added Blueprint + Remix to the pipeline
-- [x] `docs/07-DATA-MODEL.md` — added `project_versions.remix_intent`
-- [x] `docs/15-CURRENT-STATUS.md` — refreshed to actual current state (was stale)
+- [x] `docs/09-AI-GAME-GENERATION.md` — added scale tiers, budget validation, and
+      boss/finale to the pipeline description
+- [x] `docs/07-DATA-MODEL.md` — added `build_jobs.scale`, `EntityDef`/`LevelDef`
+      Phase 5 fields
+- [x] `docs/15-CURRENT-STATUS.md` — refreshed with Phase 5 summary
 - [x] TASK.md updated (this file)
 
 ---
@@ -95,37 +133,33 @@ structured intents (not free-form prose) into a new, immutable project version.
 ## 5. Git Checkpoint
 
 - [x] `git diff` / `git diff --stat` reviewed
-- [x] `git status` reviewed — only Phase 4 files touched
+- [x] `git status` reviewed immediately before commit (concurrent-session check)
 - [x] No secrets/build artifacts staged
-- [x] Commit created: `feat: add ai game blueprint and remix`
+- [x] Commit created: `feat: expand game generation and game feel`
 - [x] Working tree verified clean after commit
 
 ---
 
 ## Remaining Work
-Phases 5-8 (Advanced Generation/Game Feel, Living World, AI Director, Monetization)
-per the master expansion roadmap — each will be re-grounded in the then-current code
-and get its own implementation + checkpoint, per `AGENTS.md`'s phase discipline. Not
-started.
+Per explicit user instruction: **do not start Phase 6 (Living World) or any later
+phase until the user explicitly says to.** Phases 6-8 (Living World, AI Director,
+Monetization/BYOK) remain not started.
 
 ## Blockers
 None.
 
 ## Note on concurrent session
-Part of this session's git history (commit `60de2d9`, Gemini API key rotation) was
-produced by a second Claude Code session working concurrently in this same working
-tree. No conflicting edits landed in the same files at the same time as this phase's
-final commit; verified via a fresh `git status`/`git diff --stat HEAD` review
-immediately before committing.
+As with Phase 4, this working tree may be edited concurrently by a second Claude
+Code session. `git status`/`git diff --stat HEAD` was reviewed fresh immediately
+before this phase's commit to catch any collision; none found.
 
 ---
 
 ## Completed Phase Archive
 - **Discovery Visual Experience V1**: Commit `9d83d0bb1b1ddb8a5ca59737b14f3daa11a27b3f`
 - **Game DNA & Personalization V1**: Commit `29f7379471131920800fafefffaad4656ec5611f`
-- **Creator Progression V1**: Commit `3765d5a` (XP, levels, milestones, activity
-  rewards, profile progression UI — already implemented/committed; this ledger had
-  been left stale at `IN_PROGRESS` from a prior session and is reconciled here)
+- **Creator Progression V1**: Commit `3765d5a`
 - **Gemini API Key Rotation**: Commit `60de2d9` (infra reliability, not a numbered
   roadmap phase)
-- **Phase 4 — AI Game Blueprint + Remix**: this entry
+- **Phase 4 — AI Game Blueprint + Remix**: Commit `b57db6e`
+- **Phase 5 — Advanced Game Generation + Game Feel**: this entry

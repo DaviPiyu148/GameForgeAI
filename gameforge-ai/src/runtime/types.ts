@@ -147,6 +147,9 @@ export interface EntityDef {
   patrol_radius?: number;
   detection_radius?: number;
   loot_drop?: string | null;
+  is_boss?: boolean;
+  boss_phases?: number;
+  telegraph_ms?: number;
 }
 
 export interface RuleDef {
@@ -186,6 +189,7 @@ export interface LevelDef {
   entities: EntityDef[];
   rules?: RuleDef[];
   completion_message?: string;
+  is_finale?: boolean;
 }
 
 export interface GameDSL {

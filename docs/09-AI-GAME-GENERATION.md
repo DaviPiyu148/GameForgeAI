@@ -82,3 +82,34 @@ Game DNA personalization is passed into the remix prompt strictly as secondary f
 the explicit remix request always takes precedence. Every successful remix creates a new
 immutable `ProjectVersion` (never mutates prior versions), recording the structured
 intent(s) that produced it in the new `remix_intent` column.
+
+## Scale Tiers & Budget Validation (Phase 5)
+A build's `BuildParams.scale` (`prototype`/`standard`/`campaign`, default `standard`)
+flows through to `generate_game_dsl(..., scale=...)` and `build_generation_prompt(...,
+scale=...)`, mirroring how `engine`/`art_density`/`physics` already propagate.
+`app/generation/scale_tiers.py` defines each tier's level/entity/rule count budget,
+strictly inside the DSL's existing hard caps (levels<=5, entities<=30/level,
+rules<=15/level). `GameplayQualityValidator.validate_scale_budget()` is a **floor-only**
+check: a DSL below its tier's minimum gets exactly one bounded-repair nudge (folded into
+the existing repair loop as a soft, first-attempt-only error); if still under target
+after that, the build succeeds anyway with a `WARNING` log rather than a hard failure.
+
+## Bounded Boss / Finale (Phase 5)
+`EntityDef` gains optional `is_boss`, `boss_phases` (1-2), and `telegraph_ms` (0-2000ms)
+fields (all default to values that make every pre-Phase-5 DSL validate unchanged); a boss
+must have `health >= 150` and, per-level, must meaningfully outclass ordinary enemies
+(`>= 2x` the strongest non-boss enemy in the same scope) or generation fails validation.
+`telegraph_ms` is only valid on `ranged_attack` behavior. `LevelDef.is_finale` is an
+explicit marker (rather than inferring "last level") that `build_game_blueprint()`'s
+finale derivation now prefers when present. Runtime boss behavior is a single
+deterministic threshold-based bump (speed/fire-rate x1.3 at <=50% health) plus a fixed
+visual telegraph before a ranged attack fires — not a state-machine framework.
+
+## Multi-Level Runtime Rendering (Phase 5)
+The Phaser runtime (`GameScene.ts`) previously only ever rendered level 0's visuals even
+though the DSL schema supported up to 5 levels — level transitions repositioned entities
+but never reapplied a level's `world`/`theme` overrides. `applyLevelConfig()` is now the
+single source of truth for "apply a level" (background color, spawn, entities, HUD text),
+used identically on initial load and every transition. Entity/player `color` fields are
+now rendered via texture tinting (previously generated but ignored). Level transitions
+use a deterministic 200ms fade instead of an instant teleport.

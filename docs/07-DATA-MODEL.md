@@ -71,7 +71,7 @@ Keep these distinct:
 - `remix_intent`: JSON, nullable (Phase 4: structured `RemixIntent` list that produced this version via `POST /projects/{id}/remix`; `null` for organic builds and AI-improvement-patched versions)
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 
-### BuildJob (SQLAlchemy Model: `build_jobs`, B2, extended B3 & B7)
+### BuildJob (SQLAlchemy Model: `build_jobs`, B2, extended B3, B7 & Phase 5)
 - `id`: String(36) (Primary Key, server-generated UUID)
 - `user_id`: String(36), nullable, indexed (FK to `users.id` with `ondelete="SET NULL"`, added in B7)
 - `project_id`: String(36), nullable, indexed (populated upon SUCCESS)
@@ -80,6 +80,7 @@ Keep these distinct:
 - `art_density`: Integer, non-null, default: `50` (0-100)
 - `physics`: Integer, non-null, default: `80` (0-100)
 - `modules`: JSON, non-null, default: `[]`
+- `scale`: String, non-null, default: `"standard"` (Phase 5: `"prototype"`/`"standard"`/`"campaign"` generation scale tier, threaded into `generate_game_dsl`)
 - `status`: String(50), non-null, indexed (`QUEUED`, `RUNNING`, `VALIDATING`, `SUCCESS`, `ERROR`)
 - `error_code`: String(100), nullable
 - `error_message`: Text, nullable

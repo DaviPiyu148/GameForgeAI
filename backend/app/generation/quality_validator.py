@@ -1,7 +1,8 @@
 import math
 from dataclasses import dataclass, field
 from typing import List, Optional
-from app.generation.dsl_models import GameDSL
+from app.generation.dsl_models import EntityDef, GameDSL
+from app.generation.scale_tiers import get_scale_budget
 
 
 @dataclass
@@ -107,8 +108,96 @@ class GameplayQualityValidator:
         if dsl.world.wave_count < 1 or dsl.world.wave_count > 10:
             errors.append(f"Wave count ({dsl.world.wave_count}) outside valid range (1-10).")
 
+        # 7. Boss Fairness & Telegraph Compatibility (Phase 5).
+        # Scoped per entity list (top-level dsl.entities, then each campaign level's
+        # own entities), matching how reachability validation iterates dsl.levels --
+        # a boss is only compared against the OTHER enemies sharing its own level, not
+        # enemies from a different level entirely.
+        entity_scopes: List[List[EntityDef]] = [dsl.entities] + [lvl.entities for lvl in dsl.levels]
+        for ents in entity_scopes:
+            non_boss_enemy_healths = [e.health for e in ents if e.type == "enemy" and not e.is_boss]
+            max_non_boss_health = max(non_boss_enemy_healths) if non_boss_enemy_healths else 0
+
+            for ent in ents:
+                if ent.is_boss:
+                    # Boss must meaningfully outclass the toughest regular enemy sharing
+                    # its level (>= 2x), or clear a flat 150 HP floor when it is the only
+                    # enemy present. (EntityDef itself also enforces a flat >=150 floor,
+                    # but that single-entity validator has no visibility into siblings --
+                    # this is the scope-aware, stricter check.)
+                    required_health = max(150, max_non_boss_health * 2) if non_boss_enemy_healths else 150
+                    if ent.health < required_health:
+                        errors.append(
+                            f"Boss fairness: Boss entity '{ent.id}' has health {ent.health}, which does not "
+                            f"sufficiently exceed other enemies in its level (requires >= {required_health})."
+                        )
+
+                # Telegraph is only meaningful for a discrete, timed attack event that a
+                # visible wind-up window can precede -- today only 'ranged_attack'
+                # behavior fires such a discrete event; other behaviors (patrol/chase/
+                # stationary/bounce/float/flee/guard) have no equivalent attack beat for
+                # a telegraph to announce.
+                if ent.telegraph_ms > 0 and ent.behavior != "ranged_attack":
+                    errors.append(
+                        f"Invalid telegraph: Entity '{ent.id}' sets telegraph_ms={ent.telegraph_ms} but has "
+                        f"behavior '{ent.behavior}' (telegraph_ms only applies to 'ranged_attack' behavior)."
+                    )
+
         return QualityValidationResult(
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,
         )
+
+    @classmethod
+    def validate_scale_budget(cls, dsl: GameDSL, scale: str) -> List[str]:
+        """
+        Check a validated GameDSL against the requested scale tier's structural
+        budget (level count, entities/level, rules/level from
+        app.generation.scale_tiers.get_scale_budget). Returns a list of "below
+        tier minimum" error-shaped strings.
+
+        Deliberately floor-only: this never flags exceeding a tier's maximum --
+        the hard schema ceilings (GameDSL.levels max_length=5, LevelDef.entities
+        max_length=30, LevelDef.rules max_length=15) already bound that, and
+        `validate()` above's own rule-count check covers the top-level ceiling.
+        This method only nudges a DSL that came in UNDER a tier's target floor.
+
+        Caller contract (see GameGenerationService.generate_game_dsl): the errors
+        returned here are a soft, first-attempt-only nudge fed into the bounded
+        AI repair loop -- never a hard, permanently-blocking error. A DSL that is
+        still under-target after repair is accepted with the shortfall treated as
+        a warning, not a build failure ("a slightly-off tier is not worth a hard
+        failure").
+        """
+        budget = get_scale_budget(scale)
+        errors: List[str] = []
+
+        levels = dsl.levels
+        level_count = len(levels) if levels else 1
+        min_levels, _max_levels = budget.level_count
+        if level_count < min_levels:
+            errors.append(
+                f"Scale tier '{scale}' expects at least {min_levels} level(s), but the generated game has {level_count}."
+            )
+
+        # A DSL with no `levels` campaign array (single-stage prototype) is
+        # evaluated against its top-level entities/rules as an implicit single level.
+        level_entity_lists = [lvl.entities for lvl in levels] if levels else [dsl.entities]
+        level_rule_lists = [lvl.rules for lvl in levels] if levels else [dsl.rules]
+
+        min_entities, _max_entities = budget.entities_per_level
+        for idx, ents in enumerate(level_entity_lists, start=1):
+            if len(ents) < min_entities:
+                errors.append(
+                    f"Scale tier '{scale}' expects at least {min_entities} entities in level {idx}, but it has {len(ents)}."
+                )
+
+        min_rules, _max_rules = budget.rules_per_level
+        for idx, rules in enumerate(level_rule_lists, start=1):
+            if len(rules) < min_rules:
+                errors.append(
+                    f"Scale tier '{scale}' expects at least {min_rules} rules in level {idx}, but it has {len(rules)}."
+                )
+
+        return errors

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { GameDSL, GameState, PlaytestSummary } from './types';
+import type { EntityDef, GameDSL, GameState, LevelDef, PlaytestSummary } from './types';
 import { generateProceduralTextures } from './textures';
 import { RuleEngine } from './rules';
 import { generateProceduralLayout } from './procedural';
@@ -75,6 +75,14 @@ export class GameScene extends Phaser.Scene {
   // Multi-Level Campaign Support
   private currentLevelIndex: number = 0;
   private totalLevels: number = 1;
+  private backgroundRect!: Phaser.GameObjects.Rectangle;
+  private isTransitioning: boolean = false;
+
+  // Boss Runtime Support (Phase 5)
+  private currentBossSprite: Phaser.Physics.Arcade.Sprite | null = null;
+  private bossHealthBarBg?: Phaser.GameObjects.Rectangle;
+  private bossHealthBarFill?: Phaser.GameObjects.Rectangle;
+  private bossLabelText?: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -119,9 +127,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, worldW, worldH);
     this.cameras.main.setBounds(0, 0, worldW, worldH);
 
-    // Background
+    // Background (this rectangle is re-tinted per level by applyLevelConfig; do not
+    // create a second background object elsewhere, or level transitions will drift).
     const bgCol = Phaser.Display.Color.HexStringToColor(this.dsl.world.background_color || '#0a0b10').color;
-    this.add.rectangle(worldW / 2, worldH / 2, worldW, worldH, bgCol);
+    this.backgroundRect = this.add.rectangle(worldW / 2, worldH / 2, worldW, worldH, bgCol);
     this.createGridOverlay(worldW, worldH);
 
     // 2. Physics Groups
@@ -132,14 +141,18 @@ export class GameScene extends Phaser.Scene {
     this.bulletsGroup = this.physics.add.group();
     this.enemyBulletsGroup = this.physics.add.group();
 
-    // 3. Player Spawn (Respects Level 1 spawn if multi-stage)
-    const activeLevel = (this.dsl.levels && this.dsl.levels.length > 0) ? this.dsl.levels[0] : null;
+    // 3. Player Spawn (Respects the active level's spawn if multi-stage)
+    const activeLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
     const initialSpawnX = activeLevel?.spawn_x ?? this.dsl.player.spawn_x ?? 400;
     const initialSpawnY = activeLevel?.spawn_y ?? this.dsl.player.spawn_y ?? 300;
 
     this.player = this.physics.add.sprite(initialSpawnX, initialSpawnY, 'tex_player');
     this.player.setDisplaySize(this.dsl.player.width, this.dsl.player.height);
     this.player.setCollideWorldBounds(true);
+    if (this.dsl.player.color) {
+      this.player.setTint(Phaser.Display.Color.HexStringToColor(this.dsl.player.color).color);
+    }
+    this.playSpawnInTween(this.player);
 
     if (isPlatformer) {
       this.player.setGravityY(this.dsl.world.gravity || 800);
@@ -153,9 +166,10 @@ export class GameScene extends Phaser.Scene {
     // Camera follow player
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-    // 4. Populate Entities & Procedural Layout
-    const initialEntities = activeLevel?.entities || this.dsl.entities || [];
-    this.populateEntities(initialEntities);
+    // 4. Populate Entities & Procedural Layout.
+    // applyLevelConfig() is the single source of truth for "apply a level" — it is
+    // reused unchanged by advanceToNextLevel() so the two code paths cannot drift.
+    this.applyLevelConfig(activeLevel);
     if (!activeLevel) {
       const layout = generateProceduralLayout(this.dsl, this.seed);
       this.populateEntities(layout.entities);
@@ -207,7 +221,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private populateEntities(entities: any[]): void {
+  private populateEntities(entities: EntityDef[]): void {
     for (const ent of entities) {
       if (ent.type === 'platform') {
         const plat = this.platformsGroup.create(ent.x, ent.y, 'tex_platform') as Phaser.Physics.Arcade.Sprite;
@@ -223,7 +237,11 @@ export class GameScene extends Phaser.Scene {
         col.setDisplaySize(ent.width, ent.height);
         col.setData('points', ent.points || 50);
         col.setData('id', ent.id);
+        if (ent.color) {
+          col.setTint(Phaser.Display.Color.HexStringToColor(ent.color).color);
+        }
         (col.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+        this.playSpawnInTween(col);
         if (ent.behavior === 'float') {
           this.tweens.add({
             targets: col,
@@ -240,16 +258,118 @@ export class GameScene extends Phaser.Scene {
         enemy.setData('id', ent.id);
         enemy.setData('speed', ent.speed || 100);
         enemy.setData('health', ent.health || 30);
+        enemy.setData('maxHealth', ent.health || 30);
         enemy.setData('damage', ent.damage || 15);
         enemy.setData('behavior', ent.behavior || 'patrol');
         enemy.setData('loot_drop', ent.loot_drop || null);
         enemy.setData('originX', ent.x);
+        enemy.setData('is_boss', ent.is_boss || false);
         enemy.setCollideWorldBounds(true);
+        if (ent.color) {
+          enemy.setTint(Phaser.Display.Color.HexStringToColor(ent.color).color);
+        }
+        this.playSpawnInTween(enemy);
 
         // Register entity with centralized behavior system
         this.behaviorSystem.registerEntity(enemy, ent);
+
+        if (ent.is_boss) {
+          this.setupBoss(enemy, ent);
+        }
       }
     }
+  }
+
+  /**
+   * Single source of truth for "apply a level": background/theme, player spawn,
+   * entity population, and HUD objective/level text. Used identically by create()
+   * for the initial level and by advanceToNextLevel() for every subsequent one,
+   * so the two code paths cannot drift out of sync.
+   */
+  private applyLevelConfig(level: LevelDef | null): void {
+    // Background / theme (re-tints the single persistent background rectangle;
+    // full theme-driven palette swapping is out of scope for this phase).
+    const bgColorHex = level?.world?.background_color || this.dsl.world.background_color || '#0a0b10';
+    if (this.backgroundRect) {
+      this.backgroundRect.setFillStyle(Phaser.Display.Color.HexStringToColor(bgColorHex).color);
+    }
+    if (level?.theme) {
+      console.debug(`[GameScene] Level ${level.level_number} theme: ${level.theme}`);
+    }
+
+    // Player spawn
+    const spawnX = level?.spawn_x ?? this.dsl.player.spawn_x ?? this.dsl.world.width / 2;
+    const spawnY = level?.spawn_y ?? this.dsl.player.spawn_y ?? this.dsl.world.height / 2;
+    if (this.player) {
+      this.player.setPosition(spawnX, spawnY);
+      this.player.setVelocity(0, 0);
+    }
+
+    // Entities
+    const entities = level?.entities ?? this.dsl.entities ?? [];
+    this.populateEntities(entities);
+
+    // HUD text (guarded — not created yet on the very first call from create())
+    if (this.objectiveText) {
+      const goal = level?.objective?.description || this.dsl.design_spec?.primary_objective || 'SURVIVE';
+      this.objectiveText.setText(`GOAL: ${goal}`);
+    }
+    if (this.stageText) {
+      this.stageText.setText(`LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}`);
+    }
+  }
+
+  /** Bounded scale-in "pop" tween for newly spawned entities/player. */
+  private playSpawnInTween(sprite: Phaser.Physics.Arcade.Sprite): void {
+    const targetScaleX = sprite.scaleX;
+    const targetScaleY = sprite.scaleY;
+    sprite.setScale(targetScaleX * 0.1, targetScaleY * 0.1);
+    this.tweens.add({
+      targets: sprite,
+      scaleX: targetScaleX,
+      scaleY: targetScaleY,
+      duration: 180,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  /** Creates the boss health bar + intro banner and tracks the boss sprite. */
+  private setupBoss(enemy: Phaser.Physics.Arcade.Sprite, ent: EntityDef): void {
+    // Defensive: only one boss is tracked at a time (single-boss-per-level scope).
+    this.destroyBossUI();
+    this.currentBossSprite = enemy;
+
+    const label = ent.id ? `BOSS: ${ent.id.toUpperCase().replace(/_/g, ' ')}` : 'BOSS ENCOUNTER';
+    this.spawnFloatingText(enemy.x, enemy.y - (enemy.displayHeight / 2 + 20), `⚠ ${label}`, '#ff0055');
+
+    const barWidth = 200;
+    const barX = this.cameras.main.width / 2 - barWidth / 2;
+    const barY = 34;
+    this.bossHealthBarBg = this.add
+      .rectangle(barX, barY, barWidth, 14, 0x220011)
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(500);
+    this.bossHealthBarFill = this.add
+      .rectangle(barX, barY, barWidth, 12, 0xff0055)
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(500);
+    this.bossLabelText = this.add
+      .text(barX, barY - 20, label, { fontSize: '12px', color: '#ff0055', fontFamily: 'monospace', fontStyle: 'bold' })
+      .setScrollFactor(0)
+      .setDepth(500);
+  }
+
+  /** Destroys boss UI (health bar + label) and clears the tracked boss reference. */
+  private destroyBossUI(): void {
+    this.bossHealthBarBg?.destroy();
+    this.bossHealthBarFill?.destroy();
+    this.bossLabelText?.destroy();
+    this.bossHealthBarBg = undefined;
+    this.bossHealthBarFill = undefined;
+    this.bossLabelText = undefined;
+    this.currentBossSprite = null;
   }
 
   public update(time: number, delta: number): void {
@@ -481,7 +601,23 @@ export class GameScene extends Phaser.Scene {
     enemy.setData('health', hp);
     this.spawnFloatingText(enemy.x, enemy.y, `-${attackDmg}`, '#ffea00');
 
+    // Boss phase-2 threshold: single deterministic, health-based behavior bump,
+    // guarded to trigger at most once per boss (see EntityBehaviorSystem.triggerBossPhase2).
+    if (hp > 0 && enemy.getData('is_boss')) {
+      const maxHp = enemy.getData('maxHealth') || 1;
+      if (hp <= maxHp * 0.5) {
+        const phaseApplied = this.behaviorSystem.triggerBossPhase2(enemy);
+        if (phaseApplied) {
+          this.spawnFloatingText(enemy.x, enemy.y - 30, 'PHASE 2!', '#ff00ff');
+          this.cameras.main.shake(200, 0.012);
+        }
+      }
+    }
+
     if (hp <= 0) {
+      if (enemy === this.currentBossSprite) {
+        this.destroyBossUI();
+      }
       this.spawnParticleBurst(enemy.x, enemy.y, '#ff0055');
       this.telemetry.record('ENEMY_DEFEATED', { damageDealt: attackDmg });
       this.score += 100;
@@ -513,55 +649,69 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Advances to the next level using a fixed-duration camera fade. Deterministic
+   * (no random timing), guarded against double-firing via isTransitioning, and
+   * never leaves input disabled since gameState/keyboard handling are untouched
+   * throughout — only a black overlay is drawn during the transition.
+   */
   private advanceToNextLevel(): void {
+    if (this.isTransitioning) return;
+
     if (this.currentLevelIndex >= this.totalLevels - 1) {
       this.triggerEndGame('WON');
       return;
     }
 
-    this.currentLevelIndex += 1;
-    const nextLevel = this.dsl.levels?.[this.currentLevelIndex];
-    const stageTitle = nextLevel?.title || `Stage ${this.currentLevelIndex + 1}`;
+    this.isTransitioning = true;
+
+    const nextIndex = this.currentLevelIndex + 1;
+    const nextLevel: LevelDef | null = this.dsl.levels?.[nextIndex] ?? null;
+    const stageTitle = nextLevel?.title || `Stage ${nextIndex + 1}`;
 
     this.spawnFloatingText(this.player.x, this.player.y - 40, `★ STAGE COMPLETE! ★`, '#00ff66');
     this.spawnFloatingText(this.player.x, this.player.y - 15, `Entering: ${stageTitle}`, '#00f0ff');
-    this.cameras.main.flash(300, 0, 240, 255);
 
-    // Clear current stage entities
-    this.enemiesGroup.clear(true, true);
-    this.collectiblesGroup.clear(true, true);
-    this.hazardsGroup.clear(true, true);
-    this.platformsGroup.clear(true, true);
-    this.bulletsGroup.clear(true, true);
-    this.enemyBulletsGroup.clear(true, true);
+    const FADE_MS = 200;
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.currentLevelIndex = nextIndex;
 
-    // Respawn player at stage spawn
-    const spawnX = nextLevel?.spawn_x ?? this.dsl.player.spawn_x ?? 400;
-    const spawnY = nextLevel?.spawn_y ?? this.dsl.player.spawn_y ?? 300;
-    this.player.setPosition(spawnX, spawnY);
-    this.player.setVelocity(0, 0);
+      // Fully tear down the previous stage: unregister behavior-system state first
+      // (defensive — update() already self-prunes inactive sprites, but this makes
+      // the teardown deterministic within this same frame instead of next-frame),
+      // then destroy every level-scoped physics group member (clear(true, true)
+      // both removes-from-scene AND destroys, so nothing lingers or carries a
+      // stale tint/reference into the next level).
+      this.enemiesGroup.getChildren().forEach((child) => {
+        this.behaviorSystem.unregisterEntity(child as Phaser.Physics.Arcade.Sprite);
+      });
+      this.enemiesGroup.clear(true, true);
+      this.collectiblesGroup.clear(true, true);
+      this.hazardsGroup.clear(true, true);
+      this.platformsGroup.clear(true, true);
+      this.bulletsGroup.clear(true, true);
+      this.enemyBulletsGroup.clear(true, true);
+      this.destroyBossUI();
 
-    // Spawn new stage entities
-    if (nextLevel?.entities) {
-      this.populateEntities(nextLevel.entities);
-    }
+      // Single source of truth: background/theme, player respawn, entity
+      // population, and HUD text — identical to the path create() uses.
+      this.applyLevelConfig(nextLevel);
 
-    this.currentWave = 1;
-    this.maxWaves = nextLevel?.world?.wave_count || this.dsl.world.wave_count || 1;
+      this.currentWave = 1;
+      this.maxWaves = nextLevel?.world?.wave_count || this.dsl.world.wave_count || 1;
 
-    this.telemetry.record('OBJECTIVE_COMPLETED', { stage: this.currentLevelIndex + 1, title: stageTitle });
+      this.telemetry.record('OBJECTIVE_COMPLETED', { stage: this.currentLevelIndex + 1, title: stageTitle });
 
-    // Update HUD
-    if (this.stageText) {
-      this.stageText.setText(`STAGE: ${this.currentLevelIndex + 1}/${this.totalLevels}`);
-    }
-    if (this.objectiveText) {
-      const stageGoal = nextLevel?.objective?.description || this.dsl.design_spec?.primary_objective || 'SURVIVE';
-      this.objectiveText.setText(`GOAL: ${stageGoal}`);
-    }
+      this.cameras.main.fadeIn(FADE_MS, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_IN_COMPLETE, () => {
+        this.isTransitioning = false;
+      });
+    });
   }
 
   private checkStageProgression(): void {
+    if (this.isTransitioning) return;
     if (this.dsl.levels && this.dsl.levels.length > 0 && this.currentLevelIndex < this.totalLevels - 1) {
       this.advanceToNextLevel();
     } else if (this.currentWave < this.maxWaves) {
@@ -667,7 +817,7 @@ export class GameScene extends Phaser.Scene {
 
     let nextY = 54;
     if (this.totalLevels > 1) {
-      this.stageText = this.add.text(0, nextY, `STAGE: 1/${this.totalLevels}`, { fontSize: '12px', color: '#ff00ff', fontFamily: 'monospace', fontStyle: 'bold' });
+      this.stageText = this.add.text(0, nextY, `LEVEL: 1/${this.totalLevels}`, { fontSize: '12px', color: '#ff00ff', fontFamily: 'monospace', fontStyle: 'bold' });
       nextY += 16;
     }
 
@@ -715,6 +865,14 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText.setText(`SCORE: ${this.score}`);
     this.waveText.setText(`WAVE: ${this.currentWave}/${this.maxWaves}`);
+
+    // Boss health bar (Phase 5) — reflects live getData('health') on the tracked boss.
+    if (this.currentBossSprite && this.currentBossSprite.active && this.bossHealthBarFill) {
+      const hp = Math.max(0, this.currentBossSprite.getData('health') ?? 0);
+      const maxHp = this.currentBossSprite.getData('maxHealth') || 1;
+      const ratio = Math.max(0, Math.min(1, hp / maxHp));
+      this.bossHealthBarFill.width = 200 * ratio;
+    }
   }
 
   private spawnFloatingText(x: number, y: number, text: string, color: string): void {

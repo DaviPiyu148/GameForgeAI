@@ -132,6 +132,7 @@ class BuildService:
             art_density=data.parameters.art_density,
             physics=data.parameters.physics,
             modules=data.parameters.modules,
+            scale=data.parameters.scale,
             status="QUEUED",
         )
         saved = self.repo.create_build(db, build)
@@ -349,6 +350,7 @@ class BuildService:
                 personalization=personalization,
                 emit_log=emit_log,
                 set_status=set_status,
+                scale=build.scale or "standard",
             )
 
             # Check if build was cancelled while AI generation was in-flight

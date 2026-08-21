@@ -184,6 +184,7 @@ class GameGenerationService:
         personalization: Optional[Dict[str, Any]] = None,
         emit_log: Optional[Callable[[str, str], None]] = None,
         set_status: Optional[Callable[[str], None]] = None,
+        scale: str = "standard",
     ) -> GenerationResult:
         """
         Execute the generation pipeline: Prompt -> Gemini -> Schema & Quality Validation -> Bounded Repair.
@@ -221,6 +222,7 @@ class GameGenerationService:
             modules=active_mods,
             inspiration=inspiration,
             personalization=personalization,
+            scale=scale,
         )
 
         raw_output: Dict[str, Any]
@@ -342,13 +344,22 @@ class GameGenerationService:
         # 4. Dual Validation: Schema + Gameplay Quality
         val_result = validate_game_dsl(dsl_dict)
         quality_errors: List[str] = []
+        # Scale-budget shortfall (too few levels/entities/rules vs. the requested tier)
+        # is a SOFT, first-attempt-only nudge -- never a hard, repeatedly-blocking
+        # error ("a slightly-off tier is not worth a hard failure"). It is folded into
+        # all_errors below ONLY on this very first validation pass, so it gets AT MOST
+        # one bounded repair attempt. From the repair loop onward (see below), success
+        # is decided purely by hard schema/quality errors; any remaining budget
+        # shortfall after that one nudge is accepted as-is.
+        budget_errors: List[str] = []
 
         if val_result.is_valid and val_result.dsl:
             quality_result = GameplayQualityValidator.validate(val_result.dsl)
             if not quality_result.is_valid:
                 quality_errors = quality_result.errors
+            budget_errors = GameplayQualityValidator.validate_scale_budget(val_result.dsl, scale)
 
-        all_errors = val_result.errors + quality_errors
+        all_errors = val_result.errors + quality_errors + budget_errors
 
         if not all_errors and val_result.dsl:
             dsl = val_result.dsl
@@ -463,6 +474,9 @@ class GameGenerationService:
                 if not rep_q_res.is_valid:
                     rep_quality_errors = rep_q_res.errors
 
+            # NOTE: scale-budget shortfall is deliberately NOT included in
+            # all_rep_errors -- it only ever gets the one first-pass nudge above.
+            # From here on, only hard schema/quality errors can block success.
             all_rep_errors = repaired_val.errors + rep_quality_errors
             if not all_rep_errors and repaired_val.dsl:
                 dsl = repaired_val.dsl
@@ -473,6 +487,10 @@ class GameGenerationService:
                         dsl.design_spec = parsed_spec
                     except Exception:
                         pass
+
+                remaining_budget_warnings = GameplayQualityValidator.validate_scale_budget(dsl, scale)
+                if remaining_budget_warnings:
+                    log("WARNING", f"[AI] Scale tier '{scale}' still under target after repair (accepted, not blocking): {remaining_budget_warnings[0]}")
 
                 log("SUCCESS", f"[AI] Game DSL repaired and validated on attempt {attempt + 1}.")
                 log("SUCCESS", f"> Schema v2.0: PASS // Gameplay Quality: PASS")

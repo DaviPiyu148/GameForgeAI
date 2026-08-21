@@ -30,12 +30,30 @@ class MockAIProvider(AIProvider):
 async def test_generation_success_on_first_attempt():
     """Test standard generation succeeding on attempt 1."""
     valid_dsl = get_sample_valid_dsl_dict()
+    # Phase 5: pad past the "prototype" tier's 4-entity floor so this pre-Phase-5
+    # fixture (2 entities) doesn't trigger a scale-budget repair nudge, which would
+    # break this test's specific "succeeds on the very first attempt" assertions
+    # (attempts_used == 1, call_count == 1). Uses scale="prototype" explicitly since
+    # this test predates and is unrelated to scale tiers.
+    valid_dsl["entities"] = valid_dsl["entities"] + [
+        {
+            "id": "node_2", "type": "collectible", "x": 500, "y": 200,
+            "width": 16, "height": 16, "speed": 0, "health": 1,
+            "behavior": "float", "color": "#ffff00", "points": 100,
+        },
+        {
+            "id": "drone_2", "type": "enemy", "x": 300, "y": 400,
+            "width": 24, "height": 24, "speed": 100, "health": 30,
+            "behavior": "patrol", "color": "#ff0055", "points": 50,
+        },
+    ]
     mock_provider = MockAIProvider([valid_dsl])
     service = GameGenerationService(provider=mock_provider, max_retries=2)
 
     logs = []
     result = await service.generate_game_dsl(
         prompt="Cyberpunk Dodger",
+        scale="prototype",
         emit_log=lambda lvl, msg: logs.append(msg),
     )
 

@@ -31,6 +31,7 @@ class BuildJob(Base):
     art_density = Column(Integer, nullable=False, default=50)
     physics = Column(Integer, nullable=False, default=80)
     modules = Column(JSON, nullable=False, default=list)
+    scale = Column(String(20), nullable=False, default="standard")
 
     # Status: QUEUED -> RUNNING -> VALIDATING -> SUCCESS / ERROR
     status = Column(String(50), nullable=False, default="QUEUED", index=True)

@@ -104,6 +104,13 @@ class EntityDef(BaseModel):
     detection_radius: int = Field(250, ge=20, le=1500)
     loot_drop: Optional[str] = None
 
+    # Phase 5: Boss/Finale Attributes. Safe defaults (is_boss=False, boss_phases=1,
+    # telegraph_ms=0) mean every pre-Phase-5 DSL (schema 1.0/2.0/3.0, no boss fields
+    # present) still validates unchanged -- none of these are required fields.
+    is_boss: bool = False
+    boss_phases: int = Field(1, ge=1, le=2)
+    telegraph_ms: int = Field(0, ge=0, le=2000)
+
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("id")
@@ -118,6 +125,19 @@ class EntityDef(BaseModel):
         if not HEX_COLOR_REGEX.match(v):
             raise ValueError(f"Invalid hex color format: '{v}'.")
         return v
+
+    @model_validator(mode="after")
+    def validate_boss_health(self) -> "EntityDef":
+        # A boss must be a meaningful health-pool threat on its own terms; the
+        # stronger scope-aware comparison against sibling enemies (>= 2x the
+        # strongest non-boss enemy in the same entity list) is enforced separately
+        # in GameplayQualityValidator.validate(), which has access to the full
+        # entity list this single-entity validator does not.
+        if self.is_boss and self.health < 150:
+            raise ValueError(
+                f"Boss entity '{self.id}' has health {self.health}, below the minimum required boss health (150)."
+            )
+        return self
 
 
 class RuleDef(BaseModel):
@@ -220,6 +240,10 @@ class LevelDef(BaseModel):
     entities: List[EntityDef] = Field(default_factory=list, max_length=30)
     rules: List[RuleDef] = Field(default_factory=list, max_length=15)
     completion_message: str = Field("STAGE COMPLETE!", max_length=100)
+
+    # Phase 5: explicit finale marker. Defaults to False so every existing DSL
+    # (which predates this field) still validates unchanged.
+    is_finale: bool = False
 
     model_config = ConfigDict(extra="forbid")
 

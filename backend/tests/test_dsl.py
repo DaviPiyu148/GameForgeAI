@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 from app.generation.dsl_models import (
     EntityDef,
     GameDSL,
@@ -207,3 +208,19 @@ def test_cross_field_coordinate_clamping():
     assert result.dsl is not None
     # Clamped to middle of world width
     assert result.dsl.player.spawn_x == 400
+
+
+def test_boss_phases_out_of_range_rejected():
+    """Phase 5: EntityDef.boss_phases must be within [1, 2]."""
+    with pytest.raises(ValidationError):
+        EntityDef(id="e_phases_low", x=10, y=10, boss_phases=0)
+    with pytest.raises(ValidationError):
+        EntityDef(id="e_phases_high", x=10, y=10, boss_phases=3)
+
+
+def test_telegraph_ms_out_of_range_rejected():
+    """Phase 5: EntityDef.telegraph_ms must be within [0, 2000]."""
+    with pytest.raises(ValidationError):
+        EntityDef(id="e_telegraph_low", x=10, y=10, telegraph_ms=-1)
+    with pytest.raises(ValidationError):
+        EntityDef(id="e_telegraph_high", x=10, y=10, telegraph_ms=2001)

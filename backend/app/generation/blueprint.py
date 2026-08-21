@@ -82,8 +82,12 @@ def build_game_blueprint(
     enemy_variety = len({e.id for e in enemy_entities})
 
     if levels and len(levels) > 1:
-        last = levels[-1]
-        finale = last.completion_message or last.title
+        # Phase 5: prefer an explicitly marked finale level (LevelDef.is_finale=True)
+        # over the "last level" heuristic. Falls back to the last level when no level
+        # is explicitly marked, preserving behavior for pre-Phase-5 DSLs.
+        explicit_finale = next((lvl for lvl in levels if lvl.is_finale), None)
+        finale_level = explicit_finale or levels[-1]
+        finale = finale_level.completion_message or finale_level.title
     elif design_spec and design_spec.win_conditions:
         finale = design_spec.win_conditions[0]
     else:

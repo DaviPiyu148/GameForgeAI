@@ -22,6 +22,13 @@ export interface EntityRuntimeState {
   guardState: 'GUARDING' | 'ENGAGING' | 'RETURNING';
   floatPhase: number;
   bounceInitialized: boolean;
+  // Boss / telegraph support (Phase 5)
+  isBoss: boolean;
+  bossPhases: number;
+  phase2Triggered: boolean;
+  telegraphMs: number;
+  telegraphUntil: number; // 0 = not currently telegraphing
+  savedTint: number | null;
 }
 
 export interface BehaviorContext {
@@ -59,6 +66,12 @@ export class EntityBehaviorSystem {
       guardState: 'GUARDING',
       floatPhase: ((def.x * 17 + def.y * 31) % 1000) / 1000 * (Math.PI * 2),
       bounceInitialized: false,
+      isBoss: def.is_boss ?? false,
+      bossPhases: def.boss_phases ?? 0,
+      phase2Triggered: false,
+      telegraphMs: def.telegraph_ms ?? 0,
+      telegraphUntil: 0,
+      savedTint: null,
     };
 
     this.entityStates.set(sprite, state);
@@ -246,15 +259,69 @@ export class EntityBehaviorSystem {
           sprite.setVelocity(body.velocity.x * 0.8, body.velocity.y * 0.8);
         }
 
-        // Fire projectile if player in detection radius and cooldown ready
+        // Fire projectile if player in detection radius and cooldown ready.
+        // If a telegraph window is configured, the attack is delayed by a fixed,
+        // deterministic duration with a visual cue before it actually fires.
         const cooldownMs = state.fireRate * 1000;
-        if (dist <= state.detectionRadius && time - state.lastFiredTime > cooldownMs) {
-          state.lastFiredTime = time;
-          this.fireEnemyProjectile(sprite, player, state.damage, enemyBulletsGroup, scene);
+        if (state.telegraphUntil > 0) {
+          // Already telegraphing a queued attack — fire once the window elapses.
+          if (time >= state.telegraphUntil) {
+            state.telegraphUntil = 0;
+            state.lastFiredTime = time;
+            if (state.savedTint !== null) {
+              sprite.setTint(state.savedTint);
+              state.savedTint = null;
+            }
+            this.fireEnemyProjectile(sprite, player, state.damage, enemyBulletsGroup, scene);
+          }
+        } else if (dist <= state.detectionRadius && time - state.lastFiredTime > cooldownMs) {
+          if (state.telegraphMs > 0) {
+            state.telegraphUntil = time + state.telegraphMs;
+            state.savedTint = sprite.tintTopLeft;
+            sprite.setTint(0xffff00);
+            EntityBehaviorSystem.showTelegraphWarning(scene, sprite.x, sprite.y - (sprite.displayHeight / 2 + 10));
+          } else {
+            state.lastFiredTime = time;
+            this.fireEnemyProjectile(sprite, player, state.damage, enemyBulletsGroup, scene);
+          }
         }
         break;
       }
     }
+  }
+
+  /**
+   * Applies the single deterministic phase-2 behavior bump for a two-phase boss
+   * once its health drops to or below 50% of max. Triggers at most once per boss.
+   * Returns true if the phase change was applied on this call.
+   */
+  public triggerBossPhase2(sprite: Phaser.Physics.Arcade.Sprite): boolean {
+    const state = this.entityStates.get(sprite);
+    if (!state || !state.isBoss || state.bossPhases !== 2 || state.phase2Triggered) {
+      return false;
+    }
+    state.phase2Triggered = true;
+    const multiplier = 1.3;
+    state.speed *= multiplier;
+    state.fireRate = Math.max(0.2, state.fireRate / multiplier);
+    return true;
+  }
+
+  /**
+   * Bounded, self-cleaning warning cue shown above an entity before a telegraphed
+   * attack fires. Independent of GameScene internals so it can be reused here.
+   */
+  private static showTelegraphWarning(scene: Phaser.Scene, x: number, y: number): void {
+    const txt = scene.add
+      .text(x, y, '!', { fontSize: '18px', color: '#ffff00', fontStyle: 'bold', fontFamily: 'monospace' })
+      .setOrigin(0.5);
+    scene.tweens.add({
+      targets: txt,
+      y: y - 12,
+      alpha: 0,
+      duration: 400,
+      onComplete: () => txt.destroy(),
+    });
   }
 
   /**

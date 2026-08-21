@@ -11,6 +11,7 @@ class BuildParams(BaseModel):
     art_density: int = Field(default=50, ge=0, le=100, alias="artDensity")
     physics: int = Field(default=80, ge=0, le=100)
     modules: List[str] = Field(default_factory=list, max_length=50)
+    scale: Literal["prototype", "standard", "campaign"] = "standard"
 
     model_config = ConfigDict(
         populate_by_name=True,
