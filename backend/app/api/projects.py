@@ -131,7 +131,41 @@ def record_playtest(
 ) -> PlaytestSessionResponse:
     """Record playtest summary and telemetry. Enforces ownership."""
     try:
-        return service.create_playtest_session(db, project_id, current_user.id, data)
+        session_res = service.create_playtest_session(db, project_id, current_user.id, data)
+
+        # Grant PLAYTEST XP and record preferences
+        try:
+            from app.services.progression_service import progression_service
+            from app.services.preference_service import preference_service
+
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="PLAYTEST",
+                source_ref=session_res.id,
+            )
+            if getattr(data, "outcome", "").upper() == "WON":
+                progression_service.grant_xp(
+                    db=db,
+                    user_id=current_user.id,
+                    event_type="PLAYTEST_WIN",
+                    source_ref=session_res.id,
+                )
+
+            # Retrieve project to get genre
+            proj = service.get_project(db, project_id, current_user.id)
+            if proj:
+                preference_service.record_signal(
+                    db=db,
+                    user_id=current_user.id,
+                    raw_genres_or_tags=[proj.genre, proj.title],
+                    weight=8.0,
+                    source="playtest",
+                )
+        except Exception as pe:
+            logger.warning(f"Telemetry tracking failed on playtest for user {current_user.id}: {pe}")
+
+        return session_res
     except ProjectNotFoundError as e:
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
 

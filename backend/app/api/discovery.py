@@ -1,6 +1,12 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from typing import Optional
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.dependencies import get_optional_user
+from app.models.user import User
 from app.schemas.discovery import (
     BuildInspirationResponse,
     DiscoverySearchRequest,
@@ -8,6 +14,8 @@ from app.schemas.discovery import (
     MoreLikeThisRequest,
 )
 from app.services.discovery_service import DiscoveryService, discovery_service
+from app.services.preference_service import preference_service
+from app.services.progression_service import progression_service
 
 
 logger = logging.getLogger(__name__)
@@ -30,12 +38,46 @@ def get_discovery_service() -> DiscoveryService:
 async def search_games(
     request: DiscoverySearchRequest,
     service: DiscoveryService = Depends(get_discovery_service),
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ) -> DiscoverySearchResponse:
     """
     Search the catalog of games using natural language descriptions, entity names, or concept phrases.
     """
     try:
         response = await service.search(request)
+
+        # Behavioral personalization and XP tracking for authenticated users
+        if current_user and db:
+            try:
+                # 1. Grant search XP (subject to anti-spam duplicate rate limit)
+                normalized_query = request.prompt.strip().lower()
+                progression_service.grant_xp(
+                    db=db,
+                    user_id=current_user.id,
+                    event_type="SEARCH",
+                    source_ref=normalized_query[:100],
+                )
+
+                # 2. Extract genre signals from top results
+                matched_genres = [
+                    genre
+                    for res in response.results[:3]
+                    for genre in getattr(res.game, "genres", [])
+                ]
+                if request.filters and request.filters.genres:
+                    matched_genres.extend(request.filters.genres)
+
+                preference_service.record_signal(
+                    db=db,
+                    user_id=current_user.id,
+                    raw_genres_or_tags=matched_genres or [request.prompt],
+                    weight=1.0,
+                    source="search",
+                )
+            except Exception as pe:
+                logger.warning(f"Failed to record discovery telemetry for user {current_user.id}: {pe}")
+
         return response
     except RuntimeError as re:
         logger.error(f"Discovery search runtime failure: {re}")

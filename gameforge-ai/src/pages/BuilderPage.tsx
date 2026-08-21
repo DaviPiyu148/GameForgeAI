@@ -192,6 +192,24 @@ const BuilderPage = () => {
 
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
+                    <label className="block font-mono text-[10px] text-on-surface-variant uppercase">Game Scale / Structure</label>
+                    <span className="font-mono text-[9px] text-secondary bg-secondary/10 px-1.5 py-0.5 border border-secondary/30 rounded-xs uppercase">
+                      {state.currentBuildParams.scale === 'campaign' ? 'Multi-Stage' : state.currentBuildParams.scale === 'standard' ? 'Standard' : 'Prototype'}
+                    </span>
+                  </div>
+                  <select 
+                    className="w-full bg-terminal-bg border border-primary/40 p-2 text-primary font-mono text-xs cursor-pointer focus:ring-1 focus:ring-primary outline-none"
+                    value={state.currentBuildParams.scale || 'prototype'}
+                    onChange={(e) => updateBuildParams({ scale: e.target.value as 'prototype' | 'standard' | 'campaign' })}
+                  >
+                    <option value="prototype">Single-Stage Fast Prototype (1 Level)</option>
+                    <option value="standard">Standard Campaign (2-3 Stages)</option>
+                    <option value="campaign">Advanced Multi-Stage Campaign (3-5 Stages)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
                     <label className="block font-mono text-[10px] text-on-surface-variant uppercase">Procedural Visual Density</label>
                     <span className="font-mono text-[10px] text-primary font-bold">{state.currentBuildParams.artDensity}%</span>
                   </div>

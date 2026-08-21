@@ -8,6 +8,7 @@ export interface BuildParams {
   artDensity: number;
   physics: number;
   modules: string[];
+  scale?: 'prototype' | 'standard' | 'campaign';
 }
 
 export interface GameProject {
@@ -41,9 +42,10 @@ export interface UserProfile {
   username: string;
   level: number;
   avatarPlaceholder: string;
+  avatar_url?: string | null;
 }
 
-// --- Backend Auth Types (Phase B7) ---
+// --- Backend Auth Types (Phase B7 & V3) ---
 export type AuthStatus = 'IDLE' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'LOADING';
 
 export interface AuthUser {
@@ -51,8 +53,45 @@ export interface AuthUser {
   email: string;
   username: string;
   level: number;
+  avatar_url?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface XPEventItem {
+  id: string;
+  event_type: string;
+  xp_amount: number;
+  source_reference?: string | null;
+  created_at: string;
+}
+
+export interface UserProgressData {
+  user_id: string;
+  total_xp: number;
+  current_level: number;
+  current_level_base_xp: number;
+  next_level_xp: number;
+  xp_into_level: number;
+  xp_needed_for_next: number;
+  progress_percentage: number;
+  recent_events: XPEventItem[];
+}
+
+export interface GenreAffinityItem {
+  genre: string;
+  score: number;
+  percentage: number;
+  interaction_count: number;
+  affinity_tier: 'High' | 'Moderate' | 'Emerging';
+}
+
+export interface UserPreferencesData {
+  user_id: string;
+  top_genres: GenreAffinityItem[];
+  total_interactions: number;
+  strongest_match?: string | null;
+  has_sufficient_data: boolean;
 }
 
 export interface RegisterRequest {
@@ -232,6 +271,8 @@ export interface AppState {
   discoveryResults?: DiscoverySearchResult[];
   isProjectsLoading?: boolean;
   projectsError?: string | null;
+  progress?: UserProgressData | null;
+  preferences?: UserPreferencesData | null;
 }
 
 export interface AppContextType {
@@ -258,4 +299,9 @@ export interface AppContextType {
   removeSavedDiscovery: (id: string) => Promise<void>;
   refreshSavedDiscoveries: () => Promise<void>;
   clearDiscoveryResults: () => void;
+  // V3 Progression & Preferences Actions
+  refreshProgress: () => Promise<void>;
+  refreshPreferences: () => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string>;
+  deleteAvatar: () => Promise<void>;
 }

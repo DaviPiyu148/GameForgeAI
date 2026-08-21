@@ -189,6 +189,47 @@ class UIDef(BaseModel):
         return v.strip()
 
 
+class ObjectiveDef(BaseModel):
+    """Structured gameplay completion criteria for a stage or game."""
+    type: Literal["collect_all", "defeat_all", "reach_exit", "survive_time", "score_target"] = "collect_all"
+    target_count: int = Field(1, ge=1, le=100)
+    target_score: int = Field(100, ge=0, le=100000)
+    time_limit_seconds: int = Field(0, ge=0, le=600)
+    exit_x: Optional[int] = Field(None, ge=0, le=3840)
+    exit_y: Optional[int] = Field(None, ge=0, le=2160)
+    description: str = Field("Complete stage objective", max_length=150)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("description")
+    @classmethod
+    def validate_desc(cls, v: str) -> str:
+        check_for_script_injection(v)
+        return v.strip()
+
+
+class LevelDef(BaseModel):
+    """Structured stage/level specification in a multi-level campaign game."""
+    level_number: int = Field(1, ge=1, le=10)
+    title: str = Field("Stage 1", min_length=1, max_length=100)
+    theme: Optional[Literal["cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal"]] = None
+    world: Optional[WorldDef] = None
+    spawn_x: Optional[int] = Field(None, ge=0, le=3840)
+    spawn_y: Optional[int] = Field(None, ge=0, le=2160)
+    objective: ObjectiveDef = Field(default_factory=ObjectiveDef)
+    entities: List[EntityDef] = Field(default_factory=list, max_length=30)
+    rules: List[RuleDef] = Field(default_factory=list, max_length=15)
+    completion_message: str = Field("STAGE COMPLETE!", max_length=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("title", "completion_message")
+    @classmethod
+    def validate_safe_text(cls, v: str) -> str:
+        check_for_script_injection(v)
+        return v.strip()
+
+
 class GameDSL(BaseModel):
     """
     Authoritative top-level Game DSL Schema.
@@ -196,7 +237,7 @@ class GameDSL(BaseModel):
     This is the strict safety boundary between natural language AI generation
     and Phaser 2D browser execution.
     """
-    schema_version: Literal["1.0", "2.0"] = "2.0"
+    schema_version: Literal["1.0", "2.0", "3.0"] = "3.0"
     metadata: GameMetadata
     world: WorldDef = Field(default_factory=WorldDef)
     player: PlayerDef = Field(default_factory=PlayerDef)
@@ -204,6 +245,9 @@ class GameDSL(BaseModel):
     rules: List[RuleDef] = Field(default_factory=list, max_length=20)
     ui: UIDef = Field(default_factory=UIDef)
     design_spec: Optional[GameDesignSpec] = None
+
+    # V3 Multi-Level / Multi-Stage Campaign Support (bounded to 5 levels max)
+    levels: List[LevelDef] = Field(default_factory=list, max_length=5)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -221,5 +265,19 @@ class GameDSL(BaseModel):
                 ent.x = max(0, self.world.width - ent.width)
             if ent.y > self.world.height:
                 ent.y = max(0, self.world.height - ent.height)
+
+        # Cross-field validations across multi-level campaign if present
+        for lvl in self.levels:
+            lvl_world = lvl.world or self.world
+            if lvl.spawn_x is not None and lvl.spawn_x > lvl_world.width:
+                lvl.spawn_x = lvl_world.width // 2
+            if lvl.spawn_y is not None and lvl.spawn_y > lvl_world.height:
+                lvl.spawn_y = lvl_world.height // 2
+
+            for ent in lvl.entities:
+                if ent.x > lvl_world.width:
+                    ent.x = max(0, lvl_world.width - ent.width)
+                if ent.y > lvl_world.height:
+                    ent.y = max(0, lvl_world.height - ent.height)
 
         return self

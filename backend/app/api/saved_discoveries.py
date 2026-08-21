@@ -68,7 +68,33 @@ async def save_discovery(
         return _error("RATE_LIMITED", "Save rate limit exceeded. Please try again later.", 429)
 
     try:
-        return saved_discovery_service.save_discovery(db, current_user.id, data)
+        saved = saved_discovery_service.save_discovery(db, current_user.id, data)
+
+        # Grant XP and record genre preference signal for bookmarking a game
+        try:
+            from app.services.progression_service import progression_service
+            from app.services.preference_service import preference_service
+
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="SAVE_DISCOVERY",
+                source_ref=data.steam_app_id,
+            )
+
+            # Record genre preference
+            genres = saved.genres or []
+            preference_service.record_signal(
+                db=db,
+                user_id=current_user.id,
+                raw_genres_or_tags=genres or [saved.title],
+                weight=3.0,
+                source="save_discovery",
+            )
+        except Exception as pe:
+            logger.warning(f"Telemetry tracking failed on save_discovery for user {current_user.id}: {pe}")
+
+        return saved
     except DuplicateSaveError:
         return _error("ALREADY_SAVED", "This game is already in your saved discoveries.", 409)
     except Exception:

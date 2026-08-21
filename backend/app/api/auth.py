@@ -12,8 +12,8 @@ Security notes:
 """
 import uuid
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
 
 from app.auth.rate_limit import check_login_rate, check_register_rate
@@ -28,6 +28,7 @@ from app.services.auth_service import (
     InvalidCredentialsError,
     auth_service,
 )
+from app.services.avatar_service import avatar_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,3 +103,52 @@ async def get_me(
 ):
     """Return the authenticated user's profile."""
     return auth_service.get_profile(current_user)
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload or replace user profile avatar image (PNG, JPEG, WebP, max 2MB)."""
+    try:
+        file_bytes = await file.read()
+        content_type = file.content_type or "image/png"
+        avatar_url, message = avatar_service.save_avatar(
+            db=db,
+            user_id=current_user.id,
+            file_bytes=file_bytes,
+            content_type=content_type,
+        )
+        return {"avatar_url": avatar_url, "message": message}
+    except ValueError as e:
+        return _error("INVALID_AVATAR", str(e), 422)
+    except Exception as e:
+        logger.exception("Error during avatar upload")
+        return _error("AVATAR_UPLOAD_FAILED", "Failed to upload avatar image.", 500)
+
+
+@router.delete("/avatar")
+async def delete_avatar(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete custom avatar and revert to default generated placeholder."""
+    try:
+        avatar_service.delete_avatar(db, current_user.id)
+        return {"avatar_url": None, "message": "Profile picture removed successfully."}
+    except Exception:
+        logger.exception("Error deleting avatar")
+        return _error("AVATAR_DELETE_FAILED", "Failed to remove profile picture.", 500)
+
+
+@router.get("/avatar/{filename}")
+async def get_avatar_file(filename: str):
+    """Serve uploaded avatar file securely."""
+    result = avatar_service.get_avatar_file_path(filename)
+    if not result:
+        return _error("AVATAR_NOT_FOUND", "Avatar image not found.", 404)
+
+    target_path, content_type = result
+    return FileResponse(target_path, media_type=content_type)

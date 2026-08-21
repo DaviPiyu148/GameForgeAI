@@ -67,9 +67,14 @@ export class GameScene extends Phaser.Scene {
   private healthBarFill!: Phaser.GameObjects.Rectangle;
   private staminaBarFill!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
+  private stageText!: Phaser.GameObjects.Text;
   private waveText!: Phaser.GameObjects.Text;
   private objectiveText!: Phaser.GameObjects.Text;
   private bannerText!: Phaser.GameObjects.Text;
+
+  // Multi-Level Campaign Support
+  private currentLevelIndex: number = 0;
+  private totalLevels: number = 1;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -81,6 +86,9 @@ export class GameScene extends Phaser.Scene {
     this.ruleEngine = new RuleEngine(this.dsl.rules);
     this.onStateChange = data.onStateChange;
     this.onPlaytestComplete = data.onPlaytestComplete;
+
+    this.currentLevelIndex = 0;
+    this.totalLevels = (this.dsl.levels && this.dsl.levels.length > 0) ? this.dsl.levels.length : 1;
 
     this.score = 0;
     this.maxHealth = this.dsl.player.max_health || 100;
@@ -121,26 +129,37 @@ export class GameScene extends Phaser.Scene {
     this.hazardsGroup = this.physics.add.staticGroup();
     this.collectiblesGroup = this.physics.add.group();
     this.enemiesGroup = this.physics.add.group();
-    this.bulletsGroup = this.physics.add.group({ defaultKey: 'tex_bullet', maxSize: 40 });
-    this.enemyBulletsGroup = this.physics.add.group({ defaultKey: 'tex_enemy_bullet', maxSize: 50 });
+    this.bulletsGroup = this.physics.add.group();
+    this.enemyBulletsGroup = this.physics.add.group();
 
-    // 3. Player Creation
-    this.player = this.physics.add.sprite(
-      this.dsl.player.spawn_x,
-      this.dsl.player.spawn_y,
-      'tex_player'
-    );
+    // 3. Player Spawn (Respects Level 1 spawn if multi-stage)
+    const activeLevel = (this.dsl.levels && this.dsl.levels.length > 0) ? this.dsl.levels[0] : null;
+    const initialSpawnX = activeLevel?.spawn_x ?? this.dsl.player.spawn_x ?? 400;
+    const initialSpawnY = activeLevel?.spawn_y ?? this.dsl.player.spawn_y ?? 300;
+
+    this.player = this.physics.add.sprite(initialSpawnX, initialSpawnY, 'tex_player');
+    this.player.setDisplaySize(this.dsl.player.width, this.dsl.player.height);
     this.player.setCollideWorldBounds(true);
-    this.player.setDisplaySize(this.dsl.player.width || 32, this.dsl.player.height || 32);
+
+    if (isPlatformer) {
+      this.player.setGravityY(this.dsl.world.gravity || 800);
+    } else {
+      (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+    }
+
     this.player.setDamping(true);
     this.player.setDrag(isPlatformer ? 0.001 : 0.0005);
 
     // Camera follow player
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-    // 4. Procedural Layout & Entity Population
-    const layout = generateProceduralLayout(this.dsl, this.seed);
-    this.populateEntities(layout.entities);
+    // 4. Populate Entities & Procedural Layout
+    const initialEntities = activeLevel?.entities || this.dsl.entities || [];
+    this.populateEntities(initialEntities);
+    if (!activeLevel) {
+      const layout = generateProceduralLayout(this.dsl, this.seed);
+      this.populateEntities(layout.entities);
+    }
 
     // 5. Collisions & Overlaps
     this.physics.add.collider(this.player, this.platformsGroup);
@@ -350,13 +369,9 @@ export class GameScene extends Phaser.Scene {
 
     col.destroy();
 
-    // Check win condition
+    // Check stage progression / win condition
     if (this.enemiesGroup.countActive() === 0 && this.collectiblesGroup.countActive() === 0) {
-      if (this.currentWave >= this.maxWaves) {
-        this.triggerEndGame('WON');
-      } else {
-        this.nextWave();
-      }
+      this.checkStageProgression();
     }
   }
 
@@ -493,9 +508,66 @@ export class GameScene extends Phaser.Scene {
       enemy.destroy();
 
       if (this.enemiesGroup.countActive() === 0 && this.collectiblesGroup.countActive() === 0) {
-        if (this.currentWave >= this.maxWaves) this.triggerEndGame('WON');
-        else this.nextWave();
+        this.checkStageProgression();
       }
+    }
+  }
+
+  private advanceToNextLevel(): void {
+    if (this.currentLevelIndex >= this.totalLevels - 1) {
+      this.triggerEndGame('WON');
+      return;
+    }
+
+    this.currentLevelIndex += 1;
+    const nextLevel = this.dsl.levels?.[this.currentLevelIndex];
+    const stageTitle = nextLevel?.title || `Stage ${this.currentLevelIndex + 1}`;
+
+    this.spawnFloatingText(this.player.x, this.player.y - 40, `★ STAGE COMPLETE! ★`, '#00ff66');
+    this.spawnFloatingText(this.player.x, this.player.y - 15, `Entering: ${stageTitle}`, '#00f0ff');
+    this.cameras.main.flash(300, 0, 240, 255);
+
+    // Clear current stage entities
+    this.enemiesGroup.clear(true, true);
+    this.collectiblesGroup.clear(true, true);
+    this.hazardsGroup.clear(true, true);
+    this.platformsGroup.clear(true, true);
+    this.bulletsGroup.clear(true, true);
+    this.enemyBulletsGroup.clear(true, true);
+
+    // Respawn player at stage spawn
+    const spawnX = nextLevel?.spawn_x ?? this.dsl.player.spawn_x ?? 400;
+    const spawnY = nextLevel?.spawn_y ?? this.dsl.player.spawn_y ?? 300;
+    this.player.setPosition(spawnX, spawnY);
+    this.player.setVelocity(0, 0);
+
+    // Spawn new stage entities
+    if (nextLevel?.entities) {
+      this.populateEntities(nextLevel.entities);
+    }
+
+    this.currentWave = 1;
+    this.maxWaves = nextLevel?.world?.wave_count || this.dsl.world.wave_count || 1;
+
+    this.telemetry.record('OBJECTIVE_COMPLETED', { stage: this.currentLevelIndex + 1, title: stageTitle });
+
+    // Update HUD
+    if (this.stageText) {
+      this.stageText.setText(`STAGE: ${this.currentLevelIndex + 1}/${this.totalLevels}`);
+    }
+    if (this.objectiveText) {
+      const stageGoal = nextLevel?.objective?.description || this.dsl.design_spec?.primary_objective || 'SURVIVE';
+      this.objectiveText.setText(`GOAL: ${stageGoal}`);
+    }
+  }
+
+  private checkStageProgression(): void {
+    if (this.dsl.levels && this.dsl.levels.length > 0 && this.currentLevelIndex < this.totalLevels - 1) {
+      this.advanceToNextLevel();
+    } else if (this.currentWave < this.maxWaves) {
+      this.nextWave();
+    } else {
+      this.triggerEndGame('WON');
     }
   }
 
@@ -589,16 +661,23 @@ export class GameScene extends Phaser.Scene {
     this.staminaBarFill = this.add.rectangle(70, 24, 120, 6, 0x00f0ff).setOrigin(0, 0.5);
     this.staminaBarFill.setVisible(showStamina);
 
-    // Score & Wave Text
+    // Score & Stage/Wave Text
     this.scoreText = this.add.text(0, 36, `SCORE: 0`, { fontSize: '13px', color: '#ffea00', fontFamily: 'monospace', fontStyle: 'bold' });
     this.scoreText.setVisible(showScore);
 
-    this.waveText = this.add.text(0, 54, `WAVE: 1/${this.maxWaves}`, { fontSize: '12px', color: '#00f0ff', fontFamily: 'monospace' });
+    let nextY = 54;
+    if (this.totalLevels > 1) {
+      this.stageText = this.add.text(0, nextY, `STAGE: 1/${this.totalLevels}`, { fontSize: '12px', color: '#ff00ff', fontFamily: 'monospace', fontStyle: 'bold' });
+      nextY += 16;
+    }
+
+    this.waveText = this.add.text(0, nextY, `WAVE: 1/${this.maxWaves}`, { fontSize: '12px', color: '#00f0ff', fontFamily: 'monospace' });
     this.waveText.setVisible(showWave);
+    nextY += 16;
 
     // Objective / Status Text
     const primaryGoal = this.dsl.design_spec?.primary_objective || ui?.status_text || 'PLAY PROTOTYPE';
-    this.objectiveText = this.add.text(0, 72, `GOAL: ${primaryGoal}`, { fontSize: '11px', color: '#a0aec0', fontFamily: 'monospace' });
+    this.objectiveText = this.add.text(0, nextY, `GOAL: ${primaryGoal}`, { fontSize: '11px', color: '#a0aec0', fontFamily: 'monospace' });
     this.objectiveText.setVisible(showObjectives);
 
     // Status Banner
@@ -609,7 +688,7 @@ export class GameScene extends Phaser.Scene {
       { fontSize: '24px', color: '#00ff66', fontFamily: 'monospace', fontStyle: 'bold' }
     ).setOrigin(0.5).setVisible(false);
 
-    this.hudContainer.add([
+    const hudElements = [
       this.healthBarBg,
       this.healthBarFill,
       this.staminaBarFill,
@@ -618,7 +697,12 @@ export class GameScene extends Phaser.Scene {
       this.waveText,
       this.objectiveText,
       this.bannerText,
-    ]);
+    ];
+    if (this.stageText) {
+      hudElements.push(this.stageText);
+    }
+
+    this.hudContainer.add(hudElements);
   }
 
   private updateHUD(): void {

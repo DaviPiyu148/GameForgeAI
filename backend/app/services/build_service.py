@@ -457,6 +457,29 @@ class BuildService:
                         "project_id": project_res.id,
                     },
                 )
+
+                # Grant COMPLETE_BUILD XP and record genre preference
+                if user_id:
+                    try:
+                        from app.services.progression_service import progression_service
+                        from app.services.preference_service import preference_service
+
+                        progression_service.grant_xp(
+                            db=db,
+                            user_id=user_id,
+                            event_type="COMPLETE_BUILD",
+                            source_ref=project_res.id,
+                        )
+
+                        preference_service.record_signal(
+                            db=db,
+                            user_id=user_id,
+                            raw_genres_or_tags=[derived_genre, derived_title, build.prompt],
+                            weight=6.0,
+                            source="complete_build",
+                        )
+                    except Exception as pe:
+                        logger.warning(f"Telemetry tracking failed on build completion for user {user_id}: {pe}")
             else:
                 self.repo.transition_status(
                     db=db,

@@ -165,6 +165,29 @@ export interface UIDef {
   status_text: string;
 }
 
+export interface ObjectiveDef {
+  type: 'collect_all' | 'defeat_all' | 'reach_exit' | 'survive_time' | 'score_target';
+  target_count?: number;
+  target_score?: number;
+  time_limit_seconds?: number;
+  exit_x?: number;
+  exit_y?: number;
+  description?: string;
+}
+
+export interface LevelDef {
+  level_number: number;
+  title: string;
+  theme?: 'cyberpunk' | 'retro_arcade' | 'dungeon' | 'space' | 'neon' | 'minimal';
+  world?: WorldDef;
+  spawn_x?: number;
+  spawn_y?: number;
+  objective?: ObjectiveDef;
+  entities: EntityDef[];
+  rules?: RuleDef[];
+  completion_message?: string;
+}
+
 export interface GameDSL {
   schema_version: string;
   metadata: GameMetadata;
@@ -174,6 +197,7 @@ export interface GameDSL {
   rules: RuleDef[];
   ui: UIDef;
   design_spec?: GameDesignSpec;
+  levels?: LevelDef[];
 }
 
 export interface RuntimeMetadata {

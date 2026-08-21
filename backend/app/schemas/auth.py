@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     email: str
     username: str
     level: int
+    avatar_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

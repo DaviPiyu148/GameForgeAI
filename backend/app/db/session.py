@@ -39,3 +39,7 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
+
+# Ensure all declarative models are registered on Base.metadata
+import app.models  # noqa: F401, E402

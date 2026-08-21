@@ -15,12 +15,15 @@ SSE authentication protocol:
 
 This prevents the full JWT bearer token from appearing in server access logs.
 """
+import logging
 import uuid
 import jwt
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
@@ -68,7 +71,31 @@ async def create_build(
     service: BuildService = Depends(lambda: build_service),
 ) -> BuildResponse:
     """Queue a new build job and trigger async execution. user_id from JWT."""
-    return await service.submit_build(db, data, user_id=current_user.id)
+    result = await service.submit_build(db, data, user_id=current_user.id)
+
+    # Award START_BUILD XP and record preference
+    try:
+        from app.services.progression_service import progression_service
+        from app.services.preference_service import preference_service
+
+        progression_service.grant_xp(
+            db=db,
+            user_id=current_user.id,
+            event_type="START_BUILD",
+            source_ref=result.build_id,
+        )
+
+        preference_service.record_signal(
+            db=db,
+            user_id=current_user.id,
+            raw_genres_or_tags=[data.prompt],
+            weight=4.0,
+            source="start_build",
+        )
+    except Exception as pe:
+        logger.warning(f"Telemetry tracking failed on create_build for user {current_user.id}: {pe}")
+
+    return result
 
 
 @router.get(

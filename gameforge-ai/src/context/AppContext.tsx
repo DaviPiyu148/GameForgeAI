@@ -12,6 +12,7 @@ import { projectService } from '../services/projects';
 import { buildService } from '../services/builds';
 import { discoveryService } from '../services/discovery';
 import { authService, authStorage, savedDiscoveriesService } from '../services/auth';
+import { profileService } from '../services/profile';
 
 const defaultBuildParams: BuildParams = {
   // Must match one of BuilderPage.tsx's <option> values (Top-Down Action / Arena
@@ -44,6 +45,8 @@ const defaultState: AppState = {
   discoveryResults: [],
   isProjectsLoading: false,
   projectsError: null,
+  progress: null,
+  preferences: null,
 };
 
 const DRAFT_STORAGE_KEY = 'gameforge_ai_drafts';
@@ -128,6 +131,58 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // 2B. Backend Progress & Level Hydration
+  const refreshProgress = async () => {
+    const token = authStorage.getToken();
+    if (!token) {
+      setState((s) => ({ ...s, progress: null }));
+      return;
+    }
+    try {
+      const progress = await profileService.getProgress();
+      setState((s) => ({
+        ...s,
+        progress,
+        user: s.user ? { ...s.user, level: progress.current_level } : null,
+      }));
+    } catch (err) {
+      console.warn('Failed to load progress from backend API', err);
+    }
+  };
+
+  // 2C. Backend Genre Preferences Hydration
+  const refreshPreferences = async () => {
+    const token = authStorage.getToken();
+    if (!token) {
+      setState((s) => ({ ...s, preferences: null }));
+      return;
+    }
+    try {
+      const preferences = await profileService.getPreferences();
+      setState((s) => ({ ...s, preferences }));
+    } catch (err) {
+      console.warn('Failed to load preferences from backend API', err);
+    }
+  };
+
+  // 2D. Profile Picture Upload & Delete
+  const uploadAvatar = async (file: File): Promise<string> => {
+    const res = await profileService.uploadAvatar(file);
+    setState((s) => ({
+      ...s,
+      user: s.user ? { ...s.user, avatar_url: res.avatar_url } : null,
+    }));
+    return res.avatar_url;
+  };
+
+  const deleteAvatar = async (): Promise<void> => {
+    await profileService.deleteAvatar();
+    setState((s) => ({
+      ...s,
+      user: s.user ? { ...s.user, avatar_url: null } : null,
+    }));
+  };
+
   // 3. Initial Auth Hydration from /api/auth/me
   useEffect(() => {
     const initAuth = async () => {
@@ -146,7 +201,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           authStatus: 'AUTHENTICATED',
         }));
         // Hydrate backend data
-        await Promise.all([refreshProjects(), refreshSavedDiscoveries()]);
+        await Promise.all([
+          refreshProjects(),
+          refreshSavedDiscoveries(),
+          refreshProgress(),
+          refreshPreferences(),
+        ]);
       } catch (err) {
         console.warn('Auth token invalid or expired; resetting session', err);
         authStorage.clearToken();
@@ -156,6 +216,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           authStatus: 'UNAUTHENTICATED',
           myGames: [],
           savedDiscoveries: [],
+          progress: null,
+          preferences: null,
         }));
       }
     };
@@ -438,6 +500,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             } else {
               setState((s) => ({ ...s, buildStatus: 'SUCCESS' }));
             }
+            await Promise.all([
+              refreshProjects(),
+              refreshSavedDiscoveries(),
+              refreshProgress(),
+              refreshPreferences(),
+            ]);
             navigate('/status/success');
           } else if (statusData.status === 'ERROR') {
             setState((s) => ({
@@ -534,6 +602,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         removeSavedDiscovery,
         refreshSavedDiscoveries,
         clearDiscoveryResults,
+        refreshProgress,
+        refreshPreferences,
+        uploadAvatar,
+        deleteAvatar,
       }}
     >
       {children}

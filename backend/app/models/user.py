@@ -29,6 +29,9 @@ class User(Base):
     # Gamification level — starts at 1.
     level = Column(Integer, nullable=False, default=1)
 
+    # Optional profile picture URL/path
+    avatar_url = Column(String(500), nullable=True)
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

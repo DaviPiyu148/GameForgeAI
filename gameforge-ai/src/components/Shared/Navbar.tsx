@@ -67,11 +67,22 @@ export const Navbar = () => {
           {state.authStatus === 'AUTHENTICATED' && state.user ? (
             <Link
               to="/profile"
-              className="h-8 px-3 rounded-sm border border-outline-variant bg-surface-container flex items-center gap-2 text-primary icon-interactive hover:border-primary transition-colors font-mono text-xs"
-              title={`Logged in as ${state.user.username}`}
+              className="h-8 px-2.5 rounded-sm border border-outline-variant bg-surface-container flex items-center gap-2 text-primary icon-interactive hover:border-primary transition-colors font-mono text-xs"
+              title={`Logged in as ${state.user.username} (Level ${state.user.level || 1})`}
             >
-              <span className="material-symbols-outlined text-sm">person</span>
+              {state.user.avatar_url ? (
+                <img
+                  src={state.user.avatar_url}
+                  alt={state.user.username}
+                  className="w-5 h-5 rounded-full object-cover border border-primary/60 shadow-[0_0_6px_rgba(0,240,255,0.4)]"
+                />
+              ) : (
+                <span className="material-symbols-outlined text-sm">person</span>
+              )}
               <span className="hidden sm:inline font-bold">{state.user.username}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/40 font-mono font-bold tracking-tight">
+                LVL {state.user.level || 1}
+              </span>
             </Link>
           ) : (
             <button

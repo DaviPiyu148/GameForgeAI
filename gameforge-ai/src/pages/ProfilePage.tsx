@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -6,12 +6,41 @@ import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import type { GameProject } from '../types';
 
 export default function ProfilePage() {
-  const { state, setPrompt, updateBuildParams, openAuthModal, logout, removeSavedDiscovery, updateGameProject } = useAppContext();
+  const {
+    state,
+    setPrompt,
+    updateBuildParams,
+    openAuthModal,
+    logout,
+    removeSavedDiscovery,
+    updateGameProject,
+    uploadAvatar,
+    deleteAvatar,
+    refreshProgress,
+    refreshPreferences,
+  } = useAppContext();
   const navigate = useNavigate();
+
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
   const [showLikedGamesModal, setShowLikedGamesModal] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [displayGames, setDisplayGames] = useState(0);
+
+  // Avatar Management Modal
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Refresh progress and preferences on mount if authenticated
+  useEffect(() => {
+    if (state.authStatus === 'AUTHENTICATED') {
+      refreshProgress();
+      refreshPreferences();
+    }
+  }, [state.authStatus, refreshProgress, refreshPreferences]);
 
   const handleCloseModal = () => {
     setIsClosingModal(true);
@@ -50,8 +79,6 @@ export default function ProfilePage() {
       rafId = requestAnimationFrame(updateCounter);
     }
 
-    // Cleanup prevents setState-after-unmount and stops a stale loop from a prior
-    // dependency change from still running (and racing) after this effect re-fires.
     return () => {
       cancelled = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
@@ -60,9 +87,6 @@ export default function ProfilePage() {
 
   const handleContinueEdit = (desc: string) => {
     setPrompt(desc);
-    // Must match BuilderPage.tsx's actual <option>/checkbox values — 'Phaser' and
-    // 'Advanced NPC AI' matched none of the current Prototype Profile options or Logic
-    // Module checkboxes, so the Builder page appeared to reset the selection silently.
     updateBuildParams({
       engine: 'Top-Down Action',
       artDensity: 70,
@@ -72,9 +96,68 @@ export default function ProfilePage() {
     navigate('/build');
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAvatarError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Size limit check (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('Image file must be smaller than 2MB.');
+      return;
+    }
+
+    // MIME type check
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setAvatarError('Only PNG, JPEG, and WebP images are supported.');
+      return;
+    }
+
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = (loadEvt) => {
+      setAvatarPreview(loadEvt.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadAvatar = async () => {
+    if (!avatarFile) return;
+    setIsUploadingAvatar(true);
+    setAvatarError(null);
+    try {
+      await uploadAvatar(avatarFile);
+      setShowAvatarModal(false);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    } catch (err: any) {
+      setAvatarError(err?.message || 'Failed to upload image. Please try another file.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleDeleteAvatar = async () => {
+    setIsUploadingAvatar(true);
+    setAvatarError(null);
+    try {
+      await deleteAvatar();
+      setShowAvatarModal(false);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    } catch (err: any) {
+      setAvatarError(err?.message || 'Failed to remove avatar image.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const username = state.user?.username || 'Guest Architect';
   const email = state.user?.email || 'Unauthenticated Session';
-  const level = state.user?.level || 1;
+  const currentLevel = state.progress?.current_level || state.user?.level || 1;
+  const progressData = state.progress;
+  const preferencesData = state.preferences;
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-fade-in font-body text-on-surface pb-24">
@@ -85,9 +168,35 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
           {/* Left: Avatar and Info */}
           <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-sm border-4 border-primary bg-surface-container-high flex items-center justify-center shrink-0 glow-box-cyan">
-              <span className="material-symbols-outlined text-primary text-[48px]">person</span>
+            <div className="relative group">
+              <div className="w-24 h-24 rounded-sm border-4 border-primary bg-surface-container-high flex items-center justify-center shrink-0 glow-box-cyan overflow-hidden">
+                {state.user?.avatar_url ? (
+                  <img
+                    src={state.user.avatar_url}
+                    alt={username}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-[48px]">person</span>
+                )}
+              </div>
+              {state.authStatus === 'AUTHENTICATED' && (
+                <button
+                  onClick={() => {
+                    setAvatarError(null);
+                    setAvatarFile(null);
+                    setAvatarPreview(null);
+                    setShowAvatarModal(true);
+                  }}
+                  className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-mono font-bold"
+                  title="Update Profile Picture"
+                >
+                  <span className="material-symbols-outlined text-lg mb-0.5">photo_camera</span>
+                  Change
+                </button>
+              )}
             </div>
+
             <div className="space-y-2">
               <h1 className="font-display text-xl md:text-2xl text-primary uppercase text-glow-cyan tracking-wider">
                 {username}
@@ -95,7 +204,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 text-tertiary text-sm md:text-base bg-tertiary/10 px-3 py-1.5 rounded-sm border border-tertiary/20 w-fit">
                   <span className="material-symbols-outlined text-[18px]">star</span>
-                  <span>Level {level} Architect</span>
+                  <span>Level {currentLevel} Architect</span>
                 </div>
                 <span className="font-mono text-xs text-on-surface-variant">{email}</span>
               </div>
@@ -104,11 +213,15 @@ export default function ProfilePage() {
 
           {/* Right: Stat boxes & Auth Action */}
           <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[140px] text-center rounded-sm">
+            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
+              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Total XP</div>
+              <div className="font-display text-tertiary text-lg font-bold">{progressData?.total_xp || 0}</div>
+            </div>
+            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Saved Items</div>
               <div className="font-display text-primary">{state.savedDiscoveries.length}</div>
             </div>
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[140px] text-center rounded-sm">
+            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
               <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Games Built</div>
               <div className="font-display text-secondary">{displayGames}</div>
             </div>
@@ -135,12 +248,116 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Progression & XP Status Panel */}
+      {state.authStatus === 'AUTHENTICATED' && (
+        <div className="relative arcade-border bg-surface-container-low p-6 arcade-panel space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-tertiary">military_tech</span>
+              <h2 className="font-display text-lg uppercase tracking-wide">Architect Level Progression</h2>
+            </div>
+            <div className="font-mono text-xs text-tertiary">
+              Level {currentLevel} • {progressData?.xp_into_level || 0} / {(progressData?.xp_into_level || 0) + (progressData?.xp_needed_for_next || 100)} XP
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="w-full h-3.5 bg-surface-container-highest border border-outline-variant/60 rounded-sm overflow-hidden p-0.5 relative">
+              <div
+                className="h-full bg-gradient-to-r from-tertiary/70 via-tertiary to-primary transition-all duration-500 rounded-xs shadow-[0_0_8px_rgba(255,234,0,0.5)]"
+                style={{ width: `${progressData?.progress_percentage || 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] font-mono text-on-surface-variant">
+              <span>Current: Level {currentLevel}</span>
+              <span>{progressData?.xp_needed_for_next || 0} XP needed for Level {currentLevel + 1}</span>
+            </div>
+          </div>
+
+          {/* Activity Rewards Breakdown */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Discovery Search</div>
+              <div className="font-mono text-xs text-primary font-bold mt-1">+10 XP</div>
+            </div>
+            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Save Discovery</div>
+              <div className="font-mono text-xs text-secondary font-bold mt-1">+25 XP</div>
+            </div>
+            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Start Build</div>
+              <div className="font-mono text-xs text-tertiary font-bold mt-1">+30 XP</div>
+            </div>
+            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Complete Build</div>
+              <div className="font-mono text-xs text-primary font-bold mt-1">+75 XP</div>
+            </div>
+            <div className="p-2.5 bg-surface border border-outline-variant/40 rounded-sm text-center col-span-2 sm:col-span-1">
+              <div className="text-[10px] font-mono text-on-surface-variant uppercase">Playtest Prototype</div>
+              <div className="font-mono text-xs text-tertiary font-bold mt-1">+50 XP</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Left sidebar and Right details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (col-span-1) */}
+        {/* Left Column (col-span-1): Preferences & Saved Discoveries */}
         <div className="space-y-6">
-          {/* Liked Games Section */}
-          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel stagger-enter stagger-2">
+          {/* Personalized Genre Affinity Profile */}
+          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">psychology</span>
+                <h2 className="font-display text-lg uppercase tracking-wide">Genre Affinity</h2>
+              </div>
+              <span className="font-mono text-[10px] text-on-surface-variant uppercase">Telemetry</span>
+            </div>
+
+            {state.authStatus !== 'AUTHENTICATED' ? (
+              <div className="p-4 border border-outline-variant bg-surface-container text-center font-mono text-xs text-on-surface-variant">
+                Sign in to build your personalized genre profile through gameplay and discovery.
+              </div>
+            ) : !preferencesData || preferencesData.top_genres.length === 0 ? (
+              <div className="p-4 border border-outline-variant bg-surface-container text-center font-mono text-xs text-on-surface-variant space-y-2">
+                <p>No behavioral telemetry recorded yet.</p>
+                <p className="text-[10px]">Search games, save favorites, and generate prototypes to reveal your genre affinity profile.</p>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {preferencesData.strongest_match && (
+                  <div className="p-2.5 bg-primary/10 border border-primary/30 rounded-sm flex items-center justify-between">
+                    <span className="font-mono text-xs text-primary font-bold uppercase">Strongest Affinity</span>
+                    <span className="font-mono text-xs text-primary">{preferencesData.strongest_match}</span>
+                  </div>
+                )}
+
+                {preferencesData.top_genres.map((g) => (
+                  <div key={g.genre} className="space-y-1">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="text-on-surface font-semibold">{g.genre}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-on-surface-variant px-1.5 py-0.2 rounded bg-surface-container-highest border border-outline-variant/40">
+                          {g.affinity_tier}
+                        </span>
+                        <span className="text-primary font-bold">{g.percentage}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2 bg-surface-container-highest rounded-xs overflow-hidden border border-outline-variant/30">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-300"
+                        style={{ width: `${g.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Saved Discoveries Section */}
+          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-secondary">favorite</span>
@@ -210,10 +427,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Right Column (col-span-2) */}
+        {/* Right Column (col-span-2): Generated Games */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {/* Generated Games Panel */}
-          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel flex-1 flex flex-col stagger-enter stagger-3">
+          <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel flex-1 flex flex-col">
             <div className="absolute -top-3 -right-3 bg-tertiary text-background text-xs font-display px-2 py-1 uppercase tracking-wider shadow-[2px_2px_0px_#000]">
               Activity
             </div>
@@ -292,6 +508,105 @@ export default function ProfilePage() {
         />
       )}
 
+      {/* Avatar Management Modal */}
+      {showAvatarModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isUploadingAvatar) setShowAvatarModal(false);
+            }}
+          >
+            <div
+              className="w-full max-w-md bg-surface border-2 border-primary rounded-sm flex flex-col shadow-[0_0_30px_rgba(0,240,255,0.2)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-terminal-header border-b border-primary/30 p-3 flex justify-between items-center">
+                <div className="flex items-center gap-2 text-primary">
+                  <span className="material-symbols-outlined text-sm">photo_camera</span>
+                  <span className="font-mono text-sm tracking-widest font-bold uppercase">Profile Picture</span>
+                </div>
+                <button
+                  onClick={() => !isUploadingAvatar && setShowAvatarModal(false)}
+                  className="text-on-surface-variant hover:text-primary p-1 cursor-pointer"
+                  disabled={isUploadingAvatar}
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+
+              <div className="p-6 bg-terminal-bg space-y-4">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-28 h-28 rounded-sm border-2 border-primary/60 bg-surface-container-high flex items-center justify-center overflow-hidden glow-box-cyan">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : state.user?.avatar_url ? (
+                      <img src={state.user.avatar_url} alt="Current Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-primary text-[56px]">person</span>
+                    )}
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3.5 py-1.5 border border-primary/60 bg-primary/10 text-primary font-mono text-xs uppercase rounded-sm hover:bg-primary/20 cursor-pointer"
+                      disabled={isUploadingAvatar}
+                    >
+                      Browse Image
+                    </button>
+                    {state.user?.avatar_url && (
+                      <button
+                        onClick={handleDeleteAvatar}
+                        className="px-3.5 py-1.5 border border-error/50 text-error font-mono text-xs uppercase rounded-sm hover:bg-error/10 cursor-pointer"
+                        disabled={isUploadingAvatar}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-mono text-on-surface-variant text-center">
+                    Supported: PNG, JPEG, WebP • Max Size: 2MB
+                  </p>
+                </div>
+
+                {avatarError && (
+                  <div className="p-2.5 bg-error/10 border border-error/40 text-error font-mono text-xs rounded-sm">
+                    {avatarError}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setShowAvatarModal(false)}
+                    className="px-4 py-2 border border-outline-variant font-mono text-xs uppercase text-on-surface-variant hover:text-on-surface cursor-pointer rounded-sm"
+                    disabled={isUploadingAvatar}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUploadAvatar}
+                    disabled={!avatarFile || isUploadingAvatar}
+                    className="px-4 py-2 bg-primary text-on-primary font-mono text-xs uppercase font-bold glow-cyan rounded-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUploadingAvatar ? 'Uploading...' : 'Save Avatar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Liked Games Modal */}
       {showLikedGamesModal &&
         createPortal(
           <div

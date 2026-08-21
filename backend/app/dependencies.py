@@ -61,4 +61,27 @@ def get_current_user(
     return user
 
 
-__all__ = ["get_db", "get_current_user"]
+def get_optional_user(
+    token: str | None = Depends(_oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    """
+    FastAPI dependency: resolve User if a valid Bearer token is provided, otherwise return None.
+    Does NOT throw 401 if unauthenticated.
+    """
+    from app.repositories.user_repo import user_repository
+
+    if not token:
+        return None
+
+    try:
+        payload = decode_access_token(token)
+        user_id: str = payload.get("sub", "")
+        if not user_id:
+            return None
+        return user_repository.get_by_id(db, user_id)
+    except Exception:
+        return None
+
+
+__all__ = ["get_db", "get_current_user", "get_optional_user"]

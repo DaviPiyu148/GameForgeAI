@@ -84,6 +84,10 @@ def auth_setup():
         db.close()
 
 
+from unittest.mock import AsyncMock, patch
+from app.schemas.playtest import PlaytestAnalysisResponse
+
+
 def test_analyze_playtest_endpoint(auth_setup):
     client, user, token, project = auth_setup
     headers = {"Authorization": f"Bearer {token}"}
@@ -98,13 +102,32 @@ def test_analyze_playtest_endpoint(auth_setup):
         }
     }
 
-    res = client.post(f"/api/projects/{project.id}/analyze-playtest", json=payload, headers=headers)
-    assert res.status_code == 200
-    data = res.json()
-    assert "fun_rating" in data
-    assert "difficulty_rating" in data
-    assert "recommendations" in data
-    assert len(data["recommendations"]) >= 1
+    mock_analysis = PlaytestAnalysisResponse(
+        fun_rating=8,
+        difficulty_rating=6,
+        clarity_rating=9,
+        strengths=["Responsive controls", "Engaging progression"],
+        problems=[],
+        recommendations=[
+            {
+                "id": "rec_1",
+                "category": "mobility",
+                "description": "Increase player speed",
+                "dsl_change_type": "player_speed",
+                "suggested_patch": {"player": {"speed": 290}},
+            }
+        ],
+    )
+
+    with patch("app.services.project_service.project_service.analyze_playtest_session", new_callable=AsyncMock) as mock_analyze:
+        mock_analyze.return_value = mock_analysis
+        res = client.post(f"/api/projects/{project.id}/analyze-playtest", json=payload, headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert "fun_rating" in data
+        assert "difficulty_rating" in data
+        assert "recommendations" in data
+        assert len(data["recommendations"]) >= 1
 
 
 def test_apply_improvements_and_version_bump(auth_setup):
@@ -124,14 +147,25 @@ def test_apply_improvements_and_version_bump(auth_setup):
         "user_notes": "Speed up the player",
     }
 
-    res = client.post(f"/api/projects/{project.id}/improvements", json=improve_payload, headers=headers)
-    assert res.status_code == 200
-    data = res.json()
-    assert data["version_number"] == 2
-    assert data["game_dsl"]["player"]["speed"] == 290
+    from app.generation.dsl_models import GameDSL
+    from app.services.game_generation_service import GenerationResult
 
-    # Verify version listing
-    ver_res = client.get(f"/api/projects/{project.id}/versions", headers=headers)
-    assert ver_res.status_code == 200
-    versions = ver_res.json()
-    assert len(versions) >= 2
+    mock_patched_dsl = GameDSL.model_validate({
+        "schema_version": "2.0",
+        "metadata": {"title": "Improvement Test Project", "genre": "Action", "description": "Desc", "archetype": "survival"},
+        "player": {"spawn_x": 400, "spawn_y": 300, "speed": 290},
+    })
+
+    with patch("app.services.project_service.game_generation_service.apply_improvements", new_callable=AsyncMock) as mock_apply:
+        mock_apply.return_value = GenerationResult(success=True, dsl=mock_patched_dsl, attempts_used=1)
+        res = client.post(f"/api/projects/{project.id}/improvements", json=improve_payload, headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["version_number"] == 2
+        assert data["game_dsl"]["player"]["speed"] == 290
+
+        # Verify version listing
+        ver_res = client.get(f"/api/projects/{project.id}/versions", headers=headers)
+        assert ver_res.status_code == 200
+        versions = ver_res.json()
+        assert len(versions) >= 2

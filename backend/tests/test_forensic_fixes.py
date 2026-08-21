@@ -357,7 +357,16 @@ def test_dsl_schema_version_defaults_to_2_0():
         world=WorldDef(),
         player=PlayerDef(),
     )
-    assert dsl.schema_version == "2.0"
+    assert dsl.schema_version == "3.0"
+
+    # Verify backward compatibility with explicit 2.0 schema version
+    dsl_v2 = GameDSL(
+        schema_version="2.0",
+        metadata=GameMetadata(title="V2 Game", genre="Action", description="Desc", archetype="survival"),
+        world=WorldDef(),
+        player=PlayerDef(),
+    )
+    assert dsl_v2.schema_version == "2.0"
 
 
 def test_dsl_validator_accepts_v1_schema():

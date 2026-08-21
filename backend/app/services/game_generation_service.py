@@ -357,11 +357,51 @@ class GameGenerationService:
                 except Exception:
                     pass
 
+            # 5. Reachability and Spatial Feasibility Validation & Auto-Repair
+            from app.generation.reachability import ReachabilityValidator
+            reach_res = ReachabilityValidator.validate_and_repair_level(
+                world=dsl.world,
+                spawn_x=dsl.player.spawn_x,
+                spawn_y=dsl.player.spawn_y,
+                player_width=dsl.player.width,
+                player_height=dsl.player.height,
+                entities=dsl.entities,
+                jump_power=dsl.player.jump_power,
+                gravity=dsl.world.gravity,
+                archetype=dsl.metadata.archetype,
+            )
+            if reach_res.repaired:
+                if reach_res.repaired_spawn:
+                    dsl.player.spawn_x, dsl.player.spawn_y = reach_res.repaired_spawn
+                dsl.entities = reach_res.repaired_entities
+
+            for lvl in dsl.levels:
+                lvl_world = lvl.world or dsl.world
+                lvl_spawn_x = lvl.spawn_x if lvl.spawn_x is not None else dsl.player.spawn_x
+                lvl_spawn_y = lvl.spawn_y if lvl.spawn_y is not None else dsl.player.spawn_y
+                lvl_reach = ReachabilityValidator.validate_and_repair_level(
+                    world=lvl_world,
+                    spawn_x=lvl_spawn_x,
+                    spawn_y=lvl_spawn_y,
+                    player_width=dsl.player.width,
+                    player_height=dsl.player.height,
+                    entities=lvl.entities,
+                    objective=lvl.objective,
+                    jump_power=dsl.player.jump_power,
+                    gravity=lvl_world.gravity,
+                    archetype=dsl.metadata.archetype,
+                )
+                if lvl_reach.repaired:
+                    if lvl_reach.repaired_spawn:
+                        lvl.spawn_x, lvl.spawn_y = lvl_reach.repaired_spawn
+                    lvl.entities = lvl_reach.repaired_entities
+
             log("INFO", "[AI] Game specification validated successfully")
-            log("SUCCESS", "[VALIDATION] Schema v2.0: PASS // Gameplay Quality: PASS")
+            stage_cnt = len(dsl.levels) if dsl.levels else 1
+            log("SUCCESS", f"[VALIDATION] Schema v3.0: PASS // Gameplay Quality: PASS // Stages: {stage_cnt}")
             log("INFO", "[PHASER]")
             log("INFO", f"> Layout Seed: {dsl.world.procedural_seed or 18492031}")
-            log("INFO", f"> Procedural Generation: PASS")
+            log("INFO", f"> Procedural Generation & Reachability: PASS")
             log("SUCCESS", "> Prototype ready")
 
             return GenerationResult(

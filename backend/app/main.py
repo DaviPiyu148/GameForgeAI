@@ -12,6 +12,7 @@ from app.api.builds import router as builds_router
 from app.api.discovery import router as discovery_router
 from app.api.auth import router as auth_router
 from app.api.saved_discoveries import router as saved_discoveries_router
+from app.api.profile import router as profile_router
 
 
 @asynccontextmanager
@@ -114,6 +115,7 @@ app.include_router(projects_router, prefix="/api")
 app.include_router(builds_router, prefix="/api")
 app.include_router(discovery_router, prefix="/api")
 app.include_router(saved_discoveries_router, prefix="/api")  # B7: /api/saved-discoveries/*
+app.include_router(profile_router, prefix="/api")            # V3: /api/profile/*
 
 
 @app.get("/")
