@@ -12,6 +12,7 @@ class BuildParams(BaseModel):
     physics: int = Field(default=80, ge=0, le=100)
     modules: List[str] = Field(default_factory=list, max_length=50)
     scale: Literal["prototype", "standard", "campaign"] = "standard"
+    world_mode: Literal["linear", "campaign", "open_world"] = Field(default="linear", alias="worldMode")
 
     model_config = ConfigDict(
         populate_by_name=True,

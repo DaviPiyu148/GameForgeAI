@@ -133,6 +133,7 @@ class BuildService:
             physics=data.parameters.physics,
             modules=data.parameters.modules,
             scale=data.parameters.scale,
+            world_mode=data.parameters.world_mode or "linear",
             status="QUEUED",
         )
         saved = self.repo.create_build(db, build)
@@ -351,6 +352,7 @@ class BuildService:
                 emit_log=emit_log,
                 set_status=set_status,
                 scale=build.scale or "standard",
+                world_mode=getattr(build, "world_mode", "linear") or "linear",
             )
 
             # Check if build was cancelled while AI generation was in-flight

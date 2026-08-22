@@ -210,4 +210,92 @@ export function generateProceduralTextures(scene: Phaser.Scene): void {
       canvas.refresh();
     }
   }
+
+  // 8. Open World Vehicle (48x28)
+  if (!scene.textures.exists('tex_vehicle')) {
+    const canvas = scene.textures.createCanvas('tex_vehicle', 48, 28);
+    if (canvas) {
+      const ctx = canvas.getContext();
+      ctx.clearRect(0, 0, 48, 28);
+
+      // Chassis
+      ctx.fillStyle = '#00ffff';
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.roundRect(2, 4, 44, 20, 4);
+      ctx.fill();
+
+      // Cockpit / windshield
+      ctx.fillStyle = '#112233';
+      ctx.beginPath();
+      ctx.roundRect(14, 7, 20, 14, 2);
+      ctx.fill();
+
+      // Headlights
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(44, 6, 2, 4);
+      ctx.fillRect(44, 18, 2, 4);
+
+      // Taillights
+      ctx.fillStyle = '#ff0055';
+      ctx.fillRect(2, 6, 2, 4);
+      ctx.fillRect(2, 18, 2, 4);
+
+      canvas.refresh();
+    }
+  }
+
+  // 9. Open World POI Station / Waypoint (32x32)
+  if (!scene.textures.exists('tex_poi')) {
+    const canvas = scene.textures.createCanvas('tex_poi', 32, 32);
+    if (canvas) {
+      const ctx = canvas.getContext();
+      ctx.clearRect(0, 0, 32, 32);
+
+      // Outer diamond
+      ctx.strokeStyle = '#ffff00';
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(16, 2);
+      ctx.lineTo(30, 16);
+      ctx.lineTo(16, 30);
+      ctx.lineTo(2, 16);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Center node
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(16, 16, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      canvas.refresh();
+    }
+  }
+
+  // 10. Open World Living Actor / NPC (24x24)
+  if (!scene.textures.exists('tex_actor')) {
+    const canvas = scene.textures.createCanvas('tex_actor', 24, 24);
+    if (canvas) {
+      const ctx = canvas.getContext();
+      ctx.clearRect(0, 0, 24, 24);
+
+      // Body circle
+      ctx.fillStyle = '#aaaaaa';
+      ctx.shadowColor = '#aaaaaa';
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      ctx.arc(12, 12, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Visor / eyes
+      ctx.fillStyle = '#00f0ff';
+      ctx.fillRect(8, 9, 8, 3);
+
+      canvas.refresh();
+    }
+  }
 }

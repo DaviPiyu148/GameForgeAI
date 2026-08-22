@@ -107,9 +107,11 @@ class BaseHostedProvider(AIProvider):
         except Exception as exc:
             raise AIError("AI_CONNECTION_FAILED", f"Failed to reach {self.provider_name} provider: {str(exc)}")
 
-        if response.status_code == 401 or response.status_code == 403:
+        if response.status_code in (401, 403) or (
+            response.status_code == 400 and any(msg in response.text.lower() for msg in ["invalid auth key", "api key not valid", "api_key_invalid", "invalid_argument"])
+        ):
             raise AIConfigurationError(
-                f"{self.provider_name.capitalize()} rejected the configured credentials.",
+                f"{self.provider_name.capitalize()} rejected the configured credentials: {response.text[:200]}",
                 code="AI_PROVIDER_AUTHENTICATION",
             )
         elif response.status_code == 429:
@@ -175,7 +177,8 @@ class GeminiProvider(BaseHostedProvider):
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
     ):
-        resolved_key = api_key if api_key is not None else (settings.GEMINI_API_KEY or settings.AI_API_KEY)
+        pool = settings.gemini_api_key_pool()
+        resolved_key = api_key if api_key is not None else (pool[0] if pool else settings.AI_API_KEY)
         resolved_model = model if model is not None else (settings.GEMINI_MODEL or settings.AI_MODEL or "gemini-3-flash-preview")
         resolved_url = base_url if base_url is not None else (settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai")
 

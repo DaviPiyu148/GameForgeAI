@@ -215,9 +215,27 @@ const BuilderPage = () => {
 
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <label className="block font-mono text-[10px] text-on-surface-variant uppercase">Game Scale / Structure</label>
+                    <label className="block font-mono text-[10px] text-on-surface-variant uppercase">World Architecture Mode</label>
+                    <span className="font-mono text-[9px] text-primary/80 bg-primary/10 px-1.5 py-0.5 border border-primary/30 rounded-xs uppercase">
+                      {state.currentBuildParams.world_mode === 'open_world' ? 'Open World' : state.currentBuildParams.world_mode === 'campaign' ? 'Campaign' : 'Linear'}
+                    </span>
+                  </div>
+                  <select 
+                    className="w-full bg-terminal-bg border border-primary/40 p-2 text-primary font-mono text-xs cursor-pointer focus:ring-1 focus:ring-primary outline-none"
+                    value={state.currentBuildParams.world_mode || 'linear'}
+                    onChange={(e) => updateBuildParams({ world_mode: e.target.value as 'linear' | 'campaign' | 'open_world' })}
+                  >
+                    <option value="linear">Linear Arena / Single Stage</option>
+                    <option value="campaign">Sequential Multi-Stage Campaign</option>
+                    <option value="open_world">Generalized Open World (Districts & Vehicles)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block font-mono text-[10px] text-on-surface-variant uppercase">Game Scale / Budget Tier</label>
                     <span className="font-mono text-[9px] text-secondary bg-secondary/10 px-1.5 py-0.5 border border-secondary/30 rounded-xs uppercase">
-                      {state.currentBuildParams.scale === 'campaign' ? 'Multi-Stage' : state.currentBuildParams.scale === 'standard' ? 'Standard' : 'Prototype'}
+                      {state.currentBuildParams.scale === 'campaign' ? 'Expanded' : state.currentBuildParams.scale === 'standard' ? 'Standard' : 'Prototype'}
                     </span>
                   </div>
                   <select 
@@ -225,9 +243,9 @@ const BuilderPage = () => {
                     value={state.currentBuildParams.scale || 'prototype'}
                     onChange={(e) => updateBuildParams({ scale: e.target.value as 'prototype' | 'standard' | 'campaign' })}
                   >
-                    <option value="prototype">Single-Stage Fast Prototype (1 Level)</option>
-                    <option value="standard">Standard Campaign (2-3 Stages)</option>
-                    <option value="campaign">Advanced Multi-Stage Campaign (3-5 Stages)</option>
+                    <option value="prototype">Fast Prototype (1 Level / Small World)</option>
+                    <option value="standard">Standard Scale (2-3 Stages / Mid World)</option>
+                    <option value="campaign">Expanded Scale (3-5 Stages / Large World)</option>
                   </select>
                 </div>
 

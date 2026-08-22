@@ -104,11 +104,12 @@ export interface WorldDef {
   height: number;
   gravity: number;
   background_color: string;
-  theme: 'cyberpunk' | 'retro_arcade' | 'dungeon' | 'space' | 'neon' | 'minimal';
+  theme: 'cyberpunk' | 'retro_arcade' | 'dungeon' | 'space' | 'neon' | 'minimal' | 'wasteland' | 'urban' | 'colony' | 'fantasy';
   difficulty_scaling?: number;
   wave_count?: number;
   procedural_seed?: number;
   hazard_density?: number;
+  world_mode?: 'linear' | 'campaign' | 'open_world';
 }
 
 export interface PlayerDef {
@@ -181,7 +182,7 @@ export interface ObjectiveDef {
 export interface LevelDef {
   level_number: number;
   title: string;
-  theme?: 'cyberpunk' | 'retro_arcade' | 'dungeon' | 'space' | 'neon' | 'minimal';
+  theme?: 'cyberpunk' | 'retro_arcade' | 'dungeon' | 'space' | 'neon' | 'minimal' | 'wasteland' | 'urban' | 'colony' | 'fantasy';
   world?: WorldDef;
   spawn_x?: number;
   spawn_y?: number;
@@ -190,6 +191,223 @@ export interface LevelDef {
   rules?: RuleDef[];
   completion_message?: string;
   is_finale?: boolean;
+}
+
+// --- Phase 6: Generalized Open World Runtime Interfaces ---
+export interface RegionDef {
+  id: string;
+  name: string;
+  theme: string;
+  bounds_x?: number;
+  bounds_y?: number;
+  width: number;
+  height: number;
+  danger_level: number;
+  population_density?: number;
+  controlling_faction?: string | null;
+  traversal_connections?: string[];
+  background_color?: string | null;
+  ambient_theme?: string | null;
+}
+
+export interface WorldConnectionDef {
+  from_region: string;
+  to_region: string;
+  bidirectional?: boolean;
+  traversal_types?: ('on_foot' | 'vehicle' | 'fast_travel')[];
+  required_state_key?: string | null;
+}
+
+export interface POIDef {
+  id: string;
+  name: string;
+  type:
+    | 'safehouse'
+    | 'shop'
+    | 'garage'
+    | 'outpost'
+    | 'terminal'
+    | 'landmark'
+    | 'hospital'
+    | 'mission_giver'
+    | 'dungeon'
+    | 'station'
+    | 'hideout'
+    | 'arena'
+    | 'resource_node';
+  region_id: string;
+  x: number;
+  y: number;
+  icon?: string | null;
+  discovered?: boolean;
+  activity_ids?: string[];
+  interaction_text?: string | null;
+}
+
+export interface ActivityPrerequisite {
+  min_reputation?: Record<string, number>;
+  required_state?: Record<string, number | string | boolean>;
+  completed_activities?: string[];
+}
+
+export interface ActivityConsequence {
+  reputation_changes?: Record<string, number>;
+  threat_change?: number;
+  state_mutations?: Record<string, number | string | boolean>;
+  unlock_regions?: string[];
+  unlock_pois?: string[];
+  message?: string | null;
+}
+
+export interface ActivityDef {
+  id: string;
+  title: string;
+  description: string;
+  type:
+    | 'mission'
+    | 'delivery'
+    | 'race'
+    | 'combat'
+    | 'collection'
+    | 'investigation'
+    | 'escort'
+    | 'patrol'
+    | 'exploration'
+    | 'minigame';
+  region_id?: string | null;
+  start_poi_id?: string | null;
+  target_poi_id?: string | null;
+  target_actor_id?: string | null;
+  target_count?: number;
+  time_limit_seconds?: number;
+  prerequisites?: ActivityPrerequisite;
+  rewards?: Record<string, number | string | boolean>;
+  success_consequences?: ActivityConsequence;
+  failure_consequences?: ActivityConsequence | null;
+  status?: 'available' | 'active' | 'completed' | 'failed' | 'locked';
+}
+
+export interface ScheduleDef {
+  start_hour: number;
+  end_hour: number;
+  region_id: string;
+  poi_id?: string | null;
+  activity_name?: string;
+}
+
+export interface ActorDef {
+  id: string;
+  name: string;
+  archetype:
+    | 'civilian'
+    | 'guard'
+    | 'security'
+    | 'merchant'
+    | 'quest_giver'
+    | 'hostile'
+    | 'companion'
+    | 'patrol'
+    | 'courier';
+  faction_id?: string | null;
+  region_id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  health?: number;
+  speed?: number;
+  behavior: EntityBehavior;
+  color?: string;
+  dialogue?: string | null;
+  schedules?: ScheduleDef[];
+  gives_activity_id?: string | null;
+}
+
+export interface FactionDef {
+  id: string;
+  name: string;
+  description?: string | null;
+  initial_reputation?: number;
+  hostility_threshold?: number;
+  controlled_regions?: string[];
+  color?: string;
+  alert_unit_archetype?: string | null;
+}
+
+export interface VehicleDef {
+  id: string;
+  name: string;
+  type: 'car' | 'bike' | 'hovercraft' | 'truck' | 'speedster' | 'mount' | 'cart' | 'buggy';
+  region_id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  max_speed: number;
+  acceleration?: number;
+  handling?: number;
+  health?: number;
+  color?: string;
+  traversal_mode?: 'ground' | 'hover' | 'water';
+  is_occupied?: boolean;
+}
+
+export interface ThreatResponseUnitDef {
+  min_threat_level: number;
+  archetype: string;
+  count: number;
+  faction_id?: string | null;
+  behavior: EntityBehavior;
+}
+
+export interface ThreatSystemDef {
+  name: string;
+  current_level: number;
+  max_level: number;
+  decay_rate_per_sec: number;
+  escalation_events?: string[];
+  response_units?: ThreatResponseUnitDef[];
+}
+
+export interface WorldTimeDef {
+  start_hour: number;
+  time_scale: number;
+  day_night_cycle?: boolean;
+}
+
+export interface WorldEventDef {
+  id: string;
+  name: string;
+  type:
+    | 'faction_conflict'
+    | 'roadblock'
+    | 'security_lockdown'
+    | 'convoy'
+    | 'storm'
+    | 'market_surge'
+    | 'swarm_attack'
+    | 'festival';
+  region_ids?: string[];
+  trigger_state_key?: string | null;
+  duration_seconds: number;
+  active?: boolean;
+  threat_modifier?: number;
+  danger_modifier?: number;
+  description?: string | null;
+}
+
+export interface OpenWorldDef {
+  regions: RegionDef[];
+  connections?: WorldConnectionDef[];
+  factions: FactionDef[];
+  pois: POIDef[];
+  activities: ActivityDef[];
+  vehicles: VehicleDef[];
+  actors: ActorDef[];
+  threat_system?: ThreatSystemDef;
+  time_system?: WorldTimeDef;
+  events?: WorldEventDef[];
+  initial_state?: Record<string, number | string | boolean>;
 }
 
 export interface GameDSL {
@@ -202,6 +420,7 @@ export interface GameDSL {
   ui: UIDef;
   design_spec?: GameDesignSpec;
   levels?: LevelDef[];
+  open_world?: OpenWorldDef;
 }
 
 export interface RuntimeMetadata {
@@ -240,7 +459,18 @@ export type TelemetryEventType =
   | 'CHECKPOINT_REACHED'
   | 'GAME_WON'
   | 'GAME_LOST'
-  | 'SCORE_CHANGED';
+  | 'SCORE_CHANGED'
+  | 'REGION_ENTERED'
+  | 'POI_DISCOVERED'
+  | 'ACTIVITY_STARTED'
+  | 'ACTIVITY_COMPLETED'
+  | 'ACTIVITY_FAILED'
+  | 'VEHICLE_ENTERED'
+  | 'VEHICLE_EXITED'
+  | 'ALERT_CHANGED'
+  | 'FACTION_REPUTATION_CHANGED'
+  | 'WORLD_EVENT_STARTED'
+  | 'WORLD_EVENT_ENDED';
 
 export interface TelemetryEvent {
   type: TelemetryEventType;

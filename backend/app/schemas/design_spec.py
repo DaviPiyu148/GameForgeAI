@@ -141,6 +141,10 @@ class GameDesignSpec(BaseModel):
     objective_details: Optional[ObjectiveSpec] = None
     progression_phases: List[ProgressionPhase] = Field(default_factory=list, max_length=5)
 
+    # Phase 6: World Mode & Open World Structure
+    world_mode: Literal["linear", "campaign", "open_world"] = "linear"
+    open_world_structure: Optional[Dict[str, Any]] = None
+
     model_config = ConfigDict(extra="ignore")
 
     @field_validator(

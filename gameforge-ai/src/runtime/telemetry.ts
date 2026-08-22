@@ -91,6 +91,21 @@ export class TelemetryTracker {
       case 'GAME_LOST':
         this.outcome = 'LOST';
         break;
+      case 'ACTIVITY_COMPLETED':
+        this.objectivesCompleted += 1;
+        break;
+      case 'REGION_ENTERED':
+      case 'POI_DISCOVERED':
+      case 'ACTIVITY_STARTED':
+      case 'ACTIVITY_FAILED':
+      case 'VEHICLE_ENTERED':
+      case 'VEHICLE_EXITED':
+      case 'ALERT_CHANGED':
+      case 'FACTION_REPUTATION_CHANGED':
+      case 'WORLD_EVENT_STARTED':
+      case 'WORLD_EVENT_ENDED':
+        // Recorded in events array for AI critique
+        break;
     }
   }
 

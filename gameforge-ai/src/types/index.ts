@@ -9,6 +9,8 @@ export interface BuildParams {
   physics: number;
   modules: string[];
   scale?: 'prototype' | 'standard' | 'campaign';
+  world_mode?: 'linear' | 'campaign' | 'open_world';
+  worldMode?: 'linear' | 'campaign' | 'open_world';
 }
 
 export interface GameProject {

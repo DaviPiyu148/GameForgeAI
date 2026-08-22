@@ -29,8 +29,8 @@ class GameBlueprint(BaseModel):
     # near 200 would spuriously reject a legitimate combined string.
     core_loop: str = Field(..., max_length=700)
     estimated_session_length: str = Field(..., max_length=50)
-    level_count: int = Field(..., ge=1, le=5)
-    world_area_count: int = Field(..., ge=1, le=5)
+    level_count: int = Field(..., ge=1, le=10)
+    world_area_count: int = Field(..., ge=1, le=10)
     objectives: List[BlueprintObjective] = Field(default_factory=list, max_length=10)
     progression: List[str] = Field(default_factory=list, max_length=5)
     encounter_types: List[str] = Field(default_factory=list, max_length=20)

@@ -1,10 +1,17 @@
 import Phaser from 'phaser';
-import type { EntityDef, GameDSL, GameState, LevelDef, PlaytestSummary } from './types';
+import type { ActorDef, EntityDef, GameDSL, GameState, LevelDef, PlaytestSummary, POIDef, RegionDef, ThreatResponseUnitDef } from './types';
 import { generateProceduralTextures } from './textures';
 import { RuleEngine } from './rules';
 import { generateProceduralLayout } from './procedural';
 import { TelemetryTracker } from './telemetry';
 import { EntityBehaviorSystem } from './behaviors';
+import { WorldManager } from './WorldManager';
+import { RegionManager } from './RegionManager';
+import { VehicleManager } from './VehicleManager';
+import { ActivityManager } from './ActivityManager';
+import { FactionManager } from './FactionManager';
+import { ThreatManager } from './ThreatManager';
+import { WorldEventManager } from './WorldEventManager';
 
 export interface GameSceneData {
   dsl: GameDSL;
@@ -21,6 +28,19 @@ export class GameScene extends Phaser.Scene {
   private behaviorSystem = new EntityBehaviorSystem();
   private onStateChange?: (state: GameState, score: number, health: number) => void;
   private onPlaytestComplete?: (summary: PlaytestSummary) => void;
+
+  // Open World Modular Subsystems (Phase 6)
+  private worldManager: WorldManager | null = null;
+  private regionManager: RegionManager | null = null;
+  private vehicleManager: VehicleManager | null = null;
+  private activityManager: ActivityManager | null = null;
+  private factionManager: FactionManager | null = null;
+  private threatManager: ThreatManager | null = null;
+  private worldEventManager: WorldEventManager | null = null;
+  private poisGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private actorsGroup!: Phaser.Physics.Arcade.Group;
+  private eKey?: Phaser.Input.Keyboard.Key;
+  private regionBannerText?: Phaser.GameObjects.Text;
 
   // Game state
   private gameState: GameState = 'READY';
@@ -140,6 +160,8 @@ export class GameScene extends Phaser.Scene {
     this.enemiesGroup = this.physics.add.group();
     this.bulletsGroup = this.physics.add.group();
     this.enemyBulletsGroup = this.physics.add.group();
+    this.poisGroup = this.physics.add.staticGroup();
+    this.actorsGroup = this.physics.add.group();
 
     // 3. Player Spawn (Respects the active level's spawn if multi-stage)
     const activeLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
@@ -166,18 +188,21 @@ export class GameScene extends Phaser.Scene {
     // Camera follow player
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-    // 4. Populate Entities & Procedural Layout.
-    // applyLevelConfig() is the single source of truth for "apply a level" — it is
-    // reused unchanged by advanceToNextLevel() so the two code paths cannot drift.
-    this.applyLevelConfig(activeLevel);
-    if (!activeLevel) {
-      const layout = generateProceduralLayout(this.dsl, this.seed);
-      this.populateEntities(layout.entities);
+    // 4. Populate Entities & Procedural Layout or Open World Subsystems
+    if (this.dsl.open_world) {
+      this.setupOpenWorld();
+    } else {
+      this.applyLevelConfig(activeLevel);
+      if (!activeLevel) {
+        const layout = generateProceduralLayout(this.dsl, this.seed);
+        this.populateEntities(layout.entities);
+      }
     }
 
     // 5. Collisions & Overlaps
     this.physics.add.collider(this.player, this.platformsGroup);
     this.physics.add.collider(this.enemiesGroup, this.platformsGroup);
+    this.physics.add.collider(this.actorsGroup, this.platformsGroup);
     this.physics.add.overlap(this.player, this.collectiblesGroup, this.handleCollect, undefined, this);
     this.physics.add.overlap(this.player, this.enemiesGroup, this.handlePlayerEnemyCollision, undefined, this);
     this.physics.add.overlap(this.player, this.hazardsGroup, this.handleHazardTouch, undefined, this);
@@ -189,6 +214,7 @@ export class GameScene extends Phaser.Scene {
     // 6. Keyboard & Mouse Controls
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
+      this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
       this.wasdKeys = {
         W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
         A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
@@ -206,6 +232,7 @@ export class GameScene extends Phaser.Scene {
         Phaser.Input.Keyboard.KeyCodes.DOWN,
         Phaser.Input.Keyboard.KeyCodes.LEFT,
         Phaser.Input.Keyboard.KeyCodes.RIGHT,
+        Phaser.Input.Keyboard.KeyCodes.E,
       ]);
     }
 
@@ -221,11 +248,263 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private setupOpenWorld(): void {
+    const ow = this.dsl.open_world;
+    if (!ow) return;
+
+    // 1. Initialize Modular Subsystems
+    this.worldManager = new WorldManager(ow.time_system, ow.initial_state);
+    this.regionManager = new RegionManager(
+      ow.regions,
+      ow.connections || [],
+      ow.regions[0]?.id,
+      (newRegion, prevRegion) => {
+        this.handleRegionTransition(newRegion, prevRegion);
+      }
+    );
+    this.vehicleManager = new VehicleManager(
+      this,
+      (veh) => {
+        this.telemetry.record('VEHICLE_ENTERED', { vehicleId: veh.id, name: veh.name });
+        this.spawnFloatingText(this.player.x, this.player.y - 30, `ENTERED: ${veh.name.toUpperCase()}`, '#00ffff');
+        this.cameras.main.shake(100, 0.005);
+      },
+      (veh) => {
+        this.telemetry.record('VEHICLE_EXITED', { vehicleId: veh.id });
+        this.spawnFloatingText(this.player.x, this.player.y - 30, 'EXITED VEHICLE', '#ffffff');
+      }
+    );
+    this.activityManager = new ActivityManager(
+      ow.activities,
+      (act) => {
+        this.telemetry.record('ACTIVITY_STARTED', { activityId: act.id, title: act.title });
+        this.spawnFloatingText(this.player.x, this.player.y - 40, `MISSION: ${act.title.toUpperCase()}`, '#ffea00');
+        if (this.objectiveText) {
+          this.objectiveText.setText(`MISSION: ${act.title}`);
+        }
+      },
+      (act, consequences) => {
+        this.telemetry.record('ACTIVITY_COMPLETED', { activityId: act.id, title: act.title });
+        this.score += 500;
+        this.spawnFloatingText(this.player.x, this.player.y - 50, `★ MISSION COMPLETED: ${act.title} ★`, '#00ff66');
+        this.cameras.main.shake(150, 0.008);
+
+        // Apply consequence mutations
+        if (consequences?.reputation_changes && this.factionManager) {
+          for (const [fId, rep] of Object.entries(consequences.reputation_changes)) {
+            this.factionManager.modifyReputation(fId, rep);
+          }
+        }
+        if (consequences?.threat_change && this.threatManager) {
+          this.threatManager.escalateThreat(consequences.threat_change);
+        }
+        if (consequences?.state_mutations && this.worldManager) {
+          for (const [k, v] of Object.entries(consequences.state_mutations)) {
+            this.worldManager.setState(k, v);
+          }
+        }
+      },
+      (act) => {
+        this.telemetry.record('ACTIVITY_FAILED', { activityId: act.id });
+        this.spawnFloatingText(this.player.x, this.player.y - 40, `MISSION FAILED: ${act.title}`, '#ff0055');
+      }
+    );
+    this.factionManager = new FactionManager(ow.factions, (fId, newRep, delta) => {
+      this.telemetry.record('FACTION_REPUTATION_CHANGED', { factionId: fId, reputation: newRep, delta });
+    });
+    this.threatManager = new ThreatManager(
+      ow.threat_system,
+      (newLevel, oldLevel) => {
+        this.telemetry.record('ALERT_CHANGED', { threatLevel: newLevel, oldLevel });
+        const col = newLevel > 2 ? '#ff0055' : '#ffaa00';
+        this.spawnFloatingText(this.player.x, this.player.y - 40, `THREAT LEVEL ${newLevel}!`, col);
+      },
+      (unitDef) => {
+        this.spawnThreatResponseUnits(unitDef);
+      }
+    );
+    this.worldEventManager = new WorldEventManager(
+      ow.events || [],
+      (evt) => {
+        this.telemetry.record('WORLD_EVENT_STARTED', { eventId: evt.id, name: evt.name });
+        this.spawnFloatingText(this.player.x, this.player.y - 50, `⚡ EVENT: ${evt.name.toUpperCase()} ⚡`, '#ff00ff');
+      },
+      (evt) => {
+        this.telemetry.record('WORLD_EVENT_ENDED', { eventId: evt.id });
+      }
+    );
+
+    // 2. Setup initial region
+    const initialRegion = this.regionManager.getCurrentRegion();
+    this.populateOpenWorldRegion(initialRegion.id);
+    this.showRegionBanner(initialRegion.name, initialRegion.danger_level);
+  }
+
+  private handleRegionTransition(newRegion: RegionDef, _prevRegion: RegionDef): void {
+    this.telemetry.record('REGION_ENTERED', { regionId: newRegion.id, name: newRegion.name });
+    this.showRegionBanner(newRegion.name, newRegion.danger_level);
+
+    // Update bounds & background
+    const bgCol = newRegion.background_color
+      ? Phaser.Display.Color.HexStringToColor(newRegion.background_color).color
+      : Phaser.Display.Color.HexStringToColor('#0c0e1a').color;
+    if (this.backgroundRect) {
+      this.backgroundRect.setFillStyle(bgCol);
+    }
+
+    // Clear and repopulate region entities
+    this.populateOpenWorldRegion(newRegion.id);
+  }
+
+  private populateOpenWorldRegion(regionId: string): void {
+    const ow = this.dsl.open_world;
+    if (!ow) return;
+
+    // 1. Clear current region POIs and actors
+    this.poisGroup.clear(true, true);
+    this.actorsGroup.clear(true, true);
+
+    // 2. Spawn POIs
+    for (const poi of ow.pois) {
+      if (poi.region_id !== regionId) continue;
+      const pSpr = this.poisGroup.create(poi.x, poi.y, 'tex_poi') as Phaser.Physics.Arcade.Sprite;
+      pSpr.setDisplaySize(32, 32);
+      pSpr.setData('poiDef', poi);
+      pSpr.refreshBody();
+
+      // Ambient label above POI
+      this.add.text(poi.x, poi.y - 24, poi.name, {
+        fontSize: '10px',
+        color: '#ffff00',
+        fontFamily: 'monospace',
+        backgroundColor: '#00000088',
+      }).setOrigin(0.5);
+    }
+
+    // 3. Spawn Vehicles
+    this.vehicleManager?.spawnVehicles(ow.vehicles, regionId);
+
+    // 4. Spawn Living Actors
+    for (const actor of ow.actors) {
+      if (actor.region_id !== regionId) continue;
+      const aSpr = this.actorsGroup.create(actor.x, actor.y, 'tex_actor') as Phaser.Physics.Arcade.Sprite;
+      const w = actor.width || 24;
+      const h = actor.height || 24;
+      aSpr.setDisplaySize(w, h);
+      aSpr.setData('actorDef', actor);
+      aSpr.setData('id', actor.id);
+      aSpr.setData('speed', actor.speed || 100);
+      aSpr.setData('health', actor.health || 50);
+      aSpr.setData('behavior', actor.behavior);
+      aSpr.setCollideWorldBounds(true);
+
+      if (actor.color) {
+        aSpr.setTint(Phaser.Display.Color.HexStringToColor(actor.color).color);
+      }
+
+      // Register with behavior system
+      this.behaviorSystem.registerEntity(aSpr, {
+        id: actor.id,
+        type: 'enemy',
+        x: actor.x,
+        y: actor.y,
+        width: w,
+        height: h,
+        speed: actor.speed || 100,
+        health: actor.health || 50,
+        behavior: actor.behavior,
+        color: actor.color || '#aaaaaa',
+        points: 50,
+        patrol_radius: 120,
+        detection_radius: 200,
+      });
+
+      // Name tag above NPC
+      this.add.text(actor.x, actor.y - 18, actor.name, {
+        fontSize: '9px',
+        color: '#00f0ff',
+        fontFamily: 'monospace',
+      }).setOrigin(0.5);
+    }
+
+    // 5. Overlaps for POIs
+    this.physics.add.overlap(this.player, this.poisGroup, (_p, poiObj) => {
+      const poiDef = (poiObj as Phaser.Physics.Arcade.Sprite).getData('poiDef') as POIDef;
+      if (poiDef && !poiDef.discovered) {
+        poiDef.discovered = true;
+        this.telemetry.record('POI_DISCOVERED', { poiId: poiDef.id, name: poiDef.name });
+        this.spawnFloatingText(poiDef.x, poiDef.y - 30, `DISCOVERED: ${poiDef.name}`, '#ffff00');
+      }
+    });
+  }
+
+  private showRegionBanner(name: string, dangerLevel: number = 1): void {
+    if (!this.regionBannerText) {
+      this.regionBannerText = this.add.text(
+        this.cameras.main.width / 2,
+        80,
+        '',
+        { fontSize: '18px', color: '#00f0ff', fontFamily: 'monospace', fontStyle: 'bold', backgroundColor: '#000000aa', padding: { x: 12, y: 6 } }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(600);
+    }
+
+    this.regionBannerText.setText(`📍 ${name.toUpperCase()} (DANGER: ${dangerLevel}/10)`);
+    this.regionBannerText.setAlpha(1);
+    this.regionBannerText.setVisible(true);
+
+    this.tweens.add({
+      targets: this.regionBannerText,
+      alpha: 0,
+      delay: 2500,
+      duration: 1000,
+      onComplete: () => {
+        if (this.regionBannerText) this.regionBannerText.setVisible(false);
+      },
+    });
+  }
+
+  private spawnThreatResponseUnits(unitDef: ThreatResponseUnitDef): void {
+    for (let i = 0; i < unitDef.count; i++) {
+      const offset = (i + 1) * 40;
+      const x = Math.max(50, Math.min(this.dsl.world.width - 50, this.player.x + (i % 2 === 0 ? offset : -offset)));
+      const y = Math.max(50, Math.min(this.dsl.world.height - 50, this.player.y + offset));
+
+      const enemy = this.enemiesGroup.create(x, y, 'tex_enemy') as Phaser.Physics.Arcade.Sprite;
+      enemy.setDisplaySize(28, 28);
+      enemy.setTint(0xff0033);
+      enemy.setData('id', `threat_response_${Date.now()}_${i}`);
+      enemy.setData('health', 40);
+      enemy.setData('damage', 18);
+      enemy.setData('speed', 160);
+      enemy.setData('behavior', unitDef.behavior);
+      enemy.setCollideWorldBounds(true);
+
+      this.behaviorSystem.registerEntity(enemy, {
+        id: `threat_resp_${i}`,
+        type: 'enemy',
+        x,
+        y,
+        width: 28,
+        height: 28,
+        speed: 160,
+        health: 40,
+        behavior: unitDef.behavior,
+        color: '#ff0033',
+        points: 150,
+      });
+
+      this.spawnFloatingText(x, y, `🚨 ENFORCER`, '#ff0033');
+    }
+  }
+
   private populateEntities(entities: EntityDef[]): void {
     for (const ent of entities) {
-      if (ent.type === 'platform') {
+      if (ent.type === 'platform' || ent.type === 'obstacle') {
         const plat = this.platformsGroup.create(ent.x, ent.y, 'tex_platform') as Phaser.Physics.Arcade.Sprite;
         plat.setDisplaySize(ent.width, ent.height);
+        if (ent.color) {
+          plat.setTint(Phaser.Display.Color.HexStringToColor(ent.color).color);
+        }
         plat.refreshBody();
       } else if (ent.type === 'hazard') {
         const haz = this.hazardsGroup.create(ent.x, ent.y, 'tex_hazard') as Phaser.Physics.Arcade.Sprite;
@@ -402,34 +681,124 @@ export class GameScene extends Phaser.Scene {
     if (leftDown) vx -= 1;
     if (rightDown) vx += 1;
 
-    // Unified Dash Execution
-    let currentSpd = this.playerSpeed;
-    const wantsDash = spaceDown || shiftDown;
-    if (wantsDash && this.dashCooldownTimer <= 0 && this.stamina >= 30) {
-      this.dashCooldownTimer = this.dsl.player.dash_cooldown || 1.2;
-      this.stamina -= 30;
-      currentSpd = this.dsl.player.dash_speed || 600;
-      this.cameras.main.shake(80, 0.004);
-      this.spawnDashParticles(this.player.x, this.player.y);
-      this.telemetry.record('OBJECTIVE_COMPLETED', { action: 'dash' });
-      this.ruleEngine.trigger('on_dash', this.getGameContext(), { speed: currentSpd });
+    // Open World Subsystem Updates & Interaction Handling
+    if (this.dsl.open_world) {
+      const dtSec = delta / 1000;
+      this.worldManager?.update(dtSec);
+      this.threatManager?.update(dtSec);
+      this.worldEventManager?.update(dtSec);
+
+      // Handle 'E' Key Interaction (Vehicles, POIs, NPCs)
+      if (this.eKey && Phaser.Input.Keyboard.JustDown(this.eKey)) {
+        if (this.vehicleManager?.isInVehicle()) {
+          this.vehicleManager.exitVehicle(this.player);
+        } else {
+          const nearbyVeh = this.vehicleManager?.getNearbyVehicle(this.player.x, this.player.y, 64);
+          if (nearbyVeh) {
+            this.vehicleManager?.enterVehicle(nearbyVeh, this.player);
+          } else {
+            // Check nearby POIs for mission progress or discovery
+            let interacted = false;
+            this.poisGroup.getChildren().forEach((pObj) => {
+              const pSpr = pObj as Phaser.Physics.Arcade.Sprite;
+              if (Phaser.Math.Distance.Between(this.player.x, this.player.y, pSpr.x, pSpr.y) < 64) {
+                const poiDef = pSpr.getData('poiDef') as POIDef;
+                if (poiDef) {
+                  interacted = true;
+                  this.spawnFloatingText(poiDef.x, poiDef.y - 30, `STATION: ${poiDef.name.toUpperCase()}`, '#00ffcc');
+                  this.activityManager?.recordProgress(1);
+                }
+              }
+            });
+
+            if (!interacted) {
+              this.actorsGroup.getChildren().forEach((aObj) => {
+                const aSpr = aObj as Phaser.Physics.Arcade.Sprite;
+                if (Phaser.Math.Distance.Between(this.player.x, this.player.y, aSpr.x, aSpr.y) < 64) {
+                  const actorDef = aSpr.getData('actorDef') as ActorDef;
+                  if (actorDef) {
+                    const msg = actorDef.dialogue || `Hello traveler! Safe travels in ${this.regionManager?.getCurrentRegion().name || 'the district'}.`;
+                    this.spawnFloatingText(aSpr.x, aSpr.y - 30, msg, '#ffffff');
+                    if (actorDef.gives_activity_id) {
+                      this.activityManager?.startActivity(actorDef.gives_activity_id);
+                    }
+                  }
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Check Edge Traversal for Region Transitions
+      if (this.regionManager && !this.isTransitioning) {
+        const connected = this.regionManager.getConnectedRegionIds();
+        if (connected.length > 0) {
+          const worldW = this.dsl.world.width;
+          const worldH = this.dsl.world.height;
+          let targetRegionId: string | null = null;
+          let nextSpawnX = this.player.x;
+          let nextSpawnY = this.player.y;
+
+          if (this.player.x < 24) {
+            targetRegionId = connected[0];
+            nextSpawnX = worldW - 48;
+          } else if (this.player.x > worldW - 24) {
+            targetRegionId = connected[connected.length > 1 ? 1 : 0];
+            nextSpawnX = 48;
+          } else if (this.player.y < 24) {
+            targetRegionId = connected[0];
+            nextSpawnY = worldH - 48;
+          } else if (this.player.y > worldH - 24) {
+            targetRegionId = connected[connected.length > 1 ? 1 : 0];
+            nextSpawnY = 48;
+          }
+
+          if (targetRegionId && targetRegionId !== this.regionManager.getCurrentRegion().id) {
+            const ok = this.regionManager.transitionToRegion(targetRegionId);
+            if (ok) {
+              this.player.setPosition(nextSpawnX, nextSpawnY);
+            }
+          }
+        }
+      }
     }
 
-    if (isPlatformer) {
-      if (upDown && (this.player.body as Phaser.Physics.Arcade.Body).touching.down) {
-        this.player.setVelocityY(-(this.dsl.player.jump_power || 500));
-      }
-      this.player.setVelocityX(vx * currentSpd);
+    // Vehicle Locomotion vs On-Foot Locomotion
+    if (this.dsl.open_world && this.vehicleManager?.isInVehicle()) {
+      const moveX = (rightDown ? 1 : 0) - (leftDown ? 1 : 0);
+      const moveY = (downDown ? 1 : 0) - (upDown ? 1 : 0);
+      this.vehicleManager.updateDriving(moveX, moveY, this.player, delta);
     } else {
-      if (upDown) vy -= 1;
-      if (downDown) vy += 1;
-
-      if (vx !== 0 && vy !== 0) {
-        vx *= 0.7071;
-        vy *= 0.7071;
+      // Unified Dash Execution
+      let currentSpd = this.playerSpeed;
+      const wantsDash = spaceDown || shiftDown;
+      if (wantsDash && this.dashCooldownTimer <= 0 && this.stamina >= 30) {
+        this.dashCooldownTimer = this.dsl.player.dash_cooldown || 1.2;
+        this.stamina -= 30;
+        currentSpd = this.dsl.player.dash_speed || 600;
+        this.cameras.main.shake(80, 0.004);
+        this.spawnDashParticles(this.player.x, this.player.y);
+        this.telemetry.record('OBJECTIVE_COMPLETED', { action: 'dash' });
+        this.ruleEngine.trigger('on_dash', this.getGameContext(), { speed: currentSpd });
       }
 
-      this.player.setVelocity(vx * currentSpd, vy * currentSpd);
+      if (isPlatformer) {
+        if (upDown && (this.player.body as Phaser.Physics.Arcade.Body).touching.down) {
+          this.player.setVelocityY(-(this.dsl.player.jump_power || 500));
+        }
+        this.player.setVelocityX(vx * currentSpd);
+      } else {
+        if (upDown) vy -= 1;
+        if (downDown) vy += 1;
+
+        if (vx !== 0 && vy !== 0) {
+          vx *= 0.7071;
+          vy *= 0.7071;
+        }
+
+        this.player.setVelocity(vx * currentSpd, vy * currentSpd);
+      }
     }
 
     // Shooting Action (Honors player.attack_type and player.attack_cooldown)
@@ -865,6 +1234,25 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText.setText(`SCORE: ${this.score}`);
     this.waveText.setText(`WAVE: ${this.currentWave}/${this.maxWaves}`);
+
+    // Open World live HUD status
+    if (this.dsl.open_world && this.regionManager) {
+      const curReg = this.regionManager.getCurrentRegion();
+      const threatLvl = this.threatManager?.getThreatLevel() ?? 0;
+      const timeStr = this.worldManager?.getFormattedTime() ?? '12:00';
+      const act = this.activityManager?.getActiveActivity();
+      const actStr = act
+        ? `${act.title.toUpperCase()} (${this.activityManager?.getProgress().current}/${this.activityManager?.getProgress().target})`
+        : 'FREE ROAM';
+
+      const inVeh = this.vehicleManager?.isInVehicle();
+      const vehStr = inVeh ? ' [DRIVING - E TO EXIT]' : ' [E TO INTERACT/ENTER]';
+
+      if (this.objectiveText) {
+        this.objectiveText.setText(`[${curReg.name.toUpperCase()} (DANGER ${curReg.danger_level})] 🚨 ALERT ${threatLvl}/5 ⏰ ${timeStr} 🎯 ${actStr}${vehStr}`);
+        this.objectiveText.setColor('#00f0ff');
+      }
+    }
 
     // Boss health bar (Phase 5) — reflects live getData('health') on the tracked boss.
     if (this.currentBossSprite && this.currentBossSprite.active && this.bossHealthBarFill) {

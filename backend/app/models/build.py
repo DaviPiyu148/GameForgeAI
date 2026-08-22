@@ -32,6 +32,7 @@ class BuildJob(Base):
     physics = Column(Integer, nullable=False, default=80)
     modules = Column(JSON, nullable=False, default=list)
     scale = Column(String(20), nullable=False, default="standard")
+    world_mode = Column(String(20), nullable=False, default="linear")
 
     # Status: QUEUED -> RUNNING -> VALIDATING -> SUCCESS / ERROR
     status = Column(String(50), nullable=False, default="QUEUED", index=True)

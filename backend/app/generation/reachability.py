@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from app.generation.dsl_models import EntityDef, WorldDef, ObjectiveDef
@@ -148,5 +148,141 @@ class ReachabilityValidator:
             repaired_spawn=(fixed_spawn_x, fixed_spawn_y) if repaired else None,
         )
 
+    @classmethod
+    def validate_open_world_connectivity(
+        cls,
+        regions: List[Any],
+        connections: List[Any],
+        start_region_id: Optional[str] = None,
+    ) -> Tuple[bool, List[Any]]:
+        """
+        Validate that all regions are reachable via traversal connections.
+        Auto-repairs disconnected regions by linking them sequentially if broken.
+        Returns (repaired_flag, final_connections).
+        """
+        if not regions:
+            return False, connections
+
+        region_ids = [getattr(r, "id", None) or (r.get("id") if isinstance(r, dict) else "") for r in regions]
+        region_ids = [rid for rid in region_ids if rid]
+        if not start_region_id or start_region_id not in region_ids:
+            start_region_id = region_ids[0] if region_ids else None
+
+        # Build adjacency graph
+        adj = {rid: set() for rid in region_ids}
+
+        # From connections
+        for conn in connections:
+            from_r = getattr(conn, "from_region", None) or (conn.get("from_region") if isinstance(conn, dict) else None)
+            to_r = getattr(conn, "to_region", None) or (conn.get("to_region") if isinstance(conn, dict) else None)
+            bidir = getattr(conn, "bidirectional", True) if hasattr(conn, "bidirectional") else (conn.get("bidirectional", True) if isinstance(conn, dict) else True)
+            if from_r in adj and to_r in adj:
+                adj[from_r].add(to_r)
+                if bidir:
+                    adj[to_r].add(from_r)
+
+        # From region traversal_connections
+        for reg in regions:
+            rid = getattr(reg, "id", None) or (reg.get("id") if isinstance(reg, dict) else None)
+            tc = getattr(reg, "traversal_connections", []) or (reg.get("traversal_connections", []) if isinstance(reg, dict) else [])
+            for target_rid in tc:
+                if target_rid in adj and rid in adj:
+                    adj[rid].add(target_rid)
+                    adj[target_rid].add(rid)
+
+        # BFS reachability from start_region_id
+        visited = set()
+        queue = [start_region_id]
+        visited.add(start_region_id)
+
+        while queue:
+            curr = queue.pop(0)
+            for neighbor in adj.get(curr, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+
+        unreachable = [rid for rid in region_ids if rid not in visited]
+        repaired = False
+        repaired_connections = list(connections)
+
+        if unreachable:
+            # Auto-repair by establishing sequential bidirectional connections
+            repaired = True
+            for i in range(len(region_ids) - 1):
+                r_a = region_ids[i]
+                r_b = region_ids[i + 1]
+                if r_b not in adj[r_a]:
+                    adj[r_a].add(r_b)
+                    adj[r_b].add(r_a)
+                    # Create connection dict/object
+                    repaired_connections.append({
+                        "from_region": r_a,
+                        "to_region": r_b,
+                        "bidirectional": True,
+                        "traversal_types": ["on_foot", "vehicle"],
+                    })
+
+        return repaired, repaired_connections
+
 
 reachability_validator = ReachabilityValidator()
+
+
+def validate_open_world_connectivity(
+    ow_or_regions: Any,
+    connections: Optional[List[Any]] = None,
+    start_region_id: Optional[str] = None,
+) -> Any:
+    """Module-level convenience helper for validating open-world graph connectivity."""
+    if hasattr(ow_or_regions, "regions"):
+        regs = ow_or_regions.regions
+        conns = ow_or_regions.connections or []
+        repaired, final_conns = ReachabilityValidator.validate_open_world_connectivity(regs, conns, start_region_id)
+        
+        region_ids = [r.id for r in regs]
+        adj = {rid: set() for rid in region_ids}
+        for conn in conns:
+            from_r = getattr(conn, "from_region", None) or (conn.get("from_region") if isinstance(conn, dict) else None)
+            to_r = getattr(conn, "to_region", None) or (conn.get("to_region") if isinstance(conn, dict) else None)
+            bidir = getattr(conn, "bidirectional", True) if hasattr(conn, "bidirectional") else (conn.get("bidirectional", True) if isinstance(conn, dict) else True)
+            if from_r in adj and to_r in adj:
+                adj[from_r].add(to_r)
+                if bidir:
+                    adj[to_r].add(from_r)
+        for reg in regs:
+            rid = getattr(reg, "id", None) or (reg.get("id") if isinstance(reg, dict) else None)
+            tc = getattr(reg, "traversal_connections", []) or (reg.get("traversal_connections", []) if isinstance(reg, dict) else [])
+            for target_rid in tc:
+                if target_rid in adj and rid in adj:
+                    adj[rid].add(target_rid)
+                    adj[target_rid].add(rid)
+
+        start_id = start_region_id or (region_ids[0] if region_ids else "")
+        visited = set()
+        if start_id in adj:
+            queue = [start_id]
+            visited.add(start_id)
+            while queue:
+                curr = queue.pop(0)
+                for neighbor in adj.get(curr, []):
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append(neighbor)
+        unreach = [rid for rid in region_ids if rid not in visited]
+
+        class ConnectivityResult:
+            def __init__(self, all_reachable, reachable, unreachable, repaired_conns):
+                self.all_reachable = all_reachable
+                self.reachable_regions = reachable
+                self.unreachable_regions = unreachable
+                self.repaired_connections = repaired_conns
+
+        return ConnectivityResult(
+            all_reachable=len(unreach) == 0,
+            reachable=list(visited),
+            unreachable=unreach,
+            repaired_conns=final_conns,
+        )
+
+    return ReachabilityValidator.validate_open_world_connectivity(ow_or_regions, connections or [], start_region_id)

@@ -224,3 +224,129 @@ def test_telegraph_ms_out_of_range_rejected():
         EntityDef(id="e_telegraph_low", x=10, y=10, telegraph_ms=-1)
     with pytest.raises(ValidationError):
         EntityDef(id="e_telegraph_high", x=10, y=10, telegraph_ms=2001)
+
+
+def test_level_id_normalization_and_sync():
+    """Test that level_id integer/string artifacts from LLMs are safely normalized and synced."""
+    data = get_sample_valid_dsl_dict()
+    data["levels"] = [
+        {
+            "level_id": 1,
+            "title": "Stage 1",
+            "entities": [
+                {
+                    "id": "coin_1",
+                    "type": "collectible",
+                    "x": 200,
+                    "y": 200,
+                    "width": 20,
+                    "height": 20,
+                    "points": 50,
+                    "color": "#ffff00",
+                }
+            ],
+            "rules": [
+                {
+                    "id": "rule_c",
+                    "trigger": "on_collect",
+                    "action": "add_score",
+                    "params": {"points": 50},
+                }
+            ],
+        },
+        {
+            "level_id": 2,
+            "title": "Stage 2",
+            "entities": [
+                {
+                    "id": "coin_2",
+                    "type": "collectible",
+                    "x": 300,
+                    "y": 300,
+                    "width": 20,
+                    "height": 20,
+                    "points": 50,
+                    "color": "#ffff00",
+                }
+            ],
+            "rules": [
+                {
+                    "id": "rule_c2",
+                    "trigger": "on_collect",
+                    "action": "add_score",
+                    "params": {"points": 50},
+                }
+            ],
+        },
+    ]
+    data["entities"] = []  # Empty top-level entities
+    data["metadata"]["archetype"] = "collector"
+
+    result = validate_game_dsl(data)
+    assert result.is_valid is True
+    assert result.dsl is not None
+    assert len(result.dsl.levels) == 2
+    assert result.dsl.levels[0].level_number == 1
+    assert result.dsl.levels[1].level_number == 2
+    # Top-level entities populated from level 0
+    assert len(result.dsl.entities) >= 1
+    assert result.dsl.entities[0].id == "coin_1"
+
+
+def test_collector_archetype_auto_remediation():
+    """Test that collector archetype without explicit collectible is auto-remediated."""
+    data = get_sample_valid_dsl_dict()
+    data["metadata"]["archetype"] = "collector"
+    data["entities"] = []
+    data["levels"] = []
+
+    result = validate_game_dsl(data)
+    assert result.is_valid is True
+    assert result.dsl is not None
+    assert any(e.type == "collectible" for e in result.dsl.entities)
+
+
+def test_entity_type_synonyms_and_dimension_clamping():
+    """Test entity type synonyms (e.g. coin -> collectible) and dimension clamping (width > 500 -> 500)."""
+    data = get_sample_valid_dsl_dict()
+    data["entities"] = [
+        {
+            "id": "e_oversized_wall",
+            "type": "wall",  # Synonym for obstacle
+            "x": 0,
+            "y": 550,
+            "width": 800,  # Clamped to 500
+            "height": 50,
+            "behavior": "none",  # Normalized to stationary
+        },
+        {
+            "id": "e_coin_pickup",
+            "type": "coin",  # Synonym for collectible
+            "x": 200,
+            "y": 200,
+            "width": 30,
+            "height": 30,
+            "points": 50,
+        },
+        {
+            "id": "e_alien_boss",
+            "type": "boss_monster",  # Synonym for enemy with boss
+            "x": 400,
+            "y": 300,
+            "behavior": "shoot",  # Normalized to ranged_attack
+            "health": 300,
+        },
+    ]
+
+    result = validate_game_dsl(data)
+    assert result.is_valid is True
+    assert result.dsl is not None
+    assert result.dsl.entities[0].type == "obstacle"
+    assert result.dsl.entities[0].width == 500
+    assert result.dsl.entities[0].behavior == "stationary"
+    assert result.dsl.entities[1].type == "collectible"
+    assert result.dsl.entities[2].type == "enemy"
+    assert result.dsl.entities[2].is_boss is True
+    assert result.dsl.entities[2].behavior == "ranged_attack"
+
+

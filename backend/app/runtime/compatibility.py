@@ -116,6 +116,27 @@ class RuntimeCompatibilityValidator:
             if rule.action not in SUPPORTED_ACTIONS:
                 errors.append(f"Rule '{rule.id}' has unsupported action '{rule.action}'.")
 
+        # Open World capability matrix checks (Phase 6)
+        if dsl.open_world:
+            ow = dsl.open_world
+            if len(ow.regions) < 2 or len(ow.regions) > 6:
+                errors.append(f"Open world region count ({len(ow.regions)}) outside supported range (2-6).")
+            if len(ow.vehicles) < 1 or len(ow.vehicles) > 10:
+                errors.append(f"Open world vehicle count ({len(ow.vehicles)}) outside supported range (1-10).")
+
+            for actor in ow.actors:
+                if actor.behavior not in SUPPORTED_ENTITY_BEHAVIORS:
+                    errors.append(
+                        f"Actor '{actor.id}' has unsupported behavior '{actor.behavior}'. Must be in {sorted(list(SUPPORTED_ENTITY_BEHAVIORS))}."
+                    )
+
+            if ow.threat_system:
+                for resp in ow.threat_system.response_units:
+                    if resp.behavior not in SUPPORTED_ENTITY_BEHAVIORS:
+                        errors.append(
+                            f"Threat response unit has unsupported behavior '{resp.behavior}'. Must be in {sorted(list(SUPPORTED_ENTITY_BEHAVIORS))}."
+                        )
+
         return CompatibilityResult(
             compatible=len(errors) == 0,
             archetype=archetype,

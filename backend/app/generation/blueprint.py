@@ -24,6 +24,13 @@ _MECHANIC_PREDICATES: List[Tuple[str, Callable[[GameDSL], bool]]] = [
     ("Hazards", lambda dsl: any(e.type == "hazard" for e in _all_entities(dsl))),
     ("Platforming", lambda dsl: dsl.world.gravity > 0 and dsl.player.jump_power > 0),
     ("Multi-Stage Campaign", lambda dsl: len(dsl.levels) > 1),
+    # Phase 6: Generalized Open World Runtime Capabilities
+    ("Open World Traversal", lambda dsl: dsl.open_world is not None and len(dsl.open_world.regions) >= 2),
+    ("Ground Vehicles", lambda dsl: dsl.open_world is not None and len(dsl.open_world.vehicles) > 0),
+    ("Dynamic Threat System", lambda dsl: dsl.open_world is not None and dsl.open_world.threat_system is not None),
+    ("Faction Dynamics", lambda dsl: dsl.open_world is not None and len(dsl.open_world.factions) > 0),
+    ("World Events", lambda dsl: dsl.open_world is not None and len(dsl.open_world.events) > 0),
+    ("Scheduled NPCs", lambda dsl: dsl.open_world is not None and any(len(a.schedules) > 0 for a in dsl.open_world.actors)),
 ]
 
 
@@ -54,10 +61,27 @@ def build_game_blueprint(
     of truth -- every field here must be traceable to real DSL/runtime state.
     """
     levels = dsl.levels
-    level_count = len(levels) if levels else 1
+    open_world = dsl.open_world
+
+    if open_world and len(open_world.regions) > 0:
+        level_count = len(open_world.regions)
+        world_area_count = len(open_world.regions)
+    elif levels:
+        level_count = len(levels)
+        world_area_count = len(levels)
+    else:
+        level_count = 1
+        world_area_count = 1
 
     objectives: List[BlueprintObjective] = []
-    if levels:
+    if open_world and open_world.activities:
+        for idx, act in enumerate(open_world.activities[:5], 1):
+            objectives.append(BlueprintObjective(
+                level_number=idx,
+                type=act.type,
+                description=f"{act.title}: {act.description}",
+            ))
+    elif levels:
         for lvl in levels:
             objectives.append(BlueprintObjective(
                 level_number=lvl.level_number,
@@ -70,7 +94,11 @@ def build_game_blueprint(
             objectives.append(BlueprintObjective(type="secondary", description=sec))
 
     progression: List[str] = []
-    if design_spec and design_spec.progression_phases:
+    if open_world and open_world.factions:
+        progression.append(f"Factions: {', '.join(f.name for f in open_world.factions[:3])}")
+        if open_world.threat_system:
+            progression.append(f"Threat system: {open_world.threat_system.name} (0-5)")
+    elif design_spec and design_spec.progression_phases:
         for phase in design_spec.progression_phases:
             progression.append(f"{phase.phase}: {phase.description}")
     elif design_spec and design_spec.difficulty_curve:
@@ -78,13 +106,18 @@ def build_game_blueprint(
 
     entities = _all_entities(dsl)
     enemy_entities = [e for e in entities if e.type == "enemy"]
-    encounter_types = sorted({e.behavior for e in enemy_entities})
-    enemy_variety = len({e.id for e in enemy_entities})
+    encounter_types_set = {e.behavior for e in enemy_entities}
+    if open_world:
+        for act in open_world.actors:
+            if act.archetype in ("hostile", "guard", "security"):
+                encounter_types_set.add(act.behavior)
+    encounter_types = sorted(encounter_types_set)
+    enemy_variety = len({e.id for e in enemy_entities}) + (len(open_world.actors) if open_world else 0)
 
-    if levels and len(levels) > 1:
-        # Phase 5: prefer an explicitly marked finale level (LevelDef.is_finale=True)
-        # over the "last level" heuristic. Falls back to the last level when no level
-        # is explicitly marked, preserving behavior for pre-Phase-5 DSLs.
+    if open_world and open_world.activities:
+        primary_act = next((a for a in open_world.activities if a.type == "mission"), open_world.activities[0])
+        finale = f"Complete objective: {primary_act.title}"
+    elif levels and len(levels) > 1:
         explicit_finale = next((lvl for lvl in levels if lvl.is_finale), None)
         finale_level = explicit_finale or levels[-1]
         finale = finale_level.completion_message or finale_level.title
@@ -98,6 +131,8 @@ def build_game_blueprint(
     elif design_spec and design_spec.loop_details:
         ld = design_spec.loop_details
         core_loop = f"{ld.player_action} -> {ld.progression} -> {ld.resolution}"
+    elif open_world:
+        core_loop = "Explore Regions -> Undertake Activities -> Navigate Factions & Threats"
     else:
         core_loop = "Explore -> Act -> Survive"
 
@@ -111,9 +146,9 @@ def build_game_blueprint(
         player_fantasy=(design_spec.player_role if design_spec else "Player"),
         theme=(design_spec.theme if design_spec else dsl.world.theme),
         core_loop=core_loop,
-        estimated_session_length=(design_spec.estimated_session_length if design_spec else "2-3 minutes"),
+        estimated_session_length=(design_spec.estimated_session_length if design_spec else "5-10 minutes" if open_world else "2-3 minutes"),
         level_count=level_count,
-        world_area_count=level_count,
+        world_area_count=world_area_count,
         objectives=objectives,
         progression=progression,
         encounter_types=encounter_types,

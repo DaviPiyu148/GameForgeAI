@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.design_spec import GameDesignSpec, check_for_script_injection, HEX_COLOR_REGEX
+from app.generation.open_world_models import OpenWorldDef
 
 
 class GameMetadata(BaseModel):
@@ -27,11 +28,12 @@ class WorldDef(BaseModel):
     height: int = Field(600, ge=300, le=2160)
     gravity: int = Field(0, ge=0, le=2000)
     background_color: str = Field("#0a0b10")
-    theme: Literal["cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal"] = "neon"
+    theme: Literal["cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal", "wasteland", "urban", "colony", "fantasy"] = "neon"
     difficulty_scaling: float = Field(1.0, ge=0.5, le=5.0)
     wave_count: int = Field(3, ge=1, le=10)
     procedural_seed: Optional[int] = None
     hazard_density: int = Field(30, ge=0, le=100)
+    world_mode: Literal["linear", "campaign", "open_world"] = "linear"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -273,10 +275,17 @@ class GameDSL(BaseModel):
     # V3 Multi-Level / Multi-Stage Campaign Support (bounded to 5 levels max)
     levels: List[LevelDef] = Field(default_factory=list, max_length=5)
 
+    # Phase 6: Generalized Open World Runtime Support
+    open_world: Optional[OpenWorldDef] = None
+
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def validate_cross_field_consistency(self) -> "GameDSL":
+        # Synchronize world_mode if open_world is populated
+        if self.open_world and self.world.world_mode != "open_world":
+            self.world.world_mode = "open_world"
+
         # Check that player spawn is within world boundaries
         if self.player.spawn_x > self.world.width:
             self.player.spawn_x = self.world.width // 2
@@ -303,5 +312,40 @@ class GameDSL(BaseModel):
                     ent.x = max(0, lvl_world.width - ent.width)
                 if ent.y > lvl_world.height:
                     ent.y = max(0, lvl_world.height - ent.height)
+
+        # Cross-field validations for open world
+        if self.open_world:
+            regions_by_id = {r.id: r for r in self.open_world.regions}
+            first_reg = self.open_world.regions[0] if self.open_world.regions else None
+
+            # Bounded checks for vehicles
+            for veh in self.open_world.vehicles:
+                reg = regions_by_id.get(veh.region_id, first_reg)
+                max_w = reg.width if reg else self.world.width
+                max_h = reg.height if reg else self.world.height
+                if veh.x > max_w:
+                    veh.x = max(0, max_w - veh.width)
+                if veh.y > max_h:
+                    veh.y = max(0, max_h - veh.height)
+
+            # Bounded checks for actors
+            for act in self.open_world.actors:
+                reg = regions_by_id.get(act.region_id, first_reg)
+                max_w = reg.width if reg else self.world.width
+                max_h = reg.height if reg else self.world.height
+                if act.x > max_w:
+                    act.x = max(0, max_w - act.width)
+                if act.y > max_h:
+                    act.y = max(0, max_h - act.height)
+
+            # Bounded checks for POIs
+            for poi in self.open_world.pois:
+                reg = regions_by_id.get(poi.region_id, first_reg)
+                max_w = reg.width if reg else self.world.width
+                max_h = reg.height if reg else self.world.height
+                if poi.x > max_w:
+                    poi.x = max(0, max_w - 32)
+                if poi.y > max_h:
+                    poi.y = max(0, max_h - 32)
 
         return self

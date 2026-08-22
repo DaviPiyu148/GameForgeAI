@@ -46,9 +46,11 @@ class GameplayQualityValidator:
                 )
 
         # 2. Objective & Win Condition Validation
-        win_rules = [r for r in dsl.rules if r.action == "win_game"]
-        has_collectibles = any(e.type == "collectible" for e in dsl.entities)
-        has_enemies = any(e.type == "enemy" for e in dsl.entities)
+        all_entities = list(dsl.entities) + [e for lvl in dsl.levels for e in lvl.entities]
+        all_rules = list(dsl.rules) + [r for lvl in dsl.levels for r in lvl.rules]
+        win_rules = [r for r in all_rules if r.action == "win_game"]
+        has_collectibles = any(e.type == "collectible" for e in all_entities)
+        has_enemies = any(e.type == "enemy" for e in all_entities)
 
         if archetype == "collector":
             if not has_collectibles:
@@ -142,6 +144,59 @@ class GameplayQualityValidator:
                         f"Invalid telegraph: Entity '{ent.id}' sets telegraph_ms={ent.telegraph_ms} but has "
                         f"behavior '{ent.behavior}' (telegraph_ms only applies to 'ranged_attack' behavior)."
                     )
+
+        # 8. Open World Gameplay Validation (Phase 6)
+        if dsl.open_world:
+            ow = dsl.open_world
+            region_ids = {r.id for r in ow.regions}
+            poi_ids = {p.id for p in ow.pois}
+            faction_ids = {f.id for f in ow.factions}
+            activity_ids = {a.id for a in ow.activities}
+
+            # Budget checks
+            if len(ow.regions) < 2 or len(ow.regions) > 6:
+                errors.append(f"Open world region count ({len(ow.regions)}) must be between 2 and 6.")
+            if len(ow.connections) > 15:
+                errors.append(f"Open world connection count ({len(ow.connections)}) exceeds maximum budget (15).")
+            if len(ow.pois) < 3 or len(ow.pois) > 25:
+                errors.append(f"Open world POI count ({len(ow.pois)}) must be between 3 and 25.")
+            if len(ow.vehicles) < 1 or len(ow.vehicles) > 10:
+                errors.append(f"Open world vehicle count ({len(ow.vehicles)}) must be between 1 and 10.")
+            if len(ow.factions) < 1 or len(ow.factions) > 5:
+                errors.append(f"Open world faction count ({len(ow.factions)}) must be between 1 and 5.")
+            if len(ow.activities) < 2 or len(ow.activities) > 15:
+                errors.append(f"Open world activity count ({len(ow.activities)}) must be between 2 and 15.")
+            if len(ow.actors) > 50:
+                errors.append(f"Open world actor count ({len(ow.actors)}) exceeds maximum budget (50).")
+            if len(ow.events) > 5:
+                errors.append(f"Open world event count ({len(ow.events)}) exceeds maximum budget (5).")
+
+            # Reference integrity
+            for p in ow.pois:
+                if p.region_id not in region_ids:
+                    errors.append(f"POI '{p.id}' references nonexistent region '{p.region_id}'.")
+
+            for v in ow.vehicles:
+                if v.region_id not in region_ids:
+                    errors.append(f"Vehicle '{v.id}' references nonexistent region '{v.region_id}'.")
+
+            for a in ow.actors:
+                if a.region_id not in region_ids:
+                    errors.append(f"Actor '{a.id}' references nonexistent region '{a.region_id}'.")
+                if a.faction_id and a.faction_id not in faction_ids:
+                    errors.append(f"Actor '{a.id}' references nonexistent faction '{a.faction_id}'.")
+
+            for act in ow.activities:
+                if act.region_id and act.region_id not in region_ids:
+                    errors.append(f"Activity '{act.id}' references nonexistent region '{act.region_id}'.")
+                if act.start_poi_id and act.start_poi_id not in poi_ids:
+                    errors.append(f"Activity '{act.id}' references nonexistent start POI '{act.start_poi_id}'.")
+                if act.target_poi_id and act.target_poi_id not in poi_ids:
+                    errors.append(f"Activity '{act.id}' references nonexistent target POI '{act.target_poi_id}'.")
+
+            has_avail_activity = any(a.status == "available" for a in ow.activities)
+            if not has_avail_activity:
+                warnings.append("No open world activities marked 'available' at start; player will have no active missions.")
 
         return QualityValidationResult(
             is_valid=len(errors) == 0,

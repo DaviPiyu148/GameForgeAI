@@ -154,8 +154,12 @@ class GameGenerationService:
 
         if "Resource & Score Economy" in modules:
             ui["show_score"] = True
+            all_ents = list(entities)
+            for lvl in compiled.get("levels", []):
+                if isinstance(lvl, dict):
+                    all_ents.extend(lvl.get("entities", []))
             has_score_rule = any(r.get("action") == "add_score" for r in rules)
-            if not has_score_rule and any(e.get("type") == "collectible" for e in entities):
+            if not has_score_rule and any(isinstance(e, dict) and e.get("type") == "collectible" for e in all_ents):
                 rules.append({
                     "id": f"rule_score_auto_{len(rules)+1}",
                     "trigger": "on_collect",
@@ -185,6 +189,7 @@ class GameGenerationService:
         emit_log: Optional[Callable[[str, str], None]] = None,
         set_status: Optional[Callable[[str], None]] = None,
         scale: str = "standard",
+        world_mode: str = "linear",
     ) -> GenerationResult:
         """
         Execute the generation pipeline: Prompt -> Gemini -> Schema & Quality Validation -> Bounded Repair.
@@ -223,6 +228,7 @@ class GameGenerationService:
             inspiration=inspiration,
             personalization=personalization,
             scale=scale,
+            world_mode=world_mode,
         )
 
         raw_output: Dict[str, Any]
@@ -303,6 +309,15 @@ class GameGenerationService:
             player_sec = dsl_dict.get("player", {})
             entities_list = dsl_dict.get("entities", [])
             rules_list = dsl_dict.get("rules", [])
+            levels_list = dsl_dict.get("levels", [])
+
+            total_entities_count = len(entities_list)
+            if not total_entities_count and levels_list:
+                total_entities_count = sum(len(lvl.get("entities", [])) for lvl in levels_list if isinstance(lvl, dict))
+
+            total_rules_count = len(rules_list)
+            if not total_rules_count and levels_list:
+                total_rules_count = sum(len(lvl.get("rules", [])) for lvl in levels_list if isinstance(lvl, dict))
 
             archetype = meta_sec.get("archetype", "survival")
             theme = world_sec.get("theme", "neon")
@@ -311,8 +326,12 @@ class GameGenerationService:
 
             log("INFO", f"[AI] DSL: Archetype: {archetype} // Theme: {theme}")
             log("INFO", f"> Player: {hp} HP @ {spd} px/s (Dash: {player_sec.get('dash_speed', 600)} px/s)")
-            log("INFO", f"> Entities: {len(entities_list)} spawned across world ({world_sec.get('width', 800)}x{world_sec.get('height', 600)})")
-            log("INFO", f"> Rules: {len(rules_list)} event handlers registered")
+            log("INFO", f"> Entities: {total_entities_count} spawned across world ({world_sec.get('width', 800)}x{world_sec.get('height', 600)})")
+            log("INFO", f"> Rules: {total_rules_count} event handlers registered")
+
+            if dsl_dict.get("open_world"):
+                ow = dsl_dict["open_world"]
+                log("INFO", f"[AI] OPEN WORLD: {len(ow.get('regions', []))} Regions, {len(ow.get('pois', []))} POIs, {len(ow.get('factions', []))} Factions, {len(ow.get('vehicles', []))} Vehicles, {len(ow.get('activities', []))} Activities")
 
         except AIConfigurationError as cfg_err:
             log("ERROR", f"[AI] Configuration error: {cfg_err.message}")

@@ -92,7 +92,7 @@ class Settings(BaseSettings):
         """
         candidates: List[str] = []
         if self.GEMINI_API_KEY:
-            candidates.append(self.GEMINI_API_KEY)
+            candidates.extend(self.GEMINI_API_KEY.split(","))
         if self.GEMINI_API_KEYS:
             candidates.extend(self.GEMINI_API_KEYS.split(","))
 
