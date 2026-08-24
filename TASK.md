@@ -99,8 +99,8 @@ Full detail, evidence, and severity/subsystem table: see `FULL_STACK_OPERATIONAL
 - [x] `git diff` reviewed (file by file, all 13 changed + 1 new file)
 - [x] `git diff --stat` reviewed
 - [x] secrets and generated artifacts checked (none; only source/test/migration files touched)
-- [ ] Commit
-- [ ] Working tree verified clean
+- [x] Commit: `967618c fix: harden full stack operational health`
+- [x] Working tree verified clean
 
 ---
 
