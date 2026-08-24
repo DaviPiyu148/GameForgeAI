@@ -25,6 +25,16 @@ set "FRONTEND_PORT=5173"
 :: Suppress HuggingFace cache symlink noise on Windows
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
 
+:: The Discovery embedding model (sentence-transformers/all-MiniLM-L6-v2) is
+:: fetched once and cached under %USERPROFILE%\.cache\huggingface\hub -- once
+:: it's there, no further network access to the HF Hub is needed. Without this,
+:: every load still makes an unauthenticated metadata check against HF's
+:: servers (the "sending unauthenticated requests" warning), which is an
+:: avoidable network dependency/latency source once the model is cached. If
+:: you ever need a *different*, not-yet-cached model, temporarily remove this
+:: line (or run `set HF_HUB_OFFLINE=0` first) so it can actually download.
+set "HF_HUB_OFFLINE=1"
+
 echo  Checking prerequisites ...
 echo.
 
