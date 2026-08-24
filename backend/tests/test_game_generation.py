@@ -146,3 +146,19 @@ async def test_generation_deterministic_error_compatibility_trigger():
     assert result.error_code == "BUILD_SYNTAX_ERROR"
     assert mock_provider.call_count == 0
     assert any("FATAL_EXCEPTION" in log for log in logs)
+
+
+def test_generation_prompt_includes_world_mode():
+    """Verify that build_generation_prompt explicitly formats world_mode in TARGET CONFIGURATION (HL-002)."""
+    from app.ai.prompts import build_generation_prompt
+
+    prompt_linear = build_generation_prompt("Simple game", world_mode="linear")
+    assert "- World Architecture Mode (linear):" in prompt_linear
+
+    prompt_ow = build_generation_prompt("Open world sandbox", world_mode="open_world")
+    assert "- World Architecture Mode (open_world):" in prompt_ow
+    assert "Open World Sandbox" in prompt_ow
+
+    prompt_camp = build_generation_prompt("Campaign game", world_mode="campaign")
+    assert "- World Architecture Mode (campaign):" in prompt_camp
+

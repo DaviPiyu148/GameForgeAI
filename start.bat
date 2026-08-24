@@ -19,8 +19,8 @@ set "VENV_DIR=%BACKEND_DIR%\.venv"
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "VENV_PIP=%VENV_DIR%\Scripts\pip.exe"
 set "VENV_ALEMBIC=%VENV_DIR%\Scripts\alembic.exe"
-set "BACKEND_PORT=8000"
-set "FRONTEND_PORT=5173"
+if "%BACKEND_PORT%"=="" set "BACKEND_PORT=8000"
+if "%FRONTEND_PORT%"=="" set "FRONTEND_PORT=5173"
 
 :: Suppress HuggingFace cache symlink noise on Windows
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"

@@ -15,13 +15,13 @@ import { authService, authStorage, savedDiscoveriesService } from '../services/a
 import { profileService } from '../services/profile';
 
 const defaultBuildParams: BuildParams = {
-  // Must match one of BuilderPage.tsx's <option> values (Top-Down Action / Arena
-  // Survival / 2D Platformer / Data Collector) — 'Phaser 3.88.2' matched none of them,
-  // leaving the <select> showing a mismatched option while state held a different value.
+  // Must match BuilderPage.tsx's <option> values and backend BuildParams schema defaults.
   engine: 'Top-Down Action',
   artDensity: 50,
   physics: 80,
   modules: ['Procedural Generation', 'Enhanced NPC Behavior'],
+  scale: 'standard',
+  world_mode: 'linear',
 };
 
 const defaultState: AppState = {

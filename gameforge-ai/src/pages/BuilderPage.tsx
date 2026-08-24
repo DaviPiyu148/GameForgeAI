@@ -240,7 +240,7 @@ const BuilderPage = () => {
                   </div>
                   <select 
                     className="w-full bg-terminal-bg border border-primary/40 p-2 text-primary font-mono text-xs cursor-pointer focus:ring-1 focus:ring-primary outline-none"
-                    value={state.currentBuildParams.scale || 'prototype'}
+                    value={state.currentBuildParams.scale || 'standard'}
                     onChange={(e) => updateBuildParams({ scale: e.target.value as 'prototype' | 'standard' | 'campaign' })}
                   >
                     <option value="prototype">Fast Prototype (1 Level / Small World)</option>

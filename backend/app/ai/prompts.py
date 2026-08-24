@@ -139,6 +139,14 @@ PLAYER GAME DNA (Secondary subtle motif guidance ONLY; explicit concept prompt A
 - Affinity Confidence: {str(personalization.get("confidence", "moderate")).upper()}
 """
 
+    # World architecture mode guidance
+    if world_mode == "open_world":
+        world_mode_guide = "Open World Sandbox (generate populated 'open_world' object with connected regions, POIs, factions, vehicles, and activities)"
+    elif world_mode == "campaign":
+        world_mode_guide = "Multi-Stage Campaign (generate sequential stages in the 'levels' array with escalating progression)"
+    else:
+        world_mode_guide = "Linear Arena (single-stage focused gameplay arena)"
+
     return f"""Create a cohesive, playable 2D game prototype based on the user concept:
 
 CONCEPT PROMPT:
@@ -148,6 +156,7 @@ CONCEPT PROMPT:
 {inspiration_text}{personalization_text}
 TARGET CONFIGURATION:
 - Prototype Profile: {engine}
+- World Architecture Mode ({world_mode}): {world_mode_guide}
 - Physics Complexity ({physics}/100): {physics_guide}
 - Visual Density ({art_density}/100): {density_guide}
 - Active Logic Modules: {mods_str}

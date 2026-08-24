@@ -833,6 +833,8 @@ export class GameScene extends Phaser.Scene {
       bullet.setActive(true);
       bullet.setVisible(true);
       bullet.setDisplaySize(10, 10);
+      const weaponColHex = this.dsl.player.weapon_color || '#ffea00';
+      bullet.setTint(Phaser.Display.Color.HexStringToColor(weaponColHex).color);
       bullet.setVelocity(Math.cos(angle) * 500, Math.sin(angle) * 500);
 
       this.time.delayedCall(1500, () => {
@@ -1034,11 +1036,13 @@ export class GameScene extends Phaser.Scene {
 
     this.isTransitioning = true;
 
+    const currentLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
     const nextIndex = this.currentLevelIndex + 1;
     const nextLevel: LevelDef | null = this.dsl.levels?.[nextIndex] ?? null;
     const stageTitle = nextLevel?.title || `Stage ${nextIndex + 1}`;
+    const completeMsg = currentLevel?.completion_message || 'STAGE COMPLETE!';
 
-    this.spawnFloatingText(this.player.x, this.player.y - 40, `★ STAGE COMPLETE! ★`, '#00ff66');
+    this.spawnFloatingText(this.player.x, this.player.y - 40, `★ ${completeMsg.toUpperCase()} ★`, '#00ff66');
     this.spawnFloatingText(this.player.x, this.player.y - 15, `Entering: ${stageTitle}`, '#00f0ff');
 
     const FADE_MS = 200;

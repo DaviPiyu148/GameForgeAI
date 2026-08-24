@@ -83,5 +83,9 @@ assert(
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) {
-  process.exit(1);
+  if (typeof (globalThis as any).process !== 'undefined') {
+    (globalThis as any).process.exit(1);
+  } else {
+    throw new Error(`${failed} tests failed`);
+  }
 }

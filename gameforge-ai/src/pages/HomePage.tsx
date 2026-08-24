@@ -87,6 +87,8 @@ const HomePage = () => {
       
       updateBuildParams({
         modules: inspiration.suggested_modules,
+        ...(inspiration.suggested_art_density !== undefined ? { artDensity: inspiration.suggested_art_density } : {}),
+        ...(inspiration.suggested_physics !== undefined ? { physics: inspiration.suggested_physics } : {}),
       });
       setPrompt(inspiration.recommended_prompt);
       navigate('/build');
