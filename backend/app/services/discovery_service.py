@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -77,6 +78,24 @@ class DiscoveryService:
             self._igdb_service = IGDBEnrichmentService.get_instance()
         return self._igdb_service
 
+    def _is_warm(self) -> bool:
+        return self._catalog_manager is not None and self._index_manager is not None and self._embedder is not None
+
+    def warm(self) -> None:
+        """Eagerly load the catalog (~120k records), FAISS index, and embedding model.
+
+        Synchronous and can take tens of seconds on first call. This must only be run
+        via asyncio.to_thread from the event loop (see `search()` and the app startup
+        warm-up in main.py's lifespan) -- calling it directly from an `async def` route
+        blocks Python's single-threaded event loop, and with it every other in-flight
+        request (including /api/health), for the full load duration.
+        """
+        _ = self.catalog_manager
+        _ = self.index_manager
+        _ = self.embedder
+        _ = self.lexical_index
+        _ = self.query_parser
+
     async def search(self, request: DiscoverySearchRequest) -> DiscoverySearchResponse:
         """
         Execute deterministic hybrid discovery search combining lexical full-catalog matching
@@ -92,6 +111,9 @@ class DiscoveryService:
                 target_entity=None,
                 results=[],
             )
+
+        if not self._is_warm():
+            await asyncio.to_thread(self.warm)
 
         top_k = max(request.limit * 5, 50)
         semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
@@ -160,6 +182,9 @@ class DiscoveryService:
         """
         Find games similar to a given canonical game by Steam App ID using its semantic profile and metadata.
         """
+        if not self._is_warm():
+            await asyncio.to_thread(self.warm)
+
         seed_game = self.catalog_manager.get_game(steam_app_id)
         if not seed_game:
             raise KeyError(f"Game with Steam App ID '{steam_app_id}' not found in catalog.")
@@ -230,6 +255,9 @@ class DiscoveryService:
         """
         Find related games given multiple canonical game IDs.
         """
+        if not self._is_warm():
+            await asyncio.to_thread(self.warm)
+
         seed_games: List[Dict[str, Any]] = []
         seed_ids = set()
         for gid in request.get_ids():

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -163,7 +164,10 @@ async def get_build_inspiration(
     Extract structured blueprint inspiration parameters from a discovered game.
     """
     try:
-        inspiration = service.get_build_inspiration(steam_app_id)
+        # get_build_inspiration is a synchronous method that can trigger the same
+        # slow first-access catalog/index load as search() -- run it off the event
+        # loop so it doesn't freeze every other in-flight request meanwhile.
+        inspiration = await asyncio.to_thread(service.get_build_inspiration, steam_app_id)
 
         # Track preference signal and XP for authenticated users
         if current_user and db:

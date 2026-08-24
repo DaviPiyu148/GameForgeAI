@@ -95,6 +95,8 @@ class ProjectService:
             artDensity=project.art_density,
             physics=project.physics,
             modules=project.modules if isinstance(project.modules, list) else [],
+            scale=project.scale or "standard",
+            worldMode=project.world_mode or "linear",
         )
 
         return ProjectResponse(
@@ -129,6 +131,8 @@ class ProjectService:
             art_density=data.parameters.art_density,
             physics=data.parameters.physics,
             modules=data.parameters.modules,
+            scale=data.parameters.scale,
+            world_mode=data.parameters.world_mode,
             design_spec=data.design_spec,
             game_dsl=data.game_dsl,
             runtime_metadata=data.runtime_metadata,
@@ -195,6 +199,8 @@ class ProjectService:
                 project.art_density = params.art_density
                 project.physics = params.physics
                 project.modules = params.modules
+                project.scale = params.scale
+                project.world_mode = params.world_mode
         if "design_spec" in update_dict and update_dict["design_spec"] is not None:
             project.design_spec = update_dict["design_spec"]
         if "game_dsl" in update_dict and update_dict["game_dsl"] is not None:

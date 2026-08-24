@@ -146,6 +146,8 @@ def test_update_allowed_fields(client):
             "artDensity": 85,
             "physics": 75,
             "modules": ["inventory"],
+            "scale": "campaign",
+            "worldMode": "open_world",
         }
     })
     assert res.status_code == 200
@@ -153,6 +155,12 @@ def test_update_allowed_fields(client):
     assert data["title"] == "Updated Title"
     assert data["genre"] == "Action RPG"
     assert data["parameters"]["artDensity"] == 85
+    # Regression: PATCH .../parameters used to copy only engine/artDensity/
+    # physics/modules onto the Project row, silently dropping scale/worldMode
+    # (the Project model had no columns for them at all, so any value sent
+    # here was discarded regardless).
+    assert data["parameters"]["scale"] == "campaign"
+    assert data["parameters"]["worldMode"] == "open_world"
 
 
 def test_nonexistent_project_404(client):

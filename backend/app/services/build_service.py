@@ -33,38 +33,46 @@ class BuildNotFoundError(Exception):
 
 
 class BuildEventBroadcaster:
-    """In-memory event broadcaster for live SSE subscriptions per build."""
+    """In-memory event broadcaster for live SSE subscriptions per build.
+
+    All methods are plain synchronous calls, deliberately. Each one only ever
+    does dict/set bookkeeping plus Queue.put_nowait() -- none of it needs to
+    await anything, so there is no reason to make it a coroutine. An earlier
+    version made these `async def` behind an `asyncio.Lock` and had callers
+    outside of async methods reach them via `asyncio.create_task(...)` as a
+    fire-and-forget call. That made broadcast order not match call order: a
+    directly-awaited terminal status broadcast could reach a subscriber (and
+    make its stream_events() generator break out of its loop and unsubscribe)
+    before earlier log broadcasts -- merely *scheduled*, not yet run -- ever
+    got a turn on the event loop, silently dropping them. Plain synchronous
+    calls execute exactly in program order, which removes the race entirely.
+    """
 
     def __init__(self):
         self._subscribers: Dict[str, Set[asyncio.Queue]] = {}
-        self._lock = asyncio.Lock()
 
-    async def add_subscriber(self, build_id: str) -> asyncio.Queue:
+    def add_subscriber(self, build_id: str) -> asyncio.Queue:
         """Register a subscriber queue for a specific build."""
         queue: asyncio.Queue = asyncio.Queue()
-        async with self._lock:
-            if build_id not in self._subscribers:
-                self._subscribers[build_id] = set()
-            self._subscribers[build_id].add(queue)
+        if build_id not in self._subscribers:
+            self._subscribers[build_id] = set()
+        self._subscribers[build_id].add(queue)
         return queue
 
-    async def remove_subscriber(self, build_id: str, queue: asyncio.Queue):
+    def remove_subscriber(self, build_id: str, queue: asyncio.Queue):
         """Unregister a subscriber queue."""
-        async with self._lock:
-            if build_id in self._subscribers:
-                self._subscribers[build_id].discard(queue)
-                if not self._subscribers[build_id]:
-                    del self._subscribers[build_id]
+        if build_id in self._subscribers:
+            self._subscribers[build_id].discard(queue)
+            if not self._subscribers[build_id]:
+                del self._subscribers[build_id]
 
-    async def broadcast(self, build_id: str, event_type: str, data: dict):
-        """Push an event to all live subscribers of a build under lock to maintain ordering."""
-        async with self._lock:
-            queues = list(self._subscribers.get(build_id, []))
-            for q in queues:
-                try:
-                    q.put_nowait({"event": event_type, "data": data})
-                except asyncio.QueueFull:
-                    pass
+    def broadcast(self, build_id: str, event_type: str, data: dict):
+        """Push an event to all live subscribers of a build, in call order."""
+        for q in list(self._subscribers.get(build_id, [])):
+            try:
+                q.put_nowait({"event": event_type, "data": data})
+            except asyncio.QueueFull:
+                pass
 
 
 class BuildService:
@@ -196,7 +204,7 @@ class BuildService:
         )
 
         # Broadcast terminal status and log to SSE
-        await self.broadcaster.broadcast(
+        self.broadcaster.broadcast(
             build_id,
             "log",
             {
@@ -206,7 +214,7 @@ class BuildService:
                 "timestamp": now.isoformat(),
             },
         )
-        await self.broadcaster.broadcast(
+        self.broadcaster.broadcast(
             build_id,
             "status",
             {
@@ -288,7 +296,7 @@ class BuildService:
                 # Build was cancelled or moved to error before worker ran
                 return
 
-            await self.broadcaster.broadcast(
+            self.broadcaster.broadcast(
                 build_id,
                 "status",
                 {"build_id": build_id, "status": "RUNNING"},
@@ -302,17 +310,15 @@ class BuildService:
                     level=level,
                     message=message,
                 )
-                asyncio.create_task(
-                    self.broadcaster.broadcast(
-                        build_id,
-                        "log",
-                        {
-                            "sequence": log.sequence_number,
-                            "level": level,
-                            "message": message,
-                            "timestamp": log.timestamp.isoformat(),
-                        },
-                    )
+                self.broadcaster.broadcast(
+                    build_id,
+                    "log",
+                    {
+                        "sequence": log.sequence_number,
+                        "level": level,
+                        "message": message,
+                        "timestamp": log.timestamp.isoformat(),
+                    },
                 )
 
             # Helper to update status safely
@@ -324,12 +330,10 @@ class BuildService:
                         from_statuses=["RUNNING"],
                         to_status="VALIDATING",
                     )
-                    asyncio.create_task(
-                        self.broadcaster.broadcast(
-                            build_id,
-                            "status",
-                            {"build_id": build_id, "status": "VALIDATING"},
-                        )
+                    self.broadcaster.broadcast(
+                        build_id,
+                        "status",
+                        {"build_id": build_id, "status": "VALIDATING"},
                     )
 
             # Extract structured Game DNA personalization if authenticated user has sufficient activity
@@ -386,7 +390,7 @@ class BuildService:
                         error_code="RUNTIME_INCOMPATIBLE",
                         error_message=err_msg,
                     )
-                    await self.broadcaster.broadcast(
+                    self.broadcaster.broadcast(
                         build_id,
                         "status",
                         {
@@ -418,6 +422,8 @@ class BuildService:
                     artDensity=build.art_density,
                     physics=build.physics,
                     modules=build.modules if isinstance(build.modules, list) else [],
+                    scale=build.scale or "standard",
+                    worldMode=getattr(build, "world_mode", "linear") or "linear",
                 )
 
                 # Pre-check cancellation state immediately before project creation
@@ -462,7 +468,7 @@ class BuildService:
                             pass
                     return
 
-                await self.broadcaster.broadcast(
+                self.broadcaster.broadcast(
                     build_id,
                     "status",
                     {
@@ -532,7 +538,7 @@ class BuildService:
                     error_code=result.error_code or "GENERATION_FAILED",
                     error_message=result.error_message or "Game generation failed.",
                 )
-                await self.broadcaster.broadcast(
+                self.broadcaster.broadcast(
                     build_id,
                     "status",
                     {
@@ -570,7 +576,7 @@ class BuildService:
                     error_code="INTERNAL_BUILD_ERROR",
                     error_message=str(e),
                 )
-                await self.broadcaster.broadcast(
+                self.broadcaster.broadcast(
                     build_id,
                     "status",
                     {
@@ -597,7 +603,7 @@ class BuildService:
         Subscribes to live events FIRST to guarantee zero event loss between
         persisted log retrieval and live streaming.
         """
-        queue = await self.broadcaster.add_subscriber(build_id)
+        queue = self.broadcaster.add_subscriber(build_id)
         last_seq = 0
 
         try:
@@ -663,7 +669,7 @@ class BuildService:
                 if event_type == "status" and data.get("status") in ("SUCCESS", "ERROR", "CANCELLED"):
                     break
         finally:
-            await self.broadcaster.remove_subscriber(build_id, queue)
+            self.broadcaster.remove_subscriber(build_id, queue)
 
 
 build_service = BuildService()

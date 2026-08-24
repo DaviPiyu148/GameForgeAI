@@ -146,7 +146,9 @@ async def test_build_success_lifecycle_and_project_creation(client: TestClient):
             "engine": "Phaser",
             "artDensity": 45,
             "physics": 55,
-            "modules": ["dungeon_gen", "ai_mobs"]
+            "modules": ["dungeon_gen", "ai_mobs"],
+            "scale": "campaign",
+            "worldMode": "open_world",
         }
     }
     res = client.post("/api/builds", json=payload, headers=_auth(token))
@@ -172,6 +174,14 @@ async def test_build_success_lifecycle_and_project_creation(client: TestClient):
     assert proj_data["parameters"]["artDensity"] == 45
     assert proj_data["parameters"]["physics"] == 55
     assert proj_data["parameters"]["modules"] == ["dungeon_gen", "ai_mobs"]
+    # Regression: the Project's BuildParams used to be reconstructed from only
+    # engine/artDensity/physics/modules, silently dropping the requested scale
+    # and worldMode and falling back to the schema defaults ("standard" /
+    # "linear") -- found live via an open-world build whose saved project
+    # reported worldMode "linear" even though its own generated game_dsl
+    # correctly contained a full open_world structure.
+    assert proj_data["parameters"]["scale"] == "campaign"
+    assert proj_data["parameters"]["worldMode"] == "open_world"
 
 
 @pytest.mark.asyncio
@@ -388,6 +398,57 @@ async def test_sse_with_query_token(client: TestClient):
     with client.stream("GET", f"/api/builds/{build_id}/events?sse_token={sse_token}") as sse_res:
         assert sse_res.status_code == 200
         assert "text/event-stream" in sse_res.headers["content-type"]
+
+
+@pytest.mark.asyncio
+async def test_broadcaster_preserves_order_for_sync_callback_pattern():
+    """
+    Regression test for a live event-loss bug found via manual end-to-end SSE
+    testing of an open-world build: 11 of 28 persisted BuildLog rows (the
+    repair-loop success and Phaser validation logs) never reached a connected
+    SSE client, even though they were correctly written to the DB.
+
+    Root cause: BuildEventBroadcaster.broadcast()/add_subscriber()/
+    remove_subscriber() were `async def` behind an asyncio.Lock, and
+    _run_build_worker's emit_log()/set_status() callbacks -- plain sync
+    functions, since they're passed into the mostly-synchronous AI generation
+    pipeline as callbacks -- could only reach that async broadcast() via
+    `asyncio.create_task(...)`, i.e. fire-and-forget. A directly-awaited
+    terminal status broadcast (used for the final SUCCESS/ERROR transition)
+    could then win the race and reach the subscriber's queue before the
+    earlier, merely-*scheduled* log broadcasts ever got a turn on the event
+    loop. stream_events() breaks its consumption loop and unsubscribes the
+    instant it sees a terminal status event, so those still-pending log
+    broadcasts were silently dropped once it did.
+
+    The fix makes broadcast()/add_subscriber()/remove_subscriber() plain
+    synchronous calls -- none of them ever needed to await anything, so
+    there was no reason for the lock/coroutine machinery that introduced the
+    race in the first place. This test calls broadcast() the same way
+    emit_log() does (many synchronous "log" calls immediately followed by an
+    awaited terminal "status" call) and asserts the subscriber's queue
+    contains every event in exact call order.
+    """
+    from app.services.build_service import BuildEventBroadcaster
+
+    broadcaster = BuildEventBroadcaster()
+    build_id = "regression-order-test"
+    queue = broadcaster.add_subscriber(build_id)
+
+    for seq in range(1, 12):
+        broadcaster.broadcast(
+            build_id, "log", {"sequence": seq, "level": "INFO", "message": f"log {seq}"}
+        )
+    broadcaster.broadcast(build_id, "status", {"build_id": build_id, "status": "SUCCESS"})
+
+    received = []
+    while not queue.empty():
+        received.append(queue.get_nowait())
+
+    assert len(received) == 12, f"expected 11 logs + 1 terminal status, got {len(received)}"
+    assert [e["data"]["sequence"] for e in received[:11]] == list(range(1, 12))
+    assert received[11]["event"] == "status"
+    assert received[11]["data"]["status"] == "SUCCESS"
 
 
 def test_builder_parameters_in_prompt():

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import uuid
 from fastapi import FastAPI, Request
@@ -37,6 +38,32 @@ async def lifespan(app: FastAPI):
         logging.getLogger("gameforge").warning(f"Startup orphan reconciliation skipped: {e}")
     finally:
         db.close()
+
+    # Warm the Discovery catalog/FAISS-index/embedding-model singletons in a background
+    # thread. Their first load takes tens of seconds (~120k-record catalog parse); left
+    # lazy, that cost lands on whichever request happens to trigger it first and, being
+    # synchronous, blocks the entire event loop (every other in-flight request, including
+    # /api/health) for the duration -- see DiscoveryService.warm(). Kicking it off here
+    # lets it overlap with the frontend's own startup time instead.
+    from app.services.discovery_service import discovery_service
+    import logging
+
+    def _log_warm_failure(t: "asyncio.Task") -> None:
+        # Task.exception() raises CancelledError itself for a cancelled task
+        # (e.g. app shutdown interrupting a still-running warm-up) rather than
+        # returning it -- must check cancelled() first or this callback would
+        # raise out of the event loop's callback dispatch.
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc:
+            logging.getLogger("gameforge").warning(
+                f"Discovery catalog warm-up failed (will retry lazily on first search): {exc}"
+            )
+
+    task = asyncio.create_task(asyncio.to_thread(discovery_service.warm))
+    task.add_done_callback(_log_warm_failure)
+
     yield
 
 
@@ -88,6 +115,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     msg = f"{first_error.get('loc', ['field'])[-1]}: {first_error.get('msg', 'Invalid input')}"
     if "/builds" in request.url.path:
         code = "BUILD_VALIDATION_FAILED"
+    elif "/saved-discoveries" in request.url.path:
+        code = "SAVED_DISCOVERY_VALIDATION_FAILED"
     elif "/discovery" in request.url.path:
         code = "DISCOVERY_VALIDATION_FAILED"
     elif "/auth" in request.url.path:

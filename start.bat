@@ -156,15 +156,20 @@ echo        OK  (database schema up to date)
 
 :: ══════════════════════════════════════════════════════════════════════
 :: CHECK 6  Port conflict clearance
+:: Uses Get-NetTCPConnection (exact local-port + LISTEN-state match) instead
+:: of "netstat | findstr", whose unanchored substring regex could match
+:: unrelated connections and hand their PIDs to taskkill. Only terminates a
+:: matched PID if it is actually python.exe or node.exe (our own leftover
+:: dev servers) and never PID 0/4 (Idle/System) -- taskkill /F /PID 4 was
+:: previously being attempted on every run (protected by Windows, but never
+:: should have been issued).
 :: ══════════════════════════════════════════════════════════════════════
 echo [6/6] Clearing ports %BACKEND_PORT% and %FRONTEND_PORT% ...
-for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":%BACKEND_PORT% .*LISTENING"') do (
-    echo        Stopping stale process %%P on port %BACKEND_PORT% ...
-    taskkill /F /PID %%P >nul 2>&1
-)
-for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr /R ":%FRONTEND_PORT% .*LISTENING"') do (
-    echo        Stopping stale process %%P on port %FRONTEND_PORT% ...
-    taskkill /F /PID %%P >nul 2>&1
+for %%R in (%BACKEND_PORT% %FRONTEND_PORT%) do (
+    for /f %%P in ('powershell -NoProfile -NonInteractive -Command "try { (Get-NetTCPConnection -LocalPort %%R -State Listen -ErrorAction Stop).OwningProcess | Select-Object -Unique | ForEach-Object { $proc = Get-Process -Id $_ -ErrorAction SilentlyContinue; if ($proc -and $_ -gt 4 -and ($proc.ProcessName -eq 'python' -or $proc.ProcessName -eq 'node')) { $_ } } } catch {}"') do (
+        echo        Stopping stale process %%P on port %%R ...
+        taskkill /F /PID %%P >nul 2>&1
+    )
 )
 echo        OK  (ports clear)
 

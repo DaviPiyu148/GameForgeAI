@@ -10,7 +10,13 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     DATABASE_URL: str = "sqlite:///./gameforge.db"
     DB_ECHO_SQL: bool = False
-    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173"]
+    # Both loopback forms are allowed by default: start.bat/vite.config.ts bind
+    # and open the frontend at 127.0.0.1:5173, while docs/README reference
+    # localhost:5173 -- the two are different browser origins, and a mismatch
+    # here means an otherwise-healthy backend rejects the browser's requests
+    # with "Disallowed CORS origin" the moment anything talks to it directly
+    # (i.e. outside Vite's same-origin dev proxy).
+    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # Hugging Face Settings (Optional - higher rate limits & authenticated hub downloads)
     HF_TOKEN: Optional[str] = None
@@ -75,7 +81,7 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         elif isinstance(v, list):
             return v
-        return ["http://localhost:5173"]
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     model_config = SettingsConfigDict(
         env_file=(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), ".env"),

@@ -1,9 +1,9 @@
-import json
 import os
 import pytest
 from typing import Any, Dict, List
 
 from scripts.ingest_catalog import normalize_genres_list, build_semantic_profile, EXPANDED_GENRE_MAP
+from app.search.catalog import CatalogManager
 
 
 def test_genre_normalization_mappings():
@@ -58,17 +58,17 @@ def test_catalog_data_preservation_and_fields():
     if not os.path.exists(catalog_path):
         pytest.skip("games_catalog.json not present; run ingestion first.")
 
-    with open(catalog_path, "r", encoding="utf-8") as f:
-        catalog = json.load(f)
+    # Use the production streaming loader (CatalogManager) rather than json.load(),
+    # which decodes the ~450MB catalog as one in-memory string/tree and can raise
+    # MemoryError on memory-constrained machines. This also exercises the same
+    # loading path the running application uses.
+    manager = CatalogManager(catalog_path=catalog_path)
 
-    assert len(catalog) >= 20000, "Catalog should have at least 20,000 ingested games"
-
-    # Lookup landmark test cases
-    catalog_by_id = {str(g.get("id")): g for g in catalog}
+    assert manager.count() >= 20000, "Catalog should have at least 20,000 ingested games"
 
     # 1. Stardew Valley (413150)
-    if "413150" in catalog_by_id:
-        stardew = catalog_by_id["413150"]
+    stardew = manager.get_game("413150")
+    if stardew:
         assert stardew["title"] == "Stardew Valley"
         assert stardew["original_title"] == "Stardew Valley"
         assert "original_genres" in stardew
@@ -80,8 +80,8 @@ def test_catalog_data_preservation_and_fields():
         assert "Farming Sim" in stardew["tags"] or "Agriculture" in stardew["tags"]
 
     # 2. Terraria (105600)
-    if "105600" in catalog_by_id:
-        terraria = catalog_by_id["105600"]
+    terraria = manager.get_game("105600")
+    if terraria:
         assert terraria["title"] == "Terraria"
         assert "Indie" in terraria["genres"]
         assert "Action" in terraria["genres"]
@@ -89,8 +89,8 @@ def test_catalog_data_preservation_and_fields():
         assert "Sandbox" in terraria["tags"] or "2D" in terraria["tags"]
 
     # 3. Hollow Knight (367520)
-    if "367520" in catalog_by_id:
-        hollow = catalog_by_id["367520"]
+    hollow = manager.get_game("367520")
+    if hollow:
         assert hollow["title"] == "Hollow Knight"
         assert "Action" in hollow["genres"]
         assert "Adventure" in hollow["genres"]

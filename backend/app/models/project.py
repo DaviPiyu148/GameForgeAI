@@ -33,6 +33,8 @@ class Project(Base):
     art_density = Column(Integer, nullable=False, default=50)
     physics = Column(Integer, nullable=False, default=80)
     modules = Column(JSON, nullable=False, default=list)
+    scale = Column(String(20), nullable=False, default="standard")
+    world_mode = Column(String(20), nullable=False, default="linear")
 
     # Validated Game DSL, GameDesignSpec, and Versioning
     design_spec = Column(JSON, nullable=True)
