@@ -25,13 +25,33 @@ FastAPI modular monolith
        Phaser
 ```
 
+## Setup (New Machine)
+
+See **[SETUP.md](./SETUP.md)** for the complete step-by-step guide to get the project running on any PC, including:
+- Python venv + backend dependencies
+- Gemini API key configuration
+- Database migrations
+- Discovery index download and build
+- Frontend npm install
+- Running via `start.bat` or manual commands
+
 ## Development
+
+**Frontend** (inside `gameforge-ai/`):
 ```bash
-npm install
-npm run dev
-npx tsc --noEmit
-npm run build
-npm run lint
+npm install        # first time only
+npm run dev        # dev server on :5173
+npx tsc --noEmit  # type-check
+npm run build      # production build
+npm run lint       # lint
+```
+
+**Backend** (inside `backend/`, with `.venv` active):
+```bash
+pip install -r requirements.txt   # first time only
+python -m alembic upgrade head    # apply migrations
+python -m uvicorn app.main:app --reload --port 8000
+pytest -v                         # run tests
 ```
 
 ## Documentation

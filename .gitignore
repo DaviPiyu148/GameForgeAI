@@ -1,0 +1,61 @@
+# ── Python ────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────
+.venv/
+venv/
+env/
+
+# ── Environment / secrets ─────────────────────────
+.env
+*.env.local
+
+# ── Databases ─────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Node ──────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Vite / frontend build artefacts ───────────────
+dist/
+dist-ssr/
+
+# ── OS artefacts ──────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor directories ────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.sw?
+
+# ── Test / coverage ───────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Discovery data artefacts (reproducible) ───────
+backend/data/raw/*.zip
+backend/data/raw/*.csv
+backend/data/raw/*.json
+backend/data/processed/*.json
+backend/data/processed/*.npy
+backend/data/processed/*.faiss
+backend/data/processed/*.bin
+backend/data/uploads/
