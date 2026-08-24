@@ -26,6 +26,7 @@ No browser-automation tool was available in this environment (confirmed: the CDP
 ## FS2 Backend — COMPLETE
 - Verified startup logs, lifespan orphan-build reconciliation, structured error envelopes, CORS middleware, health endpoint.
 - Found & fixed FS-002 (CRITICAL): Discovery catalog/FAISS/embedder cold-load ran synchronously inside `async def` routes, freezing the *entire* event loop — proven via concurrent health-check test (4×10s timeouts during the freeze; 0 blocking after the fix, confirmed over an 8-probe/24.8s window).
+- **Correction from post-report live testing**: the initial fix also added an eager background warm-up at startup, so the *first* search wouldn't pay the cold-load cost. On the actual target machine this instead forced the ~1.2-1.9GB cost onto *every* startup and contributed to a real crash under memory pressure. Reverted (FS-018) — see "Post-report live user testing" below. The core event-loop fix itself was re-verified live afterward and still holds.
 
 ## FS3 Database — COMPLETE
 - `alembic current`/`heads`: single head throughout, including after the new migration this audit added.
@@ -74,16 +75,25 @@ No browser-automation tool was available in this environment (confirmed: the CDP
 
 ---
 
+## Post-report live user testing — COMPLETE
+After the initial audit report was written and committed, the user ran `start.bat` live on their own machine and reported real, reproducible problems. Investigated directly rather than dismissed:
+
+- **Discovery search hung indefinitely; backend/frontend processes were later found dead.** Root cause: the FS-002 fix's eager startup warm-up forced GameForge's ~1.2-1.9GB catalog-load cost onto *every* startup, and this machine only had ~1.2GB free RAM at the time (other applications — a media player using >1GB, several editor windows — were also running). **Fixed (FS-018)**: removed the eager warm-up; the catalog now loads lazily on first real use only, same as pre-audit, but without the event-loop-freeze bug. Live-reverified the core FS-002 guarantee still holds even under *worse* memory conditions than the original test (7/8 concurrent health checks stayed instant during a 44s cold load with <1GB system RAM free).
+- **"Sending unauthenticated requests to the HF Hub" warning on every start.** Confirmed the embedding model was already fully cached locally, so this was an avoidable network round-trip, not a real download. **Fixed (FS-019)**: `HF_HUB_OFFLINE=1` in `start.bat`.
+- **Intermittent `ECONNRESET`/instant `502` from Vite's dev proxy** on `/api/profile/preferences`, `/api/projects`, `/api/discovery/search` — reproduced live: the exact same requests sent directly to the backend (port 8000) succeeded consistently, while the proxied route (port 5173) flipped between 502/200/connection-failed. Root cause: system-wide physical memory exhaustion (1.2-1.7GB free of 7.7GB during testing) causing OS-level paging to stall whichever process (Node/Vite this time) got swapped at the wrong moment. **This is a genuine, disclosed environmental constraint on this machine (FS-020) — not fixable in application code.** Practical mitigation given to the user: close other memory-heavy applications (identified `mpv` and multiple editor windows as the largest non-GameForge consumers) before using Discovery.
+
 ## Fixes applied this session
 1. `start.bat` — safe, precise port-clearing (was killing arbitrary PIDs including System).
-2. `backend/app/services/discovery_service.py`, `backend/app/api/discovery.py`, `backend/app/main.py` — discovery cold-start no longer freezes the whole app; warmed in the background at startup.
+2. `backend/app/services/discovery_service.py`, `backend/app/api/discovery.py` — discovery cold-start no longer blocks the event loop.
 3. `gameforge-ai/vite.config.ts` — bind frontend dev server to `127.0.0.1` (was IPv6-only, unreachable at the URL `start.bat` opens).
 4. `backend/app/config.py`, `backend/.env.example` — CORS now allows both loopback origins actually in use.
 5. `backend/app/services/build_service.py` — SSE broadcaster made synchronous, fixing a real event-loss bug; regression test added.
 6. `backend/app/models/project.py`, `backend/app/services/project_service.py`, `backend/app/services/build_service.py`, new migration `bc9ae398f146` — `scale`/`world_mode` now actually persist on Project records; two regression tests added.
-7. `backend/app/main.py` — fixed a bug introduced by fix #2 (`Task.exception()` on a cancelled task raising instead of returning), caught by the test suite within the same session.
+7. `backend/app/main.py` — fixed a bug introduced by fix #2's first draft (`Task.exception()` on a cancelled task raising instead of returning), caught by the test suite within the same session.
 8. `backend/app/main.py` — `/api/saved-discoveries` validation errors get their own error code instead of the generic project one.
 9. `backend/tests/test_multilingual_catalog.py` — test used to spuriously `MemoryError` on memory-constrained machines by `json.load()`-ing the full ~450MB catalog; switched to the app's own streaming loader.
+10. `backend/app/main.py` — **removed** the eager Discovery warm-up added alongside fix #2 (this audit's own regression, caught via live user testing — see above).
+11. `start.bat` — `HF_HUB_OFFLINE=1`, removing an unnecessary Hugging Face network check for an already-cached model.
 
 ## Deferred / documented only (not code-fixed)
 - Stale docs: `docs/06-BACKEND-ARCHITECTURE.md` migration list, `SETUP.md` test count, `docs/08-API-CONTRACT.md` missing endpoints, this file's previous Git Checkpoint section left unchecked despite its commit landing.
@@ -96,13 +106,14 @@ Full detail, evidence, and severity/subsystem table: see `FULL_STACK_OPERATIONAL
 ---
 
 ## Git Checkpoint
-- [x] `git diff` reviewed (file by file, all 13 changed + 1 new file)
+- [x] `git diff` reviewed (file by file, every changed file across both commit rounds)
 - [x] `git diff --stat` reviewed
 - [x] secrets and generated artifacts checked (none; only source/test/migration files touched)
-- [x] Commit: `967618c fix: harden full stack operational health`
+- [x] Commits: `967618c fix: harden full stack operational health`, `fe355e4 docs: record commit hash in audit ledger`, `6c55804 fix: skip unnecessary HF Hub network check for cached embedding model`, plus this update
 - [x] Working tree verified clean
 
 ---
 
 ## Change Log
 - 2026-08-24: Full-stack operational health audit — reconnaissance, live `start.bat` execution, 9 confirmed defects found and fixed (3 CRITICAL, 2 HIGH, 3 MEDIUM/LOW, 1 self-introduced-and-caught), regression tests added, full suite + typecheck + lint + build all green, two clean restart cycles verified.
+- 2026-08-24 (same day, post-report): live user testing on the actual target machine surfaced 3 further issues. One (FS-018) was a regression in this audit's own initial fix — reverted. One (FS-019) was a real, minor, fixed defect. One (FS-020) is a genuine environmental memory constraint on this machine, disclosed with evidence and mitigation rather than fixed, since no application code can substitute for physical RAM.

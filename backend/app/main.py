@@ -1,4 +1,3 @@
-import asyncio
 from contextlib import asynccontextmanager
 import uuid
 from fastapi import FastAPI, Request
@@ -39,30 +38,19 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # Warm the Discovery catalog/FAISS-index/embedding-model singletons in a background
-    # thread. Their first load takes tens of seconds (~120k-record catalog parse); left
-    # lazy, that cost lands on whichever request happens to trigger it first and, being
-    # synchronous, blocks the entire event loop (every other in-flight request, including
-    # /api/health) for the duration -- see DiscoveryService.warm(). Kicking it off here
-    # lets it overlap with the frontend's own startup time instead.
-    from app.services.discovery_service import discovery_service
-    import logging
-
-    def _log_warm_failure(t: "asyncio.Task") -> None:
-        # Task.exception() raises CancelledError itself for a cancelled task
-        # (e.g. app shutdown interrupting a still-running warm-up) rather than
-        # returning it -- must check cancelled() first or this callback would
-        # raise out of the event loop's callback dispatch.
-        if t.cancelled():
-            return
-        exc = t.exception()
-        if exc:
-            logging.getLogger("gameforge").warning(
-                f"Discovery catalog warm-up failed (will retry lazily on first search): {exc}"
-            )
-
-    task = asyncio.create_task(asyncio.to_thread(discovery_service.warm))
-    task.add_done_callback(_log_warm_failure)
+    # NOTE: the Discovery catalog/FAISS-index/embedding-model singletons are
+    # intentionally NOT warmed here. Their first load takes tens of seconds and
+    # pushes memory up by roughly 1.5-2GB (the ~450MB catalog file parses into
+    # ~120k Python dict objects); on a memory-constrained machine, forcing that
+    # cost unconditionally on every backend start -- including for users who
+    # never touch Discovery -- risks starving other running processes and can
+    # bring the whole system down under real-world memory pressure. That
+    # tradeoff isn't worth it just to shave the one-time cost off a user's
+    # *first* search. What matters is that the cost, whenever it *does* land,
+    # no longer blocks the event loop -- see DiscoveryService.warm() and its
+    # asyncio.to_thread() call sites in search()/get_similar_games()/
+    # more_like_this(), and the asyncio.to_thread() wrapper around
+    # get_build_inspiration() in api/discovery.py.
 
     yield
 

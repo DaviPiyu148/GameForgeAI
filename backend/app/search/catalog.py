@@ -94,6 +94,25 @@ class CatalogManager:
             if not game.get("original_tags"):
                 game["original_tags"] = game.get("tags") or []
 
+            # The ingested source data frequently stores display_description/
+            # original_description/search_description as separately-parsed but
+            # byte-for-byte identical copies of description (same for the *_title
+            # variants) -- each is its own ~hundred-plus-char string object. Across
+            # ~120k records that's real, avoidable resident memory. Strings are
+            # immutable, so re-pointing an equal-content field at the canonical
+            # object (letting the now-unreferenced duplicate get garbage collected)
+            # is always safe -- unlike the genre/tag *lists* above, which are left
+            # as separate objects since something downstream mutating one in place
+            # would then silently corrupt the "same" list under a different key.
+            description = game.get("description")
+            for key in ("display_description", "original_description", "search_description"):
+                if key in game and game[key] == description:
+                    game[key] = description
+            title = game.get("title")
+            for key in ("display_title", "original_title"):
+                if key in game and game[key] == title:
+                    game[key] = title
+
         self._catalog_list = catalog_list
         self._games_by_id = {str(g["id"]): g for g in catalog_list if "id" in g}
         self._games_by_external_id = {str(g["external_id"]): g for g in catalog_list if "external_id" in g}
