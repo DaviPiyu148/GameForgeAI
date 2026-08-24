@@ -177,7 +177,7 @@ export class GameScene extends Phaser.Scene {
     this.playSpawnInTween(this.player);
 
     if (isPlatformer) {
-      this.player.setGravityY(this.dsl.world.gravity || 800);
+      this.player.setGravityY(this.dsl.world.gravity ?? 800);
     } else {
       (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
     }
@@ -594,7 +594,9 @@ export class GameScene extends Phaser.Scene {
       this.objectiveText.setText(`GOAL: ${goal}`);
     }
     if (this.stageText) {
-      this.stageText.setText(`LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}`);
+      const isFinale = Boolean(level?.is_finale || (this.totalLevels > 1 && this.currentLevelIndex === this.totalLevels - 1));
+      const stageLabel = isFinale ? `FINAL STAGE: ${this.currentLevelIndex + 1}/${this.totalLevels}` : `LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}`;
+      this.stageText.setText(stageLabel);
     }
   }
 
