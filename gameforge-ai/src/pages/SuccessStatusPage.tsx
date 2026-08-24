@@ -20,10 +20,52 @@ const SuccessStatusPage = () => {
 
   if (state.buildStatus !== 'SUCCESS') return null;
 
-  // Find the active generated project
+  // FS-024 fix: Do not silently fall back to an unrelated myGames[0] when
+  // activeProjectId is set but the project has not yet loaded.
+  // Three cases:
+  //   1. activeProjectId present and project found → render as normal
+  //   2. activeProjectId present but project still loading → show loading state
+  //   3. activeProjectId missing / invalid after load completes → recovery state
   const activeProject =
-    state.myGames.find((p) => p.id === state.activeProjectId) ||
-    state.myGames[0];
+    state.activeProjectId
+      ? state.myGames.find((p) => p.id === state.activeProjectId) ?? null
+      : state.myGames[0] ?? null;
+
+  const isProjectLoading =
+    !activeProject &&
+    state.activeProjectId != null &&
+    (state.isProjectsLoading === true);
+
+  if (isProjectLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-primary font-mono text-xs border border-primary/30 bg-surface-container-low p-6 text-center animate-pulse">
+          &gt; LOADING_PROJECT_DATA...
+        </div>
+      </div>
+    );
+  }
+
+  const projectMissing = !activeProject && state.activeProjectId != null && !state.isProjectsLoading;
+
+  if (projectMissing) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
+        <span className="material-symbols-outlined text-4xl text-error">error_outline</span>
+        <p className="font-mono text-xs text-on-surface-variant text-center max-w-sm">
+          Build succeeded but project data could not be retrieved. Please visit the Dashboard to access your project.
+        </p>
+        <div className="flex gap-3">
+          <a href="#/dashboard" className="px-4 py-2 font-mono text-xs uppercase bg-primary text-on-primary rounded cursor-pointer">
+            Dashboard
+          </a>
+          <a href="#/build" className="px-4 py-2 font-mono text-xs uppercase border border-outline-variant text-on-surface rounded cursor-pointer">
+            Build Again
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

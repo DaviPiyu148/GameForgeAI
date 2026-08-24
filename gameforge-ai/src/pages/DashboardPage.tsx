@@ -82,7 +82,8 @@ const DashboardPage = () => {
                     </h3>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="font-mono text-[10px] text-outline border border-outline px-1">
-                        &gt; v1.0
+                        {/* FS-026 fix: use real project version from currentVersion field */}
+                        &gt; v{game.currentVersion ?? 1}.0
                       </span>
                       <span className="font-mono text-[10px] text-on-surface-variant">{game.genre}</span>
                       <span className="font-mono text-[10px] text-outline ml-4">Modified: {game.lastModified}</span>

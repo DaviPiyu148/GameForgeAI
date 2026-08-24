@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { joinApiUrl } from './urlUtils';
 import type {
   BuildLogEntry,
   BuildLogListResponse,
@@ -77,7 +78,9 @@ export const buildService = {
         if (isClosed) return;
 
         const tokenParam = `?sse_token=${encodeURIComponent(sseAuth.sse_token)}`;
-        const sseUrl = `${API_BASE_URL}${API_BASE_URL.endsWith('/') ? '' : '/'}` + `builds/${buildId}/events${tokenParam}`;
+        // FS-028 fix: use joinApiUrl so a trailing slash on API_BASE_URL never
+        // produces a double-slash in the EventSource URL.
+        const sseUrl = joinApiUrl(API_BASE_URL, `builds/${buildId}/events${tokenParam}`);
         eventSource = new EventSource(sseUrl);
 
         eventSource.addEventListener('log', (event: MessageEvent) => {

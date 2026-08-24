@@ -87,14 +87,11 @@ export default function ProfilePage() {
     };
   }, [state.myGames.length]);
 
-  const handleContinueEdit = (desc: string) => {
-    setPrompt(desc);
-    updateBuildParams({
-      engine: 'Top-Down Action',
-      artDensity: 70,
-      physics: 60,
-      modules: ['Enhanced NPC Behavior'],
-    });
+  const handleContinueEdit = (game: import('../types').GameProject) => {
+    // FS-027 fix: restore the project's actual stored parameters rather than
+    // hardcoding 'Top-Down Action' defaults.  Mirrors DashboardPage.handleModify.
+    setPrompt(game.prompt);
+    updateBuildParams(game.parameters);
     navigate('/build');
   };
 
@@ -715,7 +712,7 @@ export default function ProfilePage() {
                         Play
                       </button>
                       <button
-                        onClick={() => handleContinueEdit(game.prompt)}
+                        onClick={() => handleContinueEdit(game)}
                         className="flex items-center gap-2 text-sm text-primary hover:text-tertiary transition-colors font-semibold uppercase tracking-wider cursor-pointer btn-interactive origin-left"
                       >
                         <span className="material-symbols-outlined text-[18px]">edit_document</span>

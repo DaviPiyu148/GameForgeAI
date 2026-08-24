@@ -41,6 +41,8 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   onProjectUpdated,
 }) => {
   const [isClosing, setIsClosing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const modalContainerRef = useRef<HTMLDivElement>(null);
   const [currentDsl, setCurrentDsl] = useState<GameDSL>(
     project?.gameDsl || gameDsl || SURVIVAL_FIXTURE
   );
@@ -101,9 +103,34 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     }, 250);
   }, [onClose]);
 
+  // Fullscreen toggle — targets the modal outer container so the entire dialog
+  // including header, canvas, and AI panel enters fullscreen (not just the canvas).
+  const handleToggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      modalContainerRef.current?.requestFullscreen().catch((err) => {
+        console.warn('Fullscreen request failed:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
+  // Keep isFullscreen in sync with the browser's native fullscreen state
+  // (e.g. user presses ESC to exit fullscreen — browser handles it natively
+  // but we need to update the icon back to fullscreen).
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isClosing) {
+      // When fullscreen is active, the browser intercepts ESC to exit fullscreen.
+      // Do not also close the modal in that case — let fullscreenchange update state.
+      if (e.key === 'Escape' && !isClosing && !document.fullscreenElement) {
         handleClose();
       }
     };
@@ -306,6 +333,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
 
   return createPortal(
     <div
+      ref={modalContainerRef}
       className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-background/90 backdrop-blur-sm ${
         isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
       }`}
@@ -360,16 +388,30 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
             </div>
           )}
 
-          <button
-            ref={closeBtnRef}
-            onClick={handleClose}
-            className="text-on-surface-variant icon-interactive hover:text-error transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary ml-auto cursor-pointer"
-            aria-label="Close prototype preview"
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              close
-            </span>
-          </button>
+          {/* Right header actions: fullscreen + close */}
+          <div className="flex items-center gap-1 ml-auto">
+            <button
+              onClick={handleToggleFullscreen}
+              className="text-on-surface-variant icon-interactive hover:text-primary transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+              </span>
+            </button>
+
+            <button
+              ref={closeBtnRef}
+              onClick={handleClose}
+              className="text-on-surface-variant icon-interactive hover:text-error transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              aria-label="Close prototype preview"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Improvement Success Banner */}
