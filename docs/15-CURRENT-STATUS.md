@@ -1,15 +1,33 @@
 # 15 — Current Status
 
 ## Date
-2026-08-22
+2026-08-24
 
 ## Current Phase
-Phase 5 — Advanced Game Generation + Game Feel (Complete). Second of the Phases
-4-8 master product expansion (Blueprint/Remix -> Advanced Generation -> Living
-World -> AI Director -> Monetization/BYOK). Per explicit user instruction, Phase
-6 (Living World) and later phases will not start until explicitly requested.
+Phase 6 — Generalized Open World Game System V1 (Complete). Third of the Phases
+4-8 master product expansion. Establishes a general-purpose, reusable open-world
+runtime capability across schemas, deterministic validation, AI prompts, and
+modular Phaser runtime subsystems without game-specific hardcoding.
 
-## Phase 5 Summary
+## Phase 6 Summary
+- **Generalized Open World Schemas**: `open_world_models.py` defining `RegionDef`,
+  `WorldConnectionDef`, `POIDef`, `ActivityDef`, `ActorDef`, `FactionDef`,
+  `VehicleDef`, `ThreatSystemDef`, `WorldTimeDef`, `WorldEventDef`, and `OpenWorldDef`.
+- **Architectural Mode Separation**: Preserved `world_mode` (`linear`, `campaign`, `open_world`)
+  and `scale` (`prototype`, `standard`, `campaign`) as independent dimensions across
+  frontend builder, build jobs, database (`world_mode` column with Alembic migration `b3c4d5e6f7a8`),
+  and generation prompts.
+- **Deterministic Open World Validation & Repair**: BFS reachability graph validation
+  across regions (`reachability.py`), open-world budget enforcement and reference
+  integrity (`quality_validator.py`), and robust input normalization with actor behavior
+  capability enforcement (`validator.py`).
+- **Modular Phaser Open-World Runtime**: 7 standalone managers (`WorldManager`,
+  `RegionManager`, `VehicleManager`, `ActivityManager`, `FactionManager`, `ThreatManager`,
+  `WorldEventManager`) in `gameforge-ai/src/runtime/` driving vehicle entry/exit (`E`),
+  top-down driving physics, district edge transitions, POI discovery, and live HUD.
+- **Verification**: 327/327 backend tests passing; frontend `tsc`/`oxlint`/`build` clean;
+  live end-to-end API generation with Gemini 3 Flash verified generating playable open-world
+  prototypes with multiple regions, vehicles, factions, and activities.
 - Real server-side scale tiers (`prototype`/`standard`/`campaign`) threaded from
   `BuilderPage.tsx` through `BuildJob.scale` into `generate_game_dsl()` and the
   generation prompt -- previously a frontend-only cosmetic dropdown.

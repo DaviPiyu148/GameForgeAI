@@ -98,12 +98,35 @@ after that, the build succeeds anyway with a `WARNING` log rather than a hard fa
 `EntityDef` gains optional `is_boss`, `boss_phases` (1-2), and `telegraph_ms` (0-2000ms)
 fields (all default to values that make every pre-Phase-5 DSL validate unchanged); a boss
 must have `health >= 150` and, per-level, must meaningfully outclass ordinary enemies
-(`>= 2x` the strongest non-boss enemy in the same scope) or generation fails validation.
-`telegraph_ms` is only valid on `ranged_attack` behavior. `LevelDef.is_finale` is an
-explicit marker (rather than inferring "last level") that `build_game_blueprint()`'s
-finale derivation now prefers when present. Runtime boss behavior is a single
-deterministic threshold-based bump (speed/fire-rate x1.3 at <=50% health) plus a fixed
-visual telegraph before a ranged attack fires — not a state-machine framework.
+in health. Boss fights get a 1.5s intro banner with full-width screen health bar, a
+deterministic Phase 2 at <=50% health (+25% speed, +20% damage, distinct color), and a
+fixed-duration circular attack telegraph with color shift before firing.
+
+## Generalized Open World System (Phase 6)
+Phase 6 introduces a general-purpose, reusable open-world capability supporting crime
+sandboxes, cyberpunk courier cities, zombie survival hubs, fantasy realms, and sci-fi colonies
+without hardcoding genre-specific mechanics.
+- **Architectural Mode Separation**: `world_mode` (`"linear"`, `"campaign"`, `"open_world"`)
+  and `scale` (`"prototype"`, `"standard"`, `"campaign"`) operate as independent orthogonal
+  dimensions.
+- **OpenWorldDef Subsystem Schemas**:
+  - `RegionDef`: Multi-district world map with danger levels, themes, and dimensions.
+  - `WorldConnectionDef`: Bidirectional/unidirectional links between regions with traversal constraints.
+  - `POIDef`: Interactive points of interest (garages, terminals, safehouses, quest givers, shops).
+  - `VehicleDef`: Driveable vehicles (cars, hovercrafts, bikes, mechs) with speed, acceleration, and handling physics.
+  - `FactionDef`: Faction reputations (-100 to 100) with dynamic hostility thresholds.
+  - `ActivityDef`: Dynamic missions, deliveries, investigations, combat tasks, and rewards.
+  - `ActorDef`: Living NPCs with capability-verified behaviors (`patrol`, `chase`, `stationary`, `guard`, `flee`, `ranged_attack`).
+  - `ThreatSystemDef`: Alert meter (0-5) with decay and response unit reinforcements.
+  - `WorldTimeDef`: Game time clock and day/night cycle.
+- **Validation & Repair**: BFS reachability graph traversal ensures all regions are connected;
+  isolated regions receive automatic bridging. Open-world budgets (regions <= 6, POIs <= 25,
+  actors <= 50, vehicles <= 10, factions <= 5, activities <= 15) and runtime compatibility
+  are strictly enforced.
+- **Modular Phaser Runtime**: 7 standalone managers (`WorldManager`, `RegionManager`,
+  `VehicleManager`, `ActivityManager`, `FactionManager`, `ThreatManager`, `WorldEventManager`)
+  handle vehicle entry/exit (`E`), driving mechanics, seamless district boundary traversal,
+  and open-world HUD status displays.
 
 ## Multi-Level Runtime Rendering (Phase 5)
 The Phaser runtime (`GameScene.ts`) previously only ever rendered level 0's visuals even

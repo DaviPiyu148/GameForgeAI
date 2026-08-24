@@ -234,6 +234,7 @@ class LevelDef(BaseModel):
     """Structured stage/level specification in a multi-level campaign game."""
     level_number: int = Field(1, ge=1, le=10)
     title: str = Field("Stage 1", min_length=1, max_length=100)
+    description: Optional[str] = None
     theme: Optional[Literal["cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal"]] = None
     world: Optional[WorldDef] = None
     spawn_x: Optional[int] = Field(None, ge=0, le=3840)

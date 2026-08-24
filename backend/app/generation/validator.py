@@ -431,12 +431,25 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
 
         # 2. Connections & Graph Reachability
         connections = list(ow.get("connections") or [])
-        if len(connections) > 15:
-            connections = connections[:15]
-        _, repaired_conns = ReachabilityValidator.validate_open_world_connectivity(regions, connections)
+        norm_conns = []
+        for c in connections:
+            if isinstance(c, dict):
+                from_r = c.get("from_region") or c.get("from") or (reg_ids[0] if reg_ids else "reg_1")
+                to_r = c.get("to_region") or c.get("to") or (reg_ids[1] if len(reg_ids) > 1 else reg_ids[0])
+                if from_r in reg_ids and to_r in reg_ids:
+                    norm_conns.append({
+                        "from_region": str(from_r),
+                        "to_region": str(to_r),
+                        "bidirectional": bool(c.get("bidirectional", True)),
+                        "traversal_types": c.get("traversal_types") or ["on_foot", "vehicle"],
+                    })
+        if len(norm_conns) > 15:
+            norm_conns = norm_conns[:15]
+        _, repaired_conns = ReachabilityValidator.validate_open_world_connectivity(regions, norm_conns)
         ow["connections"] = repaired_conns
 
         # 3. Factions (1 - 5)
+        VALID_FACTION_FIELDS = {"id", "name", "initial_reputation", "color", "hostile_threshold", "allied_threshold"}
         factions = list(ow.get("factions") or [])
         if not factions:
             factions = [
@@ -455,10 +468,21 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
             ]
         elif len(factions) > 5:
             factions = factions[:5]
-        fac_ids = {f.get("id") for f in factions if isinstance(f, dict)}
-        ow["factions"] = factions
+        
+        norm_factions = []
+        for f_idx, fac in enumerate(factions):
+            if isinstance(fac, dict):
+                f_data = {k: v for k, v in fac.items() if k in VALID_FACTION_FIELDS}
+                f_data["id"] = str(f_data.get("id") or f"fac_{f_idx + 1}").strip()
+                f_data["name"] = str(f_data.get("name") or f"Faction {f_idx + 1}").strip()
+                f_data["initial_reputation"] = max(-100, min(100, int(f_data.get("initial_reputation", 0))))
+                norm_factions.append(f_data)
+        ow["factions"] = norm_factions
+        fac_ids = {f["id"] for f in norm_factions}
 
         # 4. POIs (3 - 25)
+        VALID_POI_FIELDS = {"id", "name", "type", "region_id", "x", "y", "description", "icon", "interaction_radius", "discovered"}
+        VALID_POI_TYPES = {"safehouse", "shop", "garage", "outpost", "terminal", "landmark", "hospital", "mission_giver", "dungeon", "station", "hideout", "arena", "resource_node"}
         pois = list(ow.get("pois") or [])
         if len(pois) < 3:
             for p_i in range(len(pois), 3):
@@ -474,17 +498,40 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         elif len(pois) > 25:
             pois = pois[:25]
 
+        norm_pois = []
         for p_idx, poi in enumerate(pois):
             if isinstance(poi, dict):
-                poi["id"] = str(poi.get("id") or f"poi_{p_idx + 1}").strip()
-                if poi.get("region_id") not in reg_ids:
-                    poi["region_id"] = reg_ids[0]
-                poi["name"] = poi.get("name") or f"POI {p_idx + 1}"
-                poi["x"] = max(0, min(3840, int(poi.get("x", 200))))
-                poi["y"] = max(0, min(2160, int(poi.get("y", 200))))
-        ow["pois"] = pois
+                p_name = poi.get("name") or poi.get("label") or poi.get("title") or f"POI {p_idx + 1}"
+                p_data = {k: v for k, v in poi.items() if k in VALID_POI_FIELDS}
+                p_data["id"] = str(p_data.get("id") or f"poi_{p_idx + 1}").strip()
+                p_data["name"] = str(p_name).strip()
+                if p_data.get("region_id") not in reg_ids:
+                    p_data["region_id"] = reg_ids[0]
+                raw_type = str(p_data.get("type", "terminal")).lower().strip()
+                if raw_type not in VALID_POI_TYPES:
+                    if any(w in raw_type for w in ("garage", "dock", "hangar", "parking")):
+                        p_data["type"] = "garage"
+                    elif any(w in raw_type for w in ("shop", "store", "vendor", "market")):
+                        p_data["type"] = "shop"
+                    elif any(w in raw_type for w in ("safe", "house", "base", "bunker")):
+                        p_data["type"] = "safehouse"
+                    elif any(w in raw_type for w in ("quest", "mission", "giver")):
+                        p_data["type"] = "mission_giver"
+                    elif any(w in raw_type for w in ("outpost", "camp", "fort")):
+                        p_data["type"] = "outpost"
+                    elif any(w in raw_type for w in ("landmark", "tower", "statue", "monument")):
+                        p_data["type"] = "landmark"
+                    else:
+                        p_data["type"] = "terminal"
+                p_data["x"] = max(0, min(3840, int(p_data.get("x", 200))))
+                p_data["y"] = max(0, min(2160, int(p_data.get("y", 200))))
+                norm_pois.append(p_data)
+        ow["pois"] = norm_pois
+        poi_ids = {p["id"] for p in norm_pois}
 
         # 5. Vehicles (1 - 10)
+        VALID_VEHICLE_FIELDS = {"id", "name", "type", "region_id", "x", "y", "max_speed", "acceleration", "handling", "health", "color"}
+        VALID_VEH_TYPES = {"car", "motorcycle", "hovercraft", "boat", "mech", "aircraft", "mount"}
         vehicles = list(ow.get("vehicles") or [])
         if not vehicles:
             vehicles = [
@@ -505,17 +552,34 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         elif len(vehicles) > 10:
             vehicles = vehicles[:10]
 
+        norm_vehs = []
         for v_idx, veh in enumerate(vehicles):
             if isinstance(veh, dict):
-                veh["id"] = str(veh.get("id") or f"veh_{v_idx + 1}").strip()
-                if veh.get("region_id") not in reg_ids:
-                    veh["region_id"] = reg_ids[0]
-                veh["name"] = veh.get("name") or f"Vehicle {v_idx + 1}"
-                veh["x"] = max(0, min(3840, int(veh.get("x", 300))))
-                veh["y"] = max(0, min(2160, int(veh.get("y", 300))))
-        ow["vehicles"] = vehicles
+                v_data = {k: v for k, v in veh.items() if k in VALID_VEHICLE_FIELDS}
+                v_data["id"] = str(v_data.get("id") or f"veh_{v_idx + 1}").strip()
+                v_data["name"] = str(v_data.get("name") or f"Vehicle {v_idx + 1}").strip()
+                if v_data.get("region_id") not in reg_ids:
+                    v_data["region_id"] = reg_ids[0]
+                raw_vtype = str(v_data.get("type", "car")).lower().strip()
+                if raw_vtype not in VALID_VEH_TYPES:
+                    if any(w in raw_vtype for w in ("hover", "speeder", "flyer", "ship")):
+                        v_data["type"] = "hovercraft"
+                    elif any(w in raw_vtype for w in ("bike", "cycle", "moto")):
+                        v_data["type"] = "motorcycle"
+                    elif any(w in raw_vtype for w in ("mech", "robot", "walker")):
+                        v_data["type"] = "mech"
+                    elif any(w in raw_vtype for w in ("boat", "water", "craft")):
+                        v_data["type"] = "boat"
+                    else:
+                        v_data["type"] = "car"
+                v_data["x"] = max(0, min(3840, int(v_data.get("x", 300))))
+                v_data["y"] = max(0, min(2160, int(v_data.get("y", 300))))
+                norm_vehs.append(v_data)
+        ow["vehicles"] = norm_vehs
 
         # 6. Activities (2 - 15)
+        VALID_ACTIVITY_FIELDS = {"id", "title", "description", "type", "region_id", "status", "target_poi_id", "rewards", "consequences"}
+        VALID_ACT_TYPES = {"mission", "delivery", "race", "combat", "collection", "investigation", "escort", "patrol", "exploration", "minigame"}
         activities = list(ow.get("activities") or [])
         if len(activities) < 2:
             activities = [
@@ -541,54 +605,101 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         elif len(activities) > 15:
             activities = activities[:15]
 
+        norm_acts = []
         has_available = False
         for a_idx, act in enumerate(activities):
             if isinstance(act, dict):
-                act["id"] = str(act.get("id") or f"act_{a_idx + 1}").strip()
-                act["title"] = act.get("title") or f"Activity {a_idx + 1}"
-                act["description"] = act.get("description") or "Complete the objective."
-                if act.get("region_id") and act["region_id"] not in reg_ids:
-                    act["region_id"] = reg_ids[0]
-                if act.get("status") == "available":
+                act_title = act.get("title") or act.get("name") or f"Activity {a_idx + 1}"
+                a_data = {k: v for k, v in act.items() if k in VALID_ACTIVITY_FIELDS}
+                a_data["id"] = str(a_data.get("id") or f"act_{a_idx + 1}").strip()
+                a_data["title"] = str(act_title).strip()
+                a_data["description"] = str(a_data.get("description") or "Complete the objective.").strip()
+                if a_data.get("region_id") and a_data["region_id"] not in reg_ids:
+                    a_data["region_id"] = reg_ids[0]
+                if a_data.get("target_poi_id") and a_data["target_poi_id"] not in poi_ids:
+                    a_data["target_poi_id"] = None
+                raw_atype = str(a_data.get("type", "mission")).lower().strip()
+                if raw_atype not in VALID_ACT_TYPES:
+                    if any(w in raw_atype for w in ("deliver", "courier", "transport", "fetch")):
+                        a_data["type"] = "delivery"
+                    elif any(w in raw_atype for w in ("fight", "kill", "eliminate", "combat", "bounty")):
+                        a_data["type"] = "combat"
+                    elif any(w in raw_atype for w in ("race", "speed", "time_trial")):
+                        a_data["type"] = "race"
+                    elif any(w in raw_atype for w in ("investigate", "recon", "scout", "scan")):
+                        a_data["type"] = "investigation"
+                    elif any(w in raw_atype for w in ("collect", "gather", "retrieve")):
+                        a_data["type"] = "collection"
+                    else:
+                        a_data["type"] = "mission"
+                if a_data.get("status") == "available":
                     has_available = True
-        if not has_available and activities:
-            activities[0]["status"] = "available"
-        ow["activities"] = activities
+                norm_acts.append(a_data)
+        if not has_available and norm_acts:
+            norm_acts[0]["status"] = "available"
+        ow["activities"] = norm_acts
 
         # 7. Actors (<= 50)
+        VALID_ACTOR_FIELDS = {"id", "name", "archetype", "faction_id", "region_id", "x", "y", "behavior", "dialogue", "health", "color", "gives_activity_id"}
+        VALID_ARCHETYPES = {"civilian", "guard", "security", "merchant", "quest_giver", "hostile", "companion", "patrol", "courier"}
         actors = list(ow.get("actors") or [])
         if len(actors) > 50:
             actors = actors[:50]
 
+        norm_actors = []
         for act_idx, actor in enumerate(actors):
             if isinstance(actor, dict):
-                actor["id"] = str(actor.get("id") or f"actor_{act_idx + 1}").strip()
-                actor["name"] = actor.get("name") or f"Actor {act_idx + 1}"
-                if actor.get("region_id") not in reg_ids:
-                    actor["region_id"] = reg_ids[0]
-                if actor.get("faction_id") and actor["faction_id"] not in fac_ids:
-                    actor["faction_id"] = None
+                act_name = actor.get("name") or actor.get("label") or f"Actor {act_idx + 1}"
+                ac_data = {k: v for k, v in actor.items() if k in VALID_ACTOR_FIELDS}
+                ac_data["id"] = str(ac_data.get("id") or f"actor_{act_idx + 1}").strip()
+                ac_data["name"] = str(act_name).strip()
+                if ac_data.get("region_id") not in reg_ids:
+                    ac_data["region_id"] = reg_ids[0]
+                if ac_data.get("faction_id") and ac_data["faction_id"] not in fac_ids:
+                    ac_data["faction_id"] = None
+                raw_arch = str(ac_data.get("archetype", "civilian")).lower().strip()
+                if raw_arch not in VALID_ARCHETYPES:
+                    if any(w in raw_arch for w in ("guard", "sentry", "soldier", "enforcer")):
+                        ac_data["archetype"] = "guard"
+                    elif any(w in raw_arch for w in ("police", "security", "drone", "cop")):
+                        ac_data["archetype"] = "security"
+                    elif any(w in raw_arch for w in ("quest", "fixer", "contact", "handler", "giver")):
+                        ac_data["archetype"] = "quest_giver"
+                    elif any(w in raw_arch for w in ("shop", "merchant", "vendor", "trader")):
+                        ac_data["archetype"] = "merchant"
+                    elif any(w in raw_arch for w in ("hostile", "enemy", "bandit", "thug")):
+                        ac_data["archetype"] = "hostile"
+                    elif any(w in raw_arch for w in ("patrol", "scout")):
+                        ac_data["archetype"] = "patrol"
+                    elif any(w in raw_arch for w in ("courier", "runner", "driver")):
+                        ac_data["archetype"] = "courier"
+                    else:
+                        ac_data["archetype"] = "civilian"
                 # Normalize behavior strictly against SUPPORTED_ACTOR_BEHAVIORS
-                raw_beh = str(actor.get("behavior", "patrol")).lower().strip()
+                raw_beh = str(ac_data.get("behavior", "patrol")).lower().strip()
                 if raw_beh not in SUPPORTED_ACTOR_BEHAVIORS:
                     if any(w in raw_beh for w in ("wander", "walk", "roam", "patrol")):
-                        actor["behavior"] = "patrol"
+                        ac_data["behavior"] = "patrol"
                     elif any(w in raw_beh for w in ("chase", "hunt", "attack")):
-                        actor["behavior"] = "chase"
+                        ac_data["behavior"] = "chase"
                     elif any(w in raw_beh for w in ("shoot", "fire", "range")):
-                        actor["behavior"] = "ranged_attack"
+                        ac_data["behavior"] = "ranged_attack"
                     elif any(w in raw_beh for w in ("guard", "stand", "sentry")):
-                        actor["behavior"] = "guard"
+                        ac_data["behavior"] = "guard"
                     elif any(w in raw_beh for w in ("flee", "run", "scared")):
-                        actor["behavior"] = "flee"
+                        ac_data["behavior"] = "flee"
                     else:
-                        actor["behavior"] = "patrol"
-                actor["x"] = max(0, min(3840, int(actor.get("x", 400))))
-                actor["y"] = max(0, min(2160, int(actor.get("y", 400))))
-        ow["actors"] = actors
+                        ac_data["behavior"] = "patrol"
+                ac_data["x"] = max(0, min(3840, int(ac_data.get("x", 400))))
+                ac_data["y"] = max(0, min(2160, int(ac_data.get("y", 400))))
+                norm_actors.append(ac_data)
+        ow["actors"] = norm_actors
 
         # 8. Threat System
-        ts = dict(ow.get("threat_system") or {})
+        VALID_THREAT_FIELDS = {"name", "current_level", "max_level", "decay_rate_per_sec", "response_units"}
+        VALID_UNIT_FIELDS = {"min_threat_level", "archetype", "count", "behavior"}
+        ts_raw = dict(ow.get("threat_system") or {})
+        ts = {k: v for k, v in ts_raw.items() if k in VALID_THREAT_FIELDS}
         if not ts:
             ts = {
                 "name": "Security Alert",
@@ -596,12 +707,39 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
                 "max_level": 5,
                 "decay_rate_per_sec": 0.05,
             }
+        else:
+            ts["name"] = str(ts.get("name") or "Security Alert").strip()
+            ts["current_level"] = max(0, min(5, int(ts.get("current_level", 0))))
+            ts["max_level"] = max(1, min(5, int(ts.get("max_level", 5))))
+            ts["decay_rate_per_sec"] = max(0.01, min(1.0, float(ts.get("decay_rate_per_sec", 0.05))))
+            if "response_units" in ts and isinstance(ts["response_units"], list):
+                norm_units = []
+                for u in ts["response_units"]:
+                    if isinstance(u, dict):
+                        u_data = {uk: uv for uk, uv in u.items() if uk in VALID_UNIT_FIELDS}
+                        u_data["min_threat_level"] = max(1, min(5, int(u_data.get("min_threat_level", 1))))
+                        u_data["count"] = max(1, min(10, int(u_data.get("count", 2))))
+                        raw_uarch = str(u_data.get("archetype", "security")).lower().strip()
+                        if raw_uarch not in VALID_ARCHETYPES:
+                            u_data["archetype"] = "security" if "sec" in raw_uarch or "drone" in raw_uarch else "guard"
+                        else:
+                            u_data["archetype"] = raw_uarch
+                        raw_ubeh = str(u_data.get("behavior", "chase")).lower().strip()
+                        u_data["behavior"] = raw_ubeh if raw_ubeh in SUPPORTED_ACTOR_BEHAVIORS else "chase"
+                        norm_units.append(u_data)
+                ts["response_units"] = norm_units
         ow["threat_system"] = ts
 
         # 9. Time System
-        tm = dict(ow.get("time_system") or {})
+        VALID_TIME_FIELDS = {"start_hour", "time_scale", "day_night_cycle"}
+        tm_raw = dict(ow.get("time_system") or {})
+        tm = {k: v for k, v in tm_raw.items() if k in VALID_TIME_FIELDS}
         if not tm:
             tm = {"start_hour": 8, "time_scale": 60.0, "day_night_cycle": True}
+        else:
+            tm["start_hour"] = max(0, min(23, int(tm.get("start_hour", 8))))
+            tm["time_scale"] = max(1.0, min(3600.0, float(tm.get("time_scale", 60.0))))
+            tm["day_night_cycle"] = bool(tm.get("day_night_cycle", True))
         ow["time_system"] = tm
 
         normalized["open_world"] = ow
