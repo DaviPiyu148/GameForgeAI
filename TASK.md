@@ -1,184 +1,128 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Dev Proxy 502 Investigation — Intermittent Vite Proxy 502s After Startup/Authentication
+Full Repository Hygiene & Dead-Code Audit V1 (+ approved cleanup execution)
 
 ## Status
 COMPLETE
 
 ## Objective
-Investigate the intermittent development-only `502`/connection-reset behavior observed during
-prior browser testing (several `/api/*` requests returning `502` from the Vite dev proxy
-immediately after login/register, while the FastAPI backend's own access log showed the identical
-requests returning `200 OK`). Determine root cause among: Vite dev-proxy race, backend readiness
-race, `start.bat` startup ordering, frontend request burst, connection reuse/keep-alive issue, or
-unrelated transient local environment behavior. Fix only if code-fixable; otherwise document with
-concrete evidence. Do not modify authentication behavior, redesign the API, or introduce
-production infrastructure.
+Identify obsolete files, unused folders, abandoned implementations, duplicate systems, stale
+artifacts, unused dependencies, and dead documentation across the entire tracked repository —
+without breaking imports, runtime loading, build scripts, tests, Alembic migrations, documentation
+workflows, `start.bat`, frontend routing, backend startup, the Phaser runtime, AI generation, Open
+World, telemetry, or SSE. Executed in two explicitly-gated passes: (1) full audit, no changes; (2)
+after explicit user approval of the HIGH-confidence findings only, execute exactly that scope.
 
 ## Started
 2026-08-26
 
 ---
 
-## 1. Pre-Investigation Reconnaissance
+## 1. Audit Phase (RH1-RH13) — COMPLETE
 
-- [x] Read `start.bat`, `gameforge-ai/vite.config.ts`, `gameforge-ai/src/services/api.ts`,
-      `gameforge-ai/package.json`, `backend/app/main.py` (lifespan/startup)
-- [x] Read `FULL_STACK_OPERATIONAL_AUDIT.md`, `BROWSER_E2E_TEST_REPORT.md`, prior `TASK.md`
+- [x] Confirmed execution mode with user up front: **"Audit first, pause before deleting"**
+- [x] Full tracked-file inventory (294 files) via `git ls-files`
+- [x] Reference-graph audit across frontend (components/pages/runtime/services), backend
+      (routes/services/models/schemas/repos), scripts, config, dependencies, assets, CSS,
+      migrations, and documentation — delegated to 3 parallel read-only investigation agents,
+      personally synthesized and corrected into `REPOSITORY_HYGIENE_AUDIT.md`
+- [x] **Methodology issue caught and corrected mid-audit**: 2 of 3 agents were investigating a
+      git snapshot 9 commits behind real HEAD (worktree-isolation quirk). Caught by cross-checking
+      "file does not exist" claims against the real working tree; every affected claim was
+      independently re-verified against real HEAD before inclusion. Full account in
+      `REPOSITORY_HYGIENE_AUDIT.md`.
+- [x] Produced `REPOSITORY_HYGIENE_AUDIT.md`: 12 HIGH-confidence dead frontend files + 1 broken
+      favicon reference identified and evidenced; zero dead backend code; zero unused dependencies;
+      zero migration issues; zero accidentally-committed artifacts; 15 documentation-staleness
+      findings and several other judgment calls explicitly deferred, not auto-actioned
+- [x] **No deletions performed in this phase** — presented findings and stopped, per user's chosen
+      execution mode
 
 ### Evidence
-- `FULL_STACK_OPERATIONAL_AUDIT.md` already contains **FS-020**, a prior finding (2026-08-24,
-  different session) describing the *exact same symptom* on `/api/profile/preferences`,
-  `/api/projects`, `/api/discovery/search` — root-caused there as system-wide physical memory
-  exhaustion driving OS-level paging that stalls the Node/Vite proxy process, confirmed via
-  free-RAM measurement (1.2-1.7GB free of 7.7GB) and an elevated Windows "Memory Compression"
-  process, and classified **ENVIRONMENTAL, NOT CODE-FIXABLE**.
-- `backend/app/main.py`'s `lifespan()` does only lightweight orphan-build DB reconciliation on
-  startup — no eager Discovery/FAISS/embedding warm-up (that was already removed per FS-018). The
-  4 endpoints in question (`saved-discoveries`, `projects`, `profile/progress`,
-  `profile/preferences`) are plain DB reads with no dependency on the slow Discovery catalog, so a
-  backend-readiness race specific to those endpoints was not structurally plausible going in.
-- `gameforge-ai/vite.config.ts` proxy config is minimal/standard (`target: 'http://127.0.0.1:8000'`,
-  `changeOrigin: true`, no custom agent/keep-alive/timeout options — Vite/`http-proxy` defaults).
-- `gameforge-ai/src/services/api.ts`'s `request()` has no retry logic; a `502` surfaces as a plain
-  `ApiError` and is caught/`console.warn`ed by the calling `AppContext` function (by design, not
-  swallowed silently as an app-level failure).
+`REPOSITORY_HYGIENE_AUDIT.md` (full detail, all confidence ratings, all evidence).
 
 ---
 
-## 2. Reproduction
+## 2. Cleanup Phase (RH14) — COMPLETE
 
-- [x] Started backend (`uvicorn`, confirmed healthy via `/docs`) and frontend (`vite`) fresh,
-      confirmed both fully warm before testing (rules out cold-start/readiness races by
-      construction)
-- [x] Registered a real test user directly against the backend (`POST /api/auth/register`, `201`)
-      to obtain a valid JWT, bypassing the browser entirely for a controlled, scriptable repro
-- [x] Fired the same 4 endpoints (`saved-discoveries`, `projects`, `profile/progress`,
-      `profile/preferences`) that originally 502'd, in two modes, 10 rounds each:
-      **(a) 4-way concurrent** (matching the real `Promise.all` burst `AppContext.login`/`register`
-      fires) and **(b) fully sequential**, each round run twice — once straight to the backend
-      (`127.0.0.1:8000`), once through the Vite proxy (`127.0.0.1:5173`)
-- [x] Measured system free memory (`Get-CimInstance Win32_OperatingSystem`) and checked for the
-      Windows `Memory Compression` process at the time of failures
-- [x] Captured the Vite dev server's own stdout/stderr for the underlying proxy error
+User reviewed the audit and issued an explicit, scoped approval: delete exactly the 12
+HIGH-confidence files, fix exactly the 1 favicon reference, touch nothing else. Executed precisely
+to that scope — no second sweep, no uncertain candidates removed.
 
-### Results
-| Test | Requests | Result |
-|---|---|---|
-| Direct → backend, concurrent (10 rounds × 4) | 40 | **40/40 (100%) succeeded**, 15-50ms each |
-| Proxy → backend, concurrent (10 rounds × 4) | 40 | **25/40 (62.5%) failed** (`502` or connection failure) |
-| Proxy → backend, **fully sequential** (10 rounds × 4, zero concurrency) | 40 | **~20/40 (50%) failed** — comparable failure rate with **no concurrency at all** |
+- [x] **Final safety check** (immediately before deletion, at real HEAD): repeated the reference
+      search for all 12 files across `gameforge-ai/src`, `vite.config.ts`, `package.json`,
+      `backend/`, and `start.bat` — zero live references found for any of the 12; none skipped
+- [x] Deleted (via `git rm`):
+      `gameforge-ai/src/components/Shared/{Button,DiscoveryCard,ProjectCard,StatusBadge,
+      TerminalPane,ParameterControl,ProgressBar,ScanlineOverlay,SectionHeader}.tsx`,
+      `gameforge-ai/src/assets/{react.svg,vite.svg,hero.png}`
+- [x] Fixed `gameforge-ai/index.html:5` — `href="/vite.svg"` → `href="/favicon.svg"`
+      (verified `public/favicon.svg` exists first; asset itself untouched)
+- [x] CSS safety check: confirmed no deleted component owned a CSS class/keyframe without another
+      live consumer (one class, `slider-thumb-primary`, turned out to be a pre-existing dangling
+      reference never actually defined in CSS — zero effect either way). `styles/index.css` **not
+      modified**.
+- [x] Confirmed zero uncertain candidates touched — `public/icons.svg`, `backend/scripts/*.py`,
+      `test_generation_live.py`, `AI_PROVIDER` config, `evaluate_discovery*.py`, all historical
+      reports, all migrations, `stitch_gameforge_ai/`, `DESIGN.md` all untouched
+- [x] Updated `REPOSITORY_HYGIENE_AUDIT.md`: FE-01 through FE-12 marked FIXED, Cleanup
+      Results/Regression/Browser Smoke Test sections completed with evidence, FE-13 and all
+      deferred candidates left explicitly deferred, historical findings left unrewritten
 
-- System free memory measured **0.91 GB → 0.23 GB** of 7.68 GB total *during* this test run (this
-  machine's physical RAM, not a container/VM limit).
-- Windows `Memory Compression` process active and holding 126MB at the time of failures — the same
-  active-paging signature FS-020 used as evidence.
-- Vite's own log recorded, for every failure: `[vite] http proxy error: <path>` /
-  `Error: read ECONNRESET at TCP.onStreamRead` — a low-level TCP reset on the **proxy→backend**
-  socket, not an HTTP-level error from FastAPI (the backend's own access log shows every one of
-  these same requests, across the whole session, eventually served `200 OK` — the backend itself
-  never failed to handle a single request it received).
+### Evidence
+See `REPOSITORY_HYGIENE_AUDIT.md` §§ "Cleanup Results", "Regression Results", "start.bat / App
+Startup", "Browser Smoke Test", "Before / After Inventory".
 
 ---
 
-## 3. Root Cause Analysis
+## 3. Verification
 
-Classification options were: (A) Vite dev-proxy race, (B) backend readiness race, (C) `start.bat`
-startup ordering, (D) frontend request burst, (E) connection reuse/keep-alive issue,
-(F) unrelated transient local environment behavior.
+| Check | Result |
+|---|---|
+| Backend tests (`pytest tests/ -q`) | **335 passed**, 131.45s |
+| TypeScript (`tsc --noEmit`) | **0 errors** |
+| Lint (`oxlint`) | **0 errors, 0 warnings** |
+| Production build (`npm run build`) | **Succeeded**, 1.49s (CSS bundle shrank 129.47kB→128.40kB, expected) |
+| Alembic (`current`/`heads`) | **`bc9ae398f146` (head)** — single head, unchanged |
+| `start.bat`'s two components (backend + frontend) | Both start cleanly; `/api/health` returns the expected payload; frontend serves with zero import/module-resolution errors and the corrected favicon link |
+| Browser smoke test (7 routes + Builder/Dashboard/Profile regression checks) | **PASS** — no missing components, no broken CSS/animation, no blank pages; zero console errors attributable to the cleanup (only the pre-existing, already-documented `FS-034` dev-proxy memory-pressure issue observed, reconfirmed via a fresh memory reading during this exact test) |
 
-- **(B) and (C) ruled out**: backend was confirmed healthy and fully warm for the entire test
-  window (no cold-start, no ordering dependency — `start.bat` wasn't even in the loop for the
-  isolated repro); direct-to-backend requests succeeded 100% of the time throughout.
-- **(D) ruled out as the trigger**: the fully **sequential** test (zero concurrent requests, one at
-  a time, waiting for each response) failed at essentially the same rate (~50%) as the concurrent
-  burst (62.5%). If request-burst/concurrency were the cause, the sequential run should have been
-  near-100% clean — it wasn't.
-- **(A) not supported as a proxy-internal race**: same reasoning — a "race" implies concurrent
-  requests interfering with each other inside the proxy; this reproduces with no concurrency.
-- **(E) is the *mechanism*, not the root trigger**: the failure is a genuine low-level `ECONNRESET`
-  on the Node/Vite proxy's socket to the backend — but nothing in this diff or the existing proxy
-  config manages connection pooling explicitly, and the reset is consistent with the OS tearing
-  down/stalling a socket under memory pressure, not a logic bug in reuse bookkeeping.
-- **(F) confirmed as root cause**: the failures track directly with this machine's free physical
-  RAM collapsing toward zero (0.91GB → 0.23GB of 7.68GB total) and an actively elevated Windows
-  `Memory Compression` process during the exact window failures occurred, while the backend process
-  itself never once failed to complete a request. This reproduces and reinforces **FS-020**
-  (`FULL_STACK_OPERATIONAL_AUDIT.md`, 2026-08-24) on this same physical machine, now with a second,
-  independently-gathered, more rigorous (concurrent-vs-sequential, direct-vs-proxy) dataset.
-
-**No code-level defect was found in `vite.config.ts`, `start.bat`, `api.ts`, or the backend startup
-path.** The Vite proxy's default behavior (no custom retry/circuit-breaker) is standard and
-correct; adding masking/retry logic was explicitly out of scope per the task brief and would not
-address the actual cause (physical memory exhaustion), which no application-layer code change can
-fix.
+### Before / After
+294 tracked files → 282 after the 12 deletions → 283 after this commit (the +1 is
+`REPOSITORY_HYGIENE_AUDIT.md` itself, newly tracked — expected, not a discrepancy).
 
 ---
 
-## 4. Fix
+## 4. Git Checkpoint
 
-**Not applicable — no code fix implemented.** Root cause is external to the application (system
-physical memory availability on this development machine), matching the disposition of the prior
-FS-020 finding. Implementing a retry/masking layer was explicitly excluded by the task brief and
-would misrepresent a genuine resource constraint as resolved.
-
-**No automated regression test was added** for this specific behavior: a test whose pass/fail
-outcome depends on the host machine's free RAM at execution time would be inherently flaky in CI
-and would not exercise any actual application code path — it would only encode "does this machine
-currently have enough free memory," which is not a meaningful assertion about GameForge's
-correctness. This judgment call is documented rather than silently skipped.
-
----
-
-## 5. Verification & Regression
-
-- [x] Backend tests: `.venv\Scripts\python.exe -m pytest tests/ -q` — **335 passed** in 137.83s
-      (unchanged from before this investigation — no backend code was modified)
-- [x] TypeScript check: `npx tsc --noEmit` — **0 errors**
-- [x] Lint check: `npx oxlint` — **0 errors / 0 warnings**
-- [x] Production build: `npm run build` — **succeeded**
-- [x] `git status` before and after: clean throughout — this task made **zero source changes**
-- Browser re-verification not re-run: no code changed, and the investigation's own controlled
-  direct-vs-proxy HTTP testing (§2) is a more precise, more repeatable signal for this specific
-  symptom than a fresh browser walkthrough would add.
-
----
-
-## 6. Git Checkpoint
-
-- [x] `git diff` reviewed — empty (investigation only; no `git add`/commit performed for source,
-      only this ledger + the two audit docs below are updated)
-- [x] No secrets, `.env`, or temporary files staged
-- [x] Working tree verified clean of any leftover test artifacts (temp scripts/tokens removed)
+- [x] `git status`/`git diff`/`git diff --stat` reviewed — confirmed the only changes are the 12
+      approved deletions, the `index.html` favicon fix, `TASK.md`, and `REPOSITORY_HYGIENE_AUDIT.md`
+- [x] No secrets, no unrelated files
+- [x] Commit: `chore: remove obsolete repository artifacts`
+- [x] Working tree verified clean post-commit
 
 ---
 
 ## Remaining Work
-None for this investigation. The underlying environmental constraint (limited free RAM on this
-specific development machine, exacerbated by other concurrently-running applications) remains
-un-fixable at the application layer, exactly as already disclosed in FS-020.
+Everything explicitly deferred in `REPOSITORY_HYGIENE_AUDIT.md`'s "Deferred / Uncertain Candidates"
+section remains open for a future, separately-scoped decision: 15 documentation-staleness findings,
+`public/icons.svg`, the R&D scripts in `backend/scripts/`, `test_generation_live.py`'s disposition,
+and the unread `AI_PROVIDER` config field. None of these block this task's completion — they were
+intentionally out of scope for this pass.
 
 ## Blockers
 None.
 
-## Final Verdict
-**KNOWN DEVELOPMENT-ONLY LIMITATION.** Reproducible and root-caused with concrete new evidence
-(direct-vs-proxy comparison, concurrent-vs-sequential comparison, live memory/paging measurement,
-raw Vite proxy error log). Confined to the local Vite dev-proxy path on this specific
-memory-constrained machine; does not indicate a defect in GameForge's application code, and does
-not apply to a production deployment (no dev proxy exists in that path — the built frontend talks
-to the API directly). Reinforces and does not contradict the prior FS-020 finding.
-
 ## Change Log
-- 2026-08-26: Completed Dev Proxy 502 Investigation. Reproduced the symptom with a controlled
-  direct-vs-proxy, concurrent-vs-sequential HTTP test harness (40 requests each condition),
-  confirmed root cause as system memory exhaustion (0.91GB→0.23GB free of 7.68GB) driving OS-level
-  paging that resets the Vite proxy's backend socket (`ECONNRESET`), while the backend itself never
-  failed a single request. Classified KNOWN DEVELOPMENT-ONLY LIMITATION, consistent with and
-  reinforcing FS-020. No code changes made (none would be correct — root cause is not code-fixable).
-  335/335 backend tests, clean TypeScript/lint/build, confirming zero regressions from the
-  investigation itself.
+- 2026-08-26: Completed the approved cleanup phase (RH14) — deleted the 12 HIGH-confidence dead
+  frontend files, fixed the broken favicon reference, ran full regression (335/335 backend tests,
+  clean TypeScript/lint/build, single Alembic head), verified `start.bat`'s components and a real
+  browser smoke test across all 7 routes, and committed. Zero uncertain candidates touched.
+- 2026-08-26: Completed the audit phase (RH1-RH13) — produced `REPOSITORY_HYGIENE_AUDIT.md` with a
+  full evidence-backed inventory and findings, caught and corrected a mid-audit git-worktree
+  staleness issue, stopped before any deletion pending explicit approval.
+- 2026-08-26: (Prior) Completed Dev Proxy 502 Investigation (commit `fc504c3`).
 - 2026-08-26: (Prior) Completed browser verification for the UI Copy Audit (commit `db61452`).
 - 2026-08-26: (Prior) Completed Website Content & UI Copy Audit V1 (commit `b192bc1`).
 - 2026-08-26: (Prior) Completed UI Motion & Special Effects V1 (commit `4e7fc90`).
