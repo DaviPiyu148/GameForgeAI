@@ -323,14 +323,19 @@ export default function ProfilePage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {(progressData?.milestones || []).map((m) => (
+              {(progressData?.milestones || []).map((m) => {
+                const isRecentlyUnlocked =
+                  m.is_unlocked &&
+                  Boolean(m.unlocked_at) &&
+                  Date.now() - new Date(m.unlocked_at as string).getTime() < 10 * 60 * 1000;
+                return (
                 <div
                   key={m.milestone_key}
-                  className={`p-3 rounded-sm border transition-all relative overflow-hidden flex flex-col justify-between ${
+                  className={`p-3 rounded-sm border transition-all relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 ${
                     m.is_unlocked
-                      ? 'bg-surface-container border-primary/50 shadow-[0_0_10px_rgba(76,224,210,0.15)]'
+                      ? 'bg-surface-container border-primary/50 shadow-[0_0_10px_rgba(76,224,210,0.15)] hover:shadow-[0_0_18px_rgba(76,224,210,0.3)]'
                       : 'bg-surface-container-lowest/50 border-outline-variant/30 opacity-60'
-                  }`}
+                  } ${isRecentlyUnlocked ? 'milestone-unlock-flash' : ''}`}
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -375,7 +380,8 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

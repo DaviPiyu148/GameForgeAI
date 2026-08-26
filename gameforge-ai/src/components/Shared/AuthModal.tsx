@@ -194,7 +194,7 @@ export const AuthModal = () => {
                 isSubmitting ? 'opacity-50 cursor-wait' : ''
               }`}
             >
-              <span className="material-symbols-outlined text-sm">
+              <span className={`material-symbols-outlined text-sm inline-block ${isSubmitting ? 'animate-spin' : ''}`}>
                 {isSubmitting ? 'sync' : mode === 'login' ? 'login' : 'how_to_reg'}
               </span>
               <span>{isSubmitting ? 'Verifying...' : mode === 'login' ? 'Authenticate' : 'Create Account'}</span>

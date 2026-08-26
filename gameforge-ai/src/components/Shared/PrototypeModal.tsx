@@ -42,6 +42,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
 }) => {
   const [isClosing, setIsClosing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenPulse, setFullscreenPulse] = useState(false);
   const modalContainerRef = useRef<HTMLDivElement>(null);
   const [currentDsl, setCurrentDsl] = useState<GameDSL>(
     project?.gameDsl || gameDsl || SURVIVAL_FIXTURE
@@ -121,6 +122,11 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   useEffect(() => {
     const onFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
+      // Brief scale/opacity pulse to mark the fullscreen transition itself
+      // (the browser handles the actual viewport change; this just gives it
+      // a visible "settling in" beat rather than an abrupt jump-cut).
+      setFullscreenPulse(true);
+      setTimeout(() => setFullscreenPulse(false), 260);
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
@@ -345,7 +351,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
       <div
         className={`w-full max-w-5xl max-h-[95vh] overflow-y-auto bg-surface border-2 border-primary rounded-lg flex flex-col shadow-[0_0_50px_rgba(76,224,210,0.2)] ${
           isClosing ? 'modal-exit' : 'modal-enter'
-        }`}
+        } ${fullscreenPulse ? 'fullscreen-transition' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}

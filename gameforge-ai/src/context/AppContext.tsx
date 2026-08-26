@@ -13,6 +13,7 @@ import { buildService } from '../services/builds';
 import { discoveryService } from '../services/discovery';
 import { authService, authStorage, savedDiscoveriesService } from '../services/auth';
 import { profileService } from '../services/profile';
+import { pushToast } from '../services/toastBus';
 
 const defaultBuildParams: BuildParams = {
   // Must match BuilderPage.tsx's <option> values and backend BuildParams schema defaults.
@@ -141,11 +142,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       const progress = await profileService.getProgress();
-      setState((s) => ({
-        ...s,
-        progress,
-        user: s.user ? { ...s.user, level: progress.current_level } : null,
-      }));
+      setState((s) => {
+        // Diff against the previously-known progress snapshot (if any) to raise
+        // celebratory toasts for XP gain / level up / newly unlocked milestones.
+        // Purely a UI side-effect — does not alter the fetched data or any state shape.
+        const prev = s.progress;
+        if (prev) {
+          const xpGained = progress.total_xp - prev.total_xp;
+          if (progress.current_level > prev.current_level) {
+            pushToast({
+              variant: 'levelup',
+              title: `LEVEL UP → ${progress.current_level}`,
+              description: progress.creator_title,
+            });
+          } else if (xpGained > 0) {
+            pushToast({ variant: 'xp', title: `+${xpGained} XP` });
+          }
+
+          if (progress.unlocked_milestone_count > prev.unlocked_milestone_count) {
+            const newlyUnlocked = progress.milestones.find(
+              (m) => m.is_unlocked && !prev.milestones.some((pm) => pm.milestone_key === m.milestone_key && pm.is_unlocked)
+            );
+            pushToast({
+              variant: 'milestone',
+              title: 'NEW MILESTONE',
+              description: newlyUnlocked?.title,
+            });
+          }
+        }
+
+        return {
+          ...s,
+          progress,
+          user: s.user ? { ...s.user, level: progress.current_level } : null,
+        };
+      });
     } catch (err) {
       console.warn('Failed to load progress from backend API', err);
     }
@@ -375,6 +406,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ...s,
         savedDiscoveries: [saved, ...s.savedDiscoveries.filter((d) => d.id !== saved.id)],
       }));
+      pushToast({ variant: 'success', title: 'GAME SAVED', description: saved.title });
     } catch (err) {
       // Prevents an unhandled promise rejection when a caller (e.g. HomePage's Save
       // button) invokes this without awaiting/catching. A failed save (expired token,
@@ -526,6 +558,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               refreshProgress(),
               refreshPreferences(),
             ]);
+            pushToast({ variant: 'success', title: 'BUILD COMPLETE', description: 'Prototype ready to play.' });
             navigate('/status/success');
           } else if (statusData.status === 'ERROR') {
             setState((s) => ({

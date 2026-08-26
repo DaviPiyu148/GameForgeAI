@@ -162,7 +162,7 @@ const BuilderPage = () => {
                     disabled={state.buildStatus === 'COMPILING'}
                     className={`bg-secondary-container hover:bg-secondary-soft/30 text-on-surface border border-secondary-soft px-6 py-2 font-mono text-xs uppercase tracking-wide flex items-center gap-2 btn-interactive energy-sweep glow-magenta ${state.buildStatus === 'COMPILING' ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                   >
-                    <span className="material-symbols-outlined text-sm">{state.buildStatus === 'COMPILING' ? 'sync' : 'play_arrow'}</span>
+                    <span className={`material-symbols-outlined text-sm inline-block ${state.buildStatus === 'COMPILING' ? 'animate-spin' : ''}`}>{state.buildStatus === 'COMPILING' ? 'sync' : 'play_arrow'}</span>
                     {state.buildStatus === 'COMPILING' ? 'Compiling...' : 'Compile Scene'}
                   </button>
                 </div>
@@ -177,7 +177,7 @@ const BuilderPage = () => {
                 <span className="material-symbols-outlined text-[14px]">preview</span>
                 Live Preview (Wireframe)
               </h3>
-              <div className="bg-terminal-bg border border-secondary-soft/30 aspect-video relative overflow-hidden flex items-center justify-center">
+              <div className="bg-terminal-bg border border-secondary-soft/30 aspect-video relative overflow-hidden flex items-center justify-center scan-sweep">
                 <div className="absolute inset-0" style={{
                   backgroundImage: 'linear-gradient(rgba(105, 248, 234, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(105, 248, 234, 0.2) 1px, transparent 1px)',
                   backgroundSize: '20px 20px',

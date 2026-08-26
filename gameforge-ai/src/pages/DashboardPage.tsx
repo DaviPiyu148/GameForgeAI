@@ -89,9 +89,31 @@ const DashboardPage = () => {
                       <span className="font-mono text-[10px] text-outline ml-4">Modified: {game.lastModified}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-primary/10 border border-primary/30 px-2 py-1 shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-primary crt-flicker"></div>
-                    <span className="font-mono text-[10px] text-primary uppercase">{game.status}</span>
+                  <div
+                    className={`flex items-center gap-1 border px-2 py-1 shrink-0 ${
+                      game.status === 'ERROR'
+                        ? 'bg-error/10 border-error/40'
+                        : game.status === 'COMPILING'
+                        ? 'bg-tertiary/10 border-tertiary/40'
+                        : 'bg-primary/10 border-primary/30'
+                    }`}
+                  >
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        game.status === 'ERROR'
+                          ? 'bg-error ai-pulse'
+                          : game.status === 'COMPILING'
+                          ? 'bg-tertiary ai-pulse'
+                          : 'bg-primary'
+                      }`}
+                    ></div>
+                    <span
+                      className={`font-mono text-[10px] uppercase ${
+                        game.status === 'ERROR' ? 'text-error' : game.status === 'COMPILING' ? 'text-tertiary' : 'text-primary'
+                      }`}
+                    >
+                      {game.status}
+                    </span>
                   </div>
                 </div>
 

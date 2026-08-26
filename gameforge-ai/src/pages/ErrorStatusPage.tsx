@@ -128,7 +128,10 @@ const ErrorStatusPage = () => {
           disabled={(state.buildStatus as string) === 'COMPILING'}
           className={`font-mono text-xs uppercase px-6 py-3 bg-primary text-on-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 glow-cyan btn-interactive energy-sweep cursor-pointer ${(state.buildStatus as string) === 'COMPILING' ? 'opacity-50 cursor-wait' : 'hover:bg-primary-bright hover:border-primary-bright'}`}
         >
-          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <span
+            className={`material-symbols-outlined text-base inline-block ${(state.buildStatus as string) === 'COMPILING' ? 'animate-spin' : ''}`}
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
             {(state.buildStatus as string) === 'COMPILING' ? 'sync' : 'restart_alt'}
           </span>
           {(state.buildStatus as string) === 'COMPILING' ? 'COMPILING...' : 'RETRY GENERATION'}

@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import { PageContainer } from './components/Shared/PageContainer';
 import { AuthModal } from './components/Shared/AuthModal';
+import { ToastContainer } from './components/Shared/ToastContainer';
 
 function App() {
   const location = useLocation();
@@ -22,6 +23,7 @@ function App() {
           <Route path="*" element={<Navigate to="/build" replace />} />
         </Routes>
         <AuthModal />
+        <ToastContainer />
       </div>
     );
   }
@@ -39,6 +41,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <AuthModal />
+        <ToastContainer />
       </div>
     </PageContainer>
   );
