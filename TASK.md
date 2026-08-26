@@ -78,6 +78,45 @@ Systematically inspect all user-facing copy across the GameForge AI platform (7 
 - [x] TypeScript check: `npx tsc --noEmit` — **0 errors**.
 - [x] Lint check: `npx oxlint` — **0 errors / 0 warnings**.
 - [x] Production build: `npm run build` — **succeeded** (built in 1.79s).
+- [x] Browser tests — the initial pass by the prior agent could not complete these (its
+      `open_browser_url` tool failed to resolve a CDP connection). Performed in a follow-up pass
+      using a local headless Chromium (Playwright) driving the actual Vite dev server
+      (`http://localhost:5173`) + FastAPI backend (`http://127.0.0.1:8000`), viewport 1440×900,
+      following the checklist below.
+
+### Browser Verification Results (viewport 1440×900)
+- **Home (`#/`)**: hero headline, subtitle, status pill, search placeholder, all 3 suggestion
+  chips, and the 3-card features bento grid all present and correctly worded. No typos found.
+- **Builder (`#/build`)**: "Natural Logic Editor" header present. World Architecture Mode options
+  read `Linear Arena / Single Level`, `Sequential Multi-Level Campaign`,
+  `Generalized Open World (Districts & Vehicles)`; Scale options read
+  `Fast Prototype (1 Level / Small World)`, `Standard Scale (2-3 Levels / Mid-Size World)`,
+  `Expanded Scale (3-5 Levels / Large World)` — **zero remaining "Stage" occurrences** in either
+  dropdown (checked programmatically against all `<option>` text). Procedural Visual Density,
+  Physics Complexity, Logic Modules, and the Compiler Output panel header all present.
+- **No Matches (`#/discover/no-matches`)**: terminal header, `404_CONCEPT_NOT_FOUND` alert,
+  `BUILD THIS IDEA` / `REFINE SEARCH` buttons, and both suggestion cards (`> RANDOMIZE`,
+  `> SAVED & PROJECTS` with "Access your saved discoveries and projects.") all present and correct.
+- **Dashboard (`#/dashboard`), authenticated with zero games** (registered a real throwaway test
+  user through the live Auth Modal against the running backend to reach this state): header reads
+  `MY GAMES DASHBOARD`, empty state reads exactly `No games generated yet. Head to the Builder to
+  build one!`, Saved Discoveries section present.
+- **Profile (`#/profile`), same authenticated session**: stat tiles (Total XP, Milestones, Saved
+  Items, Games Built), Your Game DNA, Saved Discoveries, and Generated Games empty state
+  (`No games generated yet. Create your first prototype in the Builder!`) all present and correct.
+  All 8 milestone cards render with readable titles/descriptions, no truncation or overlap.
+- **Console/network audit**: zero console errors attributable to any copy-audit change. One
+  environment-level observation, not a regression from this change: a handful of `/api/*` GET
+  requests (`saved-discoveries`, `projects`, `profile/progress`, `profile/preferences`) fired
+  immediately after login/register intermittently returned `502` at Vite's dev proxy layer, while
+  the backend's own access log shows every one of those same endpoints was ultimately served with
+  `200 OK` — consistent with a transient Vite-dev-proxy connection race under a concurrent request
+  burst right after auth, not a backend or application-code defect (no code in this diff touches
+  fetch/proxy/auth logic). Not reproducible via the production build (no dev proxy in that path).
+  **Gotcha for future browser verification of this app**: driving in-app navigation via a raw
+  URL/hash `goto()` forces a hard page reload that can outrun the auth-token rehydration flow and
+  make authenticated pages misleadingly appear signed-out; use the Navbar's actual `<Link>`
+  elements for in-app navigation instead, as done here.
 
 ---
 
