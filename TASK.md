@@ -1,134 +1,184 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Website Content & UI Copy Audit V1 — Typos, Grammar, Nonsense, Placeholders, Contradictions, Terminology, and User-Facing Quality
+Dev Proxy 502 Investigation — Intermittent Vite Proxy 502s After Startup/Authentication
 
 ## Status
 COMPLETE
 
 ## Objective
-Systematically inspect all user-facing copy across the GameForge AI platform (7 primary routes, shared modals, runtime UI, HUD, error states, toasts, and backend-originated strings), compile a comprehensive issue matrix in `UI_COPY_AUDIT.md`, remediate all confirmed typos, grammatical errors, placeholder leakage, debug leakage, copy/behavior mismatches, and terminology inconsistencies, and verify zero regressions across backend tests and frontend production builds.
+Investigate the intermittent development-only `502`/connection-reset behavior observed during
+prior browser testing (several `/api/*` requests returning `502` from the Vite dev proxy
+immediately after login/register, while the FastAPI backend's own access log showed the identical
+requests returning `200 OK`). Determine root cause among: Vite dev-proxy race, backend readiness
+race, `start.bat` startup ordering, frontend request burst, connection reuse/keep-alive issue, or
+unrelated transient local environment behavior. Fix only if code-fixable; otherwise document with
+concrete evidence. Do not modify authentication behavior, redesign the API, or introduce
+production infrastructure.
 
 ## Started
 2026-08-26
 
 ---
 
-## 1. Pre-Implementation & Reconnaissance
+## 1. Pre-Investigation Reconnaissance
 
-- [x] Read AGENTS.md, docs (02-PRODUCT-SPEC, 05-FRONTEND-ARCH, 08-API-CONTRACT, 15-CURRENT-STATUS), README.md, UI_MOTION_SYSTEM.md
-- [x] Inspect git status and git log (working tree clean on fresh-main prior to task)
-- [x] Inventory all frontend pages (7 routes), shared components (19 components), runtime modules (17 files), services, and user-facing backend strings
+- [x] Read `start.bat`, `gameforge-ai/vite.config.ts`, `gameforge-ai/src/services/api.ts`,
+      `gameforge-ai/package.json`, `backend/app/main.py` (lifespan/startup)
+- [x] Read `FULL_STACK_OPERATIONAL_AUDIT.md`, `BROWSER_E2E_TEST_REPORT.md`, prior `TASK.md`
 
 ### Evidence
-- 7 primary routes audited: `#/`, `#/discover/no-matches`, `#/build`, `#/status/success`, `#/status/error`, `#/dashboard`, `#/profile`.
-- 19 shared components audited in `gameforge-ai/src/components/Shared/`.
-- 17 runtime files audited in `gameforge-ai/src/runtime/`.
-- Backend endpoints and schemas audited in `backend/app/generation/`, `backend/app/schemas/`, and `backend/app/services/`.
+- `FULL_STACK_OPERATIONAL_AUDIT.md` already contains **FS-020**, a prior finding (2026-08-24,
+  different session) describing the *exact same symptom* on `/api/profile/preferences`,
+  `/api/projects`, `/api/discovery/search` — root-caused there as system-wide physical memory
+  exhaustion driving OS-level paging that stalls the Node/Vite proxy process, confirmed via
+  free-RAM measurement (1.2-1.7GB free of 7.7GB) and an elevated Windows "Memory Compression"
+  process, and classified **ENVIRONMENTAL, NOT CODE-FIXABLE**.
+- `backend/app/main.py`'s `lifespan()` does only lightweight orphan-build DB reconciliation on
+  startup — no eager Discovery/FAISS/embedding warm-up (that was already removed per FS-018). The
+  4 endpoints in question (`saved-discoveries`, `projects`, `profile/progress`,
+  `profile/preferences`) are plain DB reads with no dependency on the slow Discovery catalog, so a
+  backend-readiness race specific to those endpoints was not structurally plausible going in.
+- `gameforge-ai/vite.config.ts` proxy config is minimal/standard (`target: 'http://127.0.0.1:8000'`,
+  `changeOrigin: true`, no custom agent/keep-alive/timeout options — Vite/`http-proxy` defaults).
+- `gameforge-ai/src/services/api.ts`'s `request()` has no retry logic; a `502` surfaces as a plain
+  `ApiError` and is caught/`console.warn`ed by the calling `AppContext` function (by design, not
+  swallowed silently as an app-level failure).
 
 ---
 
-## 2. Automated & Static Content Scanning
+## 2. Reproduction
 
-- [x] Extracted 314 user-visible string literals & JSX attributes across the frontend and backend.
-- [x] Audited for typos, spelling, grammar, contractions, and casing.
-- [x] Audited for nonsense, placeholders, debug leakage, and raw code traces (0 leaks found).
-- [x] Audited terminology consistency across Builder, Dashboard, Profile, No Matches, and Phaser runtime.
-- [x] Audited CTA buttons, tooltips, and accessibility labels.
+- [x] Started backend (`uvicorn`, confirmed healthy via `/docs`) and frontend (`vite`) fresh,
+      confirmed both fully warm before testing (rules out cold-start/readiness races by
+      construction)
+- [x] Registered a real test user directly against the backend (`POST /api/auth/register`, `201`)
+      to obtain a valid JWT, bypassing the browser entirely for a controlled, scriptable repro
+- [x] Fired the same 4 endpoints (`saved-discoveries`, `projects`, `profile/progress`,
+      `profile/preferences`) that originally 502'd, in two modes, 10 rounds each:
+      **(a) 4-way concurrent** (matching the real `Promise.all` burst `AppContext.login`/`register`
+      fires) and **(b) fully sequential**, each round run twice — once straight to the backend
+      (`127.0.0.1:8000`), once through the Vite proxy (`127.0.0.1:5173`)
+- [x] Measured system free memory (`Get-CimInstance Win32_OperatingSystem`) and checked for the
+      Windows `Memory Compression` process at the time of failures
+- [x] Captured the Vite dev server's own stdout/stderr for the underlying proxy error
 
-### Findings Summary
-- **Terminology Mismatches**:
-  - Empty states in `DashboardPage.tsx` and `ProfilePage.tsx` referred to the stale pre-alpha term `"Scene Composer"` instead of `"Builder"`.
-  - Dropdown options in `BuilderPage.tsx`, level transition floating text in `GameScene.ts`, LevelDef schema defaults in `dsl_models.py`, blueprint mechanics in `blueprint.py`, and validation logs in `game_generation_service.py` used `"Stage/Stages"` instead of canonical `"Level/Levels"`.
-- **Copy/Behavior Mismatches**:
-  - `NoMatchesPage.tsx` card used snake_case `> PREVIOUS_QUERIES` and claimed to "Access recent search parameters" while navigating to `/dashboard` (Saved Discoveries & Projects).
-- **CTA Redundancy**:
-  - `ErrorStatusPage.tsx` featured two identical buttons (`MODIFY PROMPT` and `RETURN TO BUILDER`) both routing to `/build`.
-- **UI Clarity & Accessibility**:
-  - `HomePage.tsx` show more button contained repetitive text `Show More Results ({N} More)` -> updated to `Show More Results ({N} remaining)`.
-  - Missing `aria-label` attributes on icon-only buttons (HomePage mic toggle, Builder compiler output clear, Dashboard bookmark delete, Profile saved discovery remove).
+### Results
+| Test | Requests | Result |
+|---|---|---|
+| Direct → backend, concurrent (10 rounds × 4) | 40 | **40/40 (100%) succeeded**, 15-50ms each |
+| Proxy → backend, concurrent (10 rounds × 4) | 40 | **25/40 (62.5%) failed** (`502` or connection failure) |
+| Proxy → backend, **fully sequential** (10 rounds × 4, zero concurrency) | 40 | **~20/40 (50%) failed** — comparable failure rate with **no concurrency at all** |
+
+- System free memory measured **0.91 GB → 0.23 GB** of 7.68 GB total *during* this test run (this
+  machine's physical RAM, not a container/VM limit).
+- Windows `Memory Compression` process active and holding 126MB at the time of failures — the same
+  active-paging signature FS-020 used as evidence.
+- Vite's own log recorded, for every failure: `[vite] http proxy error: <path>` /
+  `Error: read ECONNRESET at TCP.onStreamRead` — a low-level TCP reset on the **proxy→backend**
+  socket, not an HTTP-level error from FastAPI (the backend's own access log shows every one of
+  these same requests, across the whole session, eventually served `200 OK` — the backend itself
+  never failed to handle a single request it received).
 
 ---
 
-## 3. UI Copy Audit Matrix Compilation
+## 3. Root Cause Analysis
 
-- [x] Compiled authoritative audit matrix in `UI_COPY_AUDIT.md` documenting all 22 tracked items with ID, location, current text, issue, recommended text, severity, category, and resolution status.
+Classification options were: (A) Vite dev-proxy race, (B) backend readiness race, (C) `start.bat`
+startup ordering, (D) frontend request burst, (E) connection reuse/keep-alive issue,
+(F) unrelated transient local environment behavior.
+
+- **(B) and (C) ruled out**: backend was confirmed healthy and fully warm for the entire test
+  window (no cold-start, no ordering dependency — `start.bat` wasn't even in the loop for the
+  isolated repro); direct-to-backend requests succeeded 100% of the time throughout.
+- **(D) ruled out as the trigger**: the fully **sequential** test (zero concurrent requests, one at
+  a time, waiting for each response) failed at essentially the same rate (~50%) as the concurrent
+  burst (62.5%). If request-burst/concurrency were the cause, the sequential run should have been
+  near-100% clean — it wasn't.
+- **(A) not supported as a proxy-internal race**: same reasoning — a "race" implies concurrent
+  requests interfering with each other inside the proxy; this reproduces with no concurrency.
+- **(E) is the *mechanism*, not the root trigger**: the failure is a genuine low-level `ECONNRESET`
+  on the Node/Vite proxy's socket to the backend — but nothing in this diff or the existing proxy
+  config manages connection pooling explicitly, and the reset is consistent with the OS tearing
+  down/stalling a socket under memory pressure, not a logic bug in reuse bookkeeping.
+- **(F) confirmed as root cause**: the failures track directly with this machine's free physical
+  RAM collapsing toward zero (0.91GB → 0.23GB of 7.68GB total) and an actively elevated Windows
+  `Memory Compression` process during the exact window failures occurred, while the backend process
+  itself never once failed to complete a request. This reproduces and reinforces **FS-020**
+  (`FULL_STACK_OPERATIONAL_AUDIT.md`, 2026-08-24) on this same physical machine, now with a second,
+  independently-gathered, more rigorous (concurrent-vs-sequential, direct-vs-proxy) dataset.
+
+**No code-level defect was found in `vite.config.ts`, `start.bat`, `api.ts`, or the backend startup
+path.** The Vite proxy's default behavior (no custom retry/circuit-breaker) is standard and
+correct; adding masking/retry logic was explicitly out of scope per the task brief and would not
+address the actual cause (physical memory exhaustion), which no application-layer code change can
+fix.
 
 ---
 
-## 4. Remediation & Fixes
+## 4. Fix
 
-- [x] `gameforge-ai/src/pages/HomePage.tsx`: Added `aria-label="Toggle voice input"`, refined show more count copy.
-- [x] `gameforge-ai/src/pages/NoMatchesPage.tsx`: Changed card to `> SAVED & PROJECTS` and copy to `"Access your saved discoveries and projects."`.
-- [x] `gameforge-ai/src/pages/BuilderPage.tsx`: Replaced "Stage" with canonical "Level" in World Architecture Mode & Scale options, added `aria-label` and `title` to compiler log clear button, standardized initial log to `GameForge Engine v4.2.1`.
-- [x] `gameforge-ai/src/pages/DashboardPage.tsx`: Standardized header to `MY GAMES DASHBOARD`, updated empty state to `"Head to the Builder to build one!"`, added `aria-label` to bookmark delete button.
-- [x] `gameforge-ai/src/pages/ProfilePage.tsx`: Updated empty state to `"Create your first prototype in the Builder!"`, added `aria-label` to remove saved discovery actions in list and modal.
-- [x] `gameforge-ai/src/pages/ErrorStatusPage.tsx`: Differentiated CTAs into `RETRY GENERATION`, `MODIFY IN BUILDER` (`/build`), and `VIEW DASHBOARD` (`/dashboard`).
-- [x] `gameforge-ai/src/runtime/GameScene.ts`: Standardized HUD to `FINAL LEVEL`, level transition text to `Entering: Level ${N}`, and default completion message to `LEVEL COMPLETE!`.
-- [x] `backend/app/generation/blueprint.py`: Updated mechanic predicate name to `"Multi-Level Campaign"`.
-- [x] `backend/app/generation/dsl_models.py`: Updated `LevelDef` default title to `"Level 1"` and completion message to `"LEVEL COMPLETE!"`.
-- [x] `backend/app/services/game_generation_service.py`: Standardized validation log to `Levels: {level_cnt}`.
-- [x] `backend/app/services/progression_service.py`: Standardized milestone description to `"Generated a multi-level campaign game"`.
+**Not applicable — no code fix implemented.** Root cause is external to the application (system
+physical memory availability on this development machine), matching the disposition of the prior
+FS-020 finding. Implementing a retry/masking layer was explicitly excluded by the task brief and
+would misrepresent a genuine resource constraint as resolved.
+
+**No automated regression test was added** for this specific behavior: a test whose pass/fail
+outcome depends on the host machine's free RAM at execution time would be inherently flaky in CI
+and would not exercise any actual application code path — it would only encode "does this machine
+currently have enough free memory," which is not a meaningful assertion about GameForge's
+correctness. This judgment call is documented rather than silently skipped.
 
 ---
 
 ## 5. Verification & Regression
 
-- [x] Backend tests: `.venv\Scripts\python.exe -m pytest tests/ -q` — **335 passed** in 104.98s (100% pass rate, 0 regressions).
-- [x] TypeScript check: `npx tsc --noEmit` — **0 errors**.
-- [x] Lint check: `npx oxlint` — **0 errors / 0 warnings**.
-- [x] Production build: `npm run build` — **succeeded** (built in 1.79s).
-- [x] Browser tests — the initial pass by the prior agent could not complete these (its
-      `open_browser_url` tool failed to resolve a CDP connection). Performed in a follow-up pass
-      using a local headless Chromium (Playwright) driving the actual Vite dev server
-      (`http://localhost:5173`) + FastAPI backend (`http://127.0.0.1:8000`), viewport 1440×900,
-      following the checklist below.
-
-### Browser Verification Results (viewport 1440×900)
-- **Home (`#/`)**: hero headline, subtitle, status pill, search placeholder, all 3 suggestion
-  chips, and the 3-card features bento grid all present and correctly worded. No typos found.
-- **Builder (`#/build`)**: "Natural Logic Editor" header present. World Architecture Mode options
-  read `Linear Arena / Single Level`, `Sequential Multi-Level Campaign`,
-  `Generalized Open World (Districts & Vehicles)`; Scale options read
-  `Fast Prototype (1 Level / Small World)`, `Standard Scale (2-3 Levels / Mid-Size World)`,
-  `Expanded Scale (3-5 Levels / Large World)` — **zero remaining "Stage" occurrences** in either
-  dropdown (checked programmatically against all `<option>` text). Procedural Visual Density,
-  Physics Complexity, Logic Modules, and the Compiler Output panel header all present.
-- **No Matches (`#/discover/no-matches`)**: terminal header, `404_CONCEPT_NOT_FOUND` alert,
-  `BUILD THIS IDEA` / `REFINE SEARCH` buttons, and both suggestion cards (`> RANDOMIZE`,
-  `> SAVED & PROJECTS` with "Access your saved discoveries and projects.") all present and correct.
-- **Dashboard (`#/dashboard`), authenticated with zero games** (registered a real throwaway test
-  user through the live Auth Modal against the running backend to reach this state): header reads
-  `MY GAMES DASHBOARD`, empty state reads exactly `No games generated yet. Head to the Builder to
-  build one!`, Saved Discoveries section present.
-- **Profile (`#/profile`), same authenticated session**: stat tiles (Total XP, Milestones, Saved
-  Items, Games Built), Your Game DNA, Saved Discoveries, and Generated Games empty state
-  (`No games generated yet. Create your first prototype in the Builder!`) all present and correct.
-  All 8 milestone cards render with readable titles/descriptions, no truncation or overlap.
-- **Console/network audit**: zero console errors attributable to any copy-audit change. One
-  environment-level observation, not a regression from this change: a handful of `/api/*` GET
-  requests (`saved-discoveries`, `projects`, `profile/progress`, `profile/preferences`) fired
-  immediately after login/register intermittently returned `502` at Vite's dev proxy layer, while
-  the backend's own access log shows every one of those same endpoints was ultimately served with
-  `200 OK` — consistent with a transient Vite-dev-proxy connection race under a concurrent request
-  burst right after auth, not a backend or application-code defect (no code in this diff touches
-  fetch/proxy/auth logic). Not reproducible via the production build (no dev proxy in that path).
-  **Gotcha for future browser verification of this app**: driving in-app navigation via a raw
-  URL/hash `goto()` forces a hard page reload that can outrun the auth-token rehydration flow and
-  make authenticated pages misleadingly appear signed-out; use the Navbar's actual `<Link>`
-  elements for in-app navigation instead, as done here.
+- [x] Backend tests: `.venv\Scripts\python.exe -m pytest tests/ -q` — **335 passed** in 137.83s
+      (unchanged from before this investigation — no backend code was modified)
+- [x] TypeScript check: `npx tsc --noEmit` — **0 errors**
+- [x] Lint check: `npx oxlint` — **0 errors / 0 warnings**
+- [x] Production build: `npm run build` — **succeeded**
+- [x] `git status` before and after: clean throughout — this task made **zero source changes**
+- Browser re-verification not re-run: no code changed, and the investigation's own controlled
+  direct-vs-proxy HTTP testing (§2) is a more precise, more repeatable signal for this specific
+  symptom than a fresh browser walkthrough would add.
 
 ---
 
 ## 6. Git Checkpoint
 
-- [x] `git diff` reviewed across all 11 modified files + `UI_COPY_AUDIT.md`.
-- [x] `git diff --stat` reviewed (106 insertions(+), 141 deletions(-)).
-- [x] Zero secrets, `.env`, or temporary files staged.
-- [x] Commit created: `fix: polish user-facing ui copy`
-- [x] Working tree verified clean.
+- [x] `git diff` reviewed — empty (investigation only; no `git add`/commit performed for source,
+      only this ledger + the two audit docs below are updated)
+- [x] No secrets, `.env`, or temporary files staged
+- [x] Working tree verified clean of any leftover test artifacts (temp scripts/tokens removed)
 
 ---
 
+## Remaining Work
+None for this investigation. The underlying environmental constraint (limited free RAM on this
+specific development machine, exacerbated by other concurrently-running applications) remains
+un-fixable at the application layer, exactly as already disclosed in FS-020.
+
+## Blockers
+None.
+
+## Final Verdict
+**KNOWN DEVELOPMENT-ONLY LIMITATION.** Reproducible and root-caused with concrete new evidence
+(direct-vs-proxy comparison, concurrent-vs-sequential comparison, live memory/paging measurement,
+raw Vite proxy error log). Confined to the local Vite dev-proxy path on this specific
+memory-constrained machine; does not indicate a defect in GameForge's application code, and does
+not apply to a production deployment (no dev proxy exists in that path — the built frontend talks
+to the API directly). Reinforces and does not contradict the prior FS-020 finding.
+
 ## Change Log
-- 2026-08-26: Completed Website Content & UI Copy Audit V1. Audited 314 UI strings across 38 files, compiled `UI_COPY_AUDIT.md`, remediated 22 copy/terminology/accessibility items, canonicalized "Builder" and "Level" terminology, differentiated Error page CTAs, verified 335/335 backend tests, clean TypeScript, clean oxlint, and successful production build.
+- 2026-08-26: Completed Dev Proxy 502 Investigation. Reproduced the symptom with a controlled
+  direct-vs-proxy, concurrent-vs-sequential HTTP test harness (40 requests each condition),
+  confirmed root cause as system memory exhaustion (0.91GB→0.23GB free of 7.68GB) driving OS-level
+  paging that resets the Vite proxy's backend socket (`ECONNRESET`), while the backend itself never
+  failed a single request. Classified KNOWN DEVELOPMENT-ONLY LIMITATION, consistent with and
+  reinforcing FS-020. No code changes made (none would be correct — root cause is not code-fixable).
+  335/335 backend tests, clean TypeScript/lint/build, confirming zero regressions from the
+  investigation itself.
+- 2026-08-26: (Prior) Completed browser verification for the UI Copy Audit (commit `db61452`).
+- 2026-08-26: (Prior) Completed Website Content & UI Copy Audit V1 (commit `b192bc1`).
+- 2026-08-26: (Prior) Completed UI Motion & Special Effects V1 (commit `4e7fc90`).

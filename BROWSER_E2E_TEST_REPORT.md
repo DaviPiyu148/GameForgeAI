@@ -146,3 +146,22 @@ Alembic Migrations: bc9ae398f146 (head)
 **OVERALL BROWSER VERDICT:** **PASS**
 
 All audited dynamic configurations demonstrably survive from user selection through HTTP serialization, backend service dispatch, AI prompt formulation, DSL compilation, SQLite database persistence, and live Phaser 2D canvas execution.
+
+---
+
+# 7. Addendum (2026-08-26) — Dev Proxy 502 Note
+
+A later browser-verification session (for a separate UI-copy-audit task) observed intermittent
+`502`s from the Vite dev proxy on several `/api/*` GET requests immediately after login/register,
+which this report's own "0 network failures" observation did not encounter. A dedicated
+investigation (see `FULL_STACK_OPERATIONAL_AUDIT.md`, **FS-034**, and `TASK.md`) reproduced it with
+a controlled direct-vs-proxy, concurrent-vs-sequential test harness and root-caused it to
+system-wide physical memory exhaustion on this specific development machine (free RAM measured
+0.91GB→0.23GB of 7.68GB during failures, with Windows' `Memory Compression` process active) driving
+`ECONNRESET`s on the Vite proxy's socket to the backend — the backend itself never failed a single
+request across either session. This is consistent with, not contradictory to, this report's
+original "0 network failures" result: memory availability at the time of *this* report's testing
+was evidently sufficient for the proxy to behave reliably. Classified **KNOWN
+DEVELOPMENT-ONLY LIMITATION** — reproducible, environment-dependent, not a GameForge application
+defect, and not applicable to a production deployment (no dev proxy exists in that path). No code
+changes were made as a result.

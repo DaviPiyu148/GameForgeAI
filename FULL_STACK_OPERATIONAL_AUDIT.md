@@ -305,3 +305,71 @@ The following findings were confirmed in the current codebase and remediated in 
 | `alembic current` / `heads` | ✅ single head `bc9ae398f146`, schema current |
 | FS-028 unit tests | ✅ 8/8 passed |
 | BROWSER TESTING | NOT PERFORMED (subagent quota limited) |
+
+---
+
+# Phase 3 — Dev Proxy 502 Investigation (2026-08-26)
+
+Triggered by a fresh browser-verification session observing the same class of symptom FS-020 first
+documented: several `/api/*` requests through the Vite dev proxy intermittently returning `502`
+immediately after login/register, while the FastAPI backend's own access log showed the identical
+requests returning `200 OK`. This phase re-investigated it from scratch, with a tighter, scriptable
+repro, rather than assuming FS-020 still applies.
+
+## FS-034 — REPRODUCED, ROOT-CAUSED, NOT CODE-FIXABLE (reinforces FS-020)
+**Severity:** INFO / ENVIRONMENTAL
+**Subsystem:** frontend dev tooling (Vite dev proxy)
+**Reproduction:** With both backend (`uvicorn`, confirmed healthy via `/docs`) and frontend
+(`vite`) fully started and warm — no cold-start, no ordering dependency — fired the 4 endpoints
+that had 502'd in browser testing (`GET /api/saved-discoveries`, `/api/projects`,
+`/api/profile/progress`, `/api/profile/preferences`) with a valid JWT, in 10 rounds each of
+(a) 4-way concurrent and (b) fully sequential (zero concurrency), both directly against the backend
+(`127.0.0.1:8000`) and through the Vite proxy (`127.0.0.1:5173`), for 160 total requests.
+
+**Results:**
+| Test | Requests | Result |
+|---|---|---|
+| Direct → backend, concurrent | 40 | **40/40 (100%) succeeded**, 15-50ms each |
+| Proxy → backend, concurrent | 40 | **25/40 (62.5%) failed** |
+| Proxy → backend, sequential (zero concurrency) | 40 | **~20/40 (50%) failed** |
+
+The near-identical failure rate between the concurrent and fully-sequential proxy runs rules out a
+proxy-internal race or a frontend request-burst as the trigger (a genuine concurrency race would
+not reproduce one request at a time). The 100%-vs-~55% split between direct and proxied requests
+under otherwise identical conditions isolates the failure to the proxy hop specifically, not the
+backend (which never failed to complete a single request across the entire investigation).
+
+**Root cause:** System-wide physical memory exhaustion on this development machine. Measured free
+RAM during the test window: **0.91 GB → 0.23 GB of 7.68 GB total**, with Windows' `Memory
+Compression` process active (126MB) — the same active-paging signature FS-020 used as evidence on
+2026-08-24. Vite's own dev-server log recorded, for every failure: `[vite] http proxy error: <path>`
+/ `Error: read ECONNRESET at TCP.onStreamRead` — a low-level TCP reset on the Node/Vite process's
+loopback socket to the backend, consistent with the OS stalling/tearing down sockets for a
+memory-starved process, not an application-level error (FastAPI's own access log shows every one of
+these requests eventually served `200 OK`).
+
+**Classification of A-F candidates:**
+- (B) backend readiness race — ruled out (backend confirmed warm throughout; 100% direct success)
+- (C) `start.bat` startup ordering — ruled out (not implicated; isolated repro bypassed it entirely)
+- (D) frontend request burst — ruled out as the trigger (sequential-only run failed comparably)
+- (A) Vite dev-proxy race — not supported (reproduces with zero concurrency)
+- (E) connection reuse/keep-alive issue — describes the *mechanism* (`ECONNRESET` on the proxy's
+  backend socket) but not the *trigger*; no connection-pooling logic bug was found in the minimal,
+  default `vite.config.ts` proxy configuration
+- **(F) unrelated transient local environment behavior — confirmed root cause**, reproducing and
+  reinforcing FS-020 with fresh, independently-gathered evidence on the same physical machine.
+
+**Fix:** None implemented. No code-level defect exists in `vite.config.ts`, `start.bat`, `api.ts`,
+or backend startup — the proxy's default (no custom retry/circuit-breaker) behavior is standard and
+correct. Adding retry/masking logic was explicitly out of scope for this investigation and would
+not address the actual cause (physical memory exhaustion), which no application-layer code can fix.
+No automated regression test was added: a test whose outcome depends on the host machine's free RAM
+at run time would be flaky in CI without exercising any real application code path.
+
+**Regression:** 335/335 backend tests, `tsc` 0 errors, `oxlint` 0 errors, `npm run build` succeeds
+— all unaffected, since zero source files were modified during this investigation.
+
+**Production applicability:** None. A production deployment serves the built frontend statically
+and talks to the API directly — there is no dev proxy in that path for this failure mode to occur.
+
+**Verdict: KNOWN DEVELOPMENT-ONLY LIMITATION.**
