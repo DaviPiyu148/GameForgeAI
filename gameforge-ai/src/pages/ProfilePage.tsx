@@ -577,6 +577,7 @@ export default function ProfilePage() {
                       onClick={() => removeSavedDiscovery(sd.id)}
                       className="p-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer shrink-0"
                       title="Remove from saved"
+                      aria-label="Remove from saved"
                     >
                       <span className="material-symbols-outlined text-sm">delete</span>
                     </button>
@@ -684,7 +685,7 @@ export default function ProfilePage() {
               </div>
             ) : state.myGames.length === 0 ? (
               <div className="text-on-surface-variant font-mono text-xs border border-outline-variant p-6 text-center">
-                No games generated yet. Create your first prototype in the Scene Composer!
+                No games generated yet. Create your first prototype in the Builder!
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-auto">
@@ -878,6 +879,7 @@ export default function ProfilePage() {
                     <button
                       onClick={() => removeSavedDiscovery(sd.id)}
                       className="text-error hover:underline font-mono text-xs cursor-pointer"
+                      aria-label={`Remove ${sd.title} from saved`}
                     >
                       Remove
                     </button>

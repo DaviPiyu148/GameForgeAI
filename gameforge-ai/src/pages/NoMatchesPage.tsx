@@ -114,10 +114,10 @@ const NoMatchesPage = () => {
           >
             <div className="flex items-center gap-2 text-tertiary font-mono text-xs font-bold mb-1">
               <span className="material-symbols-outlined text-base">history</span>
-              <span>&gt; PREVIOUS_QUERIES</span>
+              <span>&gt; SAVED & PROJECTS</span>
             </div>
             <p className="text-on-surface-variant text-xs font-body">
-              Access recent search parameters.
+              Access your saved discoveries and projects.
             </p>
           </div>
         </div>

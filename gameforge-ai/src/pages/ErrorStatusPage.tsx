@@ -142,15 +142,15 @@ const ErrorStatusPage = () => {
           className="font-mono text-xs uppercase px-6 py-3 text-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary/10 btn-interactive cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">edit_note</span>
-          MODIFY PROMPT
+          MODIFY IN BUILDER
         </Link>
 
         <Link
-          to="/build"
+          to="/dashboard"
           className="font-mono text-xs uppercase px-6 py-3 text-secondary-soft border-2 border-secondary-soft font-bold inline-flex items-center justify-center gap-2 hover:bg-secondary/10 btn-interactive cursor-pointer"
         >
-          <span className="material-symbols-outlined text-base">undo</span>
-          RETURN TO BUILDER
+          <span className="material-symbols-outlined text-base">dashboard</span>
+          VIEW DASHBOARD
         </Link>
       </div>
 

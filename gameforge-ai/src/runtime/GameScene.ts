@@ -595,7 +595,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.stageText) {
       const isFinale = Boolean(level?.is_finale || (this.totalLevels > 1 && this.currentLevelIndex === this.totalLevels - 1));
-      const stageLabel = isFinale ? `FINAL STAGE: ${this.currentLevelIndex + 1}/${this.totalLevels}` : `LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}`;
+      const stageLabel = isFinale ? `FINAL LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}` : `LEVEL: ${this.currentLevelIndex + 1}/${this.totalLevels}`;
       this.stageText.setText(stageLabel);
     }
   }
@@ -1041,8 +1041,8 @@ export class GameScene extends Phaser.Scene {
     const currentLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
     const nextIndex = this.currentLevelIndex + 1;
     const nextLevel: LevelDef | null = this.dsl.levels?.[nextIndex] ?? null;
-    const stageTitle = nextLevel?.title || `Stage ${nextIndex + 1}`;
-    const completeMsg = currentLevel?.completion_message || 'STAGE COMPLETE!';
+    const stageTitle = nextLevel?.title || `Level ${nextIndex + 1}`;
+    const completeMsg = currentLevel?.completion_message || 'LEVEL COMPLETE!';
 
     this.spawnFloatingText(this.player.x, this.player.y - 40, `★ ${completeMsg.toUpperCase()} ★`, '#00ff66');
     this.spawnFloatingText(this.player.x, this.player.y - 15, `Entering: ${stageTitle}`, '#00f0ff');

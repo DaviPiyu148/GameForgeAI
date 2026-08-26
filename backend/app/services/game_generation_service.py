@@ -435,8 +435,8 @@ class GameGenerationService:
                     lvl.entities = lvl_reach.repaired_entities
 
             log("INFO", "[AI] Game specification validated successfully")
-            stage_cnt = len(dsl.levels) if dsl.levels else 1
-            log("SUCCESS", f"[VALIDATION] Schema v3.0: PASS // Gameplay Quality: PASS // Stages: {stage_cnt}")
+            level_cnt = len(dsl.levels) if dsl.levels else 1
+            log("SUCCESS", f"[VALIDATION] Schema v3.0: PASS // Gameplay Quality: PASS // Levels: {level_cnt}")
             log("INFO", "[PHASER]")
             log("INFO", f"> Layout Seed: {dsl.world.procedural_seed or 18492031}")
             log("INFO", f"> Procedural Generation & Reachability: PASS")

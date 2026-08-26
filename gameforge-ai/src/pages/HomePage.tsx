@@ -171,6 +171,7 @@ const HomePage = () => {
                 type="button"
                 onClick={toggleMic}
                 title="Toggle Voice Input"
+                aria-label="Toggle voice input"
                 className={`p-2 transition-colors flex items-center justify-center rounded cursor-pointer icon-interactive ${
                   isListening ? 'text-secondary text-glow-magenta mic-listening' : 'text-on-surface-variant hover:text-primary'
                 }`}
@@ -466,7 +467,7 @@ const HomePage = () => {
                 className="px-6 py-3 border-2 border-primary text-primary hover:bg-primary/10 font-mono text-xs uppercase font-bold tracking-wider rounded btn-interactive glow-cyan flex items-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">expand_more</span>
-                <span>Show More Results ({state.discoveryResults.length - visibleCount} More)</span>
+                <span>Show More Results ({state.discoveryResults.length - visibleCount} remaining)</span>
               </button>
             </div>
           )}

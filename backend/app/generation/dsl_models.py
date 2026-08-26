@@ -231,9 +231,9 @@ class ObjectiveDef(BaseModel):
 
 
 class LevelDef(BaseModel):
-    """Structured stage/level specification in a multi-level campaign game."""
+    """Structured level specification in a multi-level campaign game."""
     level_number: int = Field(1, ge=1, le=10)
-    title: str = Field("Stage 1", min_length=1, max_length=100)
+    title: str = Field("Level 1", min_length=1, max_length=100)
     description: Optional[str] = None
     theme: Optional[Literal["cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal"]] = None
     world: Optional[WorldDef] = None
@@ -242,7 +242,7 @@ class LevelDef(BaseModel):
     objective: ObjectiveDef = Field(default_factory=ObjectiveDef)
     entities: List[EntityDef] = Field(default_factory=list, max_length=30)
     rules: List[RuleDef] = Field(default_factory=list, max_length=15)
-    completion_message: str = Field("STAGE COMPLETE!", max_length=100)
+    completion_message: str = Field("LEVEL COMPLETE!", max_length=100)
 
     # Phase 5: explicit finale marker. Defaults to False so every existing DSL
     # (which predates this field) still validates unchanged.

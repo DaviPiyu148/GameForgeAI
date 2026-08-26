@@ -23,7 +23,7 @@ const DashboardPage = () => {
       {/* Header */}
       <header className="flex flex-col gap-1 border-l-4 border-primary pl-4 py-1">
         <h1 className="font-display text-base md:text-2xl text-on-surface uppercase tracking-tight">
-          MY_GAMES_DASHBOARD
+          MY GAMES DASHBOARD
         </h1>
         <p className="font-mono text-xs text-on-surface-variant uppercase">
           Your generated prototypes and saved discoveries.
@@ -56,7 +56,7 @@ const DashboardPage = () => {
           </div>
         ) : state.myGames.length === 0 ? (
           <div className="text-on-surface-variant font-mono text-xs border border-outline-variant bg-surface-container-low p-6 text-center">
-            No games generated yet. Head to the Scene Composer to build one!
+            No games generated yet. Head to the Builder to build one!
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-enter stagger-1">
@@ -196,6 +196,7 @@ const DashboardPage = () => {
                     onClick={() => removeSavedDiscovery(discovery.id)}
                     className="text-on-surface-variant hover:text-error text-[10px] font-mono cursor-pointer"
                     title="Delete bookmark"
+                    aria-label="Delete bookmark"
                   >
                     ×
                   </button>

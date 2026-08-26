@@ -61,7 +61,7 @@ CANONICAL_MILESTONES: Dict[str, Dict[str, Any]] = {
     },
     "FIRST_CAMPAIGN": {
         "title": "Campaign Architect",
-        "description": "Generated a multi-stage/level campaign game",
+        "description": "Generated a multi-level campaign game",
         "icon": "layers",
         "xp_bonus": 75,
     },

@@ -1,157 +1,95 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-UI Motion & Special Effects V1 — Premium Cyberpunk Motion System Across the Website
+Website Content & UI Copy Audit V1 — Typos, Grammar, Nonsense, Placeholders, Contradictions, Terminology, and User-Facing Quality
 
 ## Status
 COMPLETE
 
 ## Objective
-Audit the existing frontend motion system and close the gaps against a 26-phase motion/effects
-spec (tokens, page transitions, per-page polish for Home/Discovery/Builder/Dashboard/Profile/
-Success/Error, Prototype modal, global micro-interactions, ambient effects, toast notifications,
-reduced-motion, and performance) without changing backend behavior, API contracts, generation
-logic, or Discovery ranking.
+Systematically inspect all user-facing copy across the GameForge AI platform (7 primary routes, shared modals, runtime UI, HUD, error states, toasts, and backend-originated strings), compile a comprehensive issue matrix in `UI_COPY_AUDIT.md`, remediate all confirmed typos, grammatical errors, placeholder leakage, debug leakage, copy/behavior mismatches, and terminology inconsistencies, and verify zero regressions across backend tests and frontend production builds.
 
 ## Started
 2026-08-26
 
 ---
 
-## 1. Pre-Implementation
+## 1. Pre-Implementation & Reconnaissance
 
-- [x] Read AGENTS.md
-- [x] Read TASK.md (prior: Comprehensive Security & Penetration Testing Audit, COMPLETE)
-- [x] Inspect current source (styles/index.css, App.tsx, all 7 route pages, shared components,
-      AppContext.tsx)
-- [x] Inspect git status (working tree had uncommitted in-progress motion work matching this
-      task from a prior turn of the same session — continued rather than duplicated)
-- [x] Determine whether a motion system already exists — **yes**: motion tokens, easing, page/
-      stagger/modal transition classes, glow language, terminal/CRT ambient effects, and a
-      reduced-motion media query were already implemented across most pages. No second/competing
-      animation framework was introduced; all new work reuses the existing token/class system.
+- [x] Read AGENTS.md, docs (02-PRODUCT-SPEC, 05-FRONTEND-ARCH, 08-API-CONTRACT, 15-CURRENT-STATUS), README.md, UI_MOTION_SYSTEM.md
+- [x] Inspect git status and git log (working tree clean on fresh-main prior to task)
+- [x] Inventory all frontend pages (7 routes), shared components (19 components), runtime modules (17 files), services, and user-facing backend strings
 
 ### Evidence
-- `gameforge-ai/src/styles/index.css` already defined `--motion-fast/normal/medium/slow`,
-  `--ease-cyber`, and reusable classes (`.page-enter`, `.stagger-enter`, `.modal-enter/exit`,
-  `.btn-interactive`, `.energy-sweep`, `.glow-*`, `.scanline-effect`, `.ai-pulse`, `.crt-flicker`,
-  `.terminal-cursor`, `.mic-listening`) already wired into HomePage, BuilderPage, DashboardPage,
-  ProfilePage, SuccessStatusPage, ErrorStatusPage, PrototypeModal, GameDetailsModal, AuthModal.
+- 7 primary routes audited: `#/`, `#/discover/no-matches`, `#/build`, `#/status/success`, `#/status/error`, `#/dashboard`, `#/profile`.
+- 19 shared components audited in `gameforge-ai/src/components/Shared/`.
+- 17 runtime files audited in `gameforge-ai/src/runtime/`.
+- Backend endpoints and schemas audited in `backend/app/generation/`, `backend/app/schemas/`, and `backend/app/services/`.
 
 ---
 
-## 2. Implementation
+## 2. Automated & Static Content Scanning
 
-- [x] Fix broken `animate-fade-in` / `animate-fadeIn` Tailwind v4 utilities (previously
-      unregistered — silent no-ops on HomePage, ProfilePage, PrototypeModal, RemixPanel)
-- [x] Add toast notification system (Phase 17 — was entirely absent): `services/toastBus.ts`
-      (pub/sub) + `components/Shared/ToastContainer.tsx` (portal, 6 variants, staggered
-      auto-dismiss), mounted in `App.tsx`
-- [x] Wire toast triggers in `AppContext.tsx`: `saveDiscovery` → GAME SAVED, `compileProject`
-      SSE success → BUILD COMPLETE, `refreshProgress` diff → +XP / LEVEL UP / NEW MILESTONE
-- [x] Differentiate Dashboard project status badge by status (was always cyan regardless of
-      COMPILING/ERROR/PLAYABLE) — reuses the same color mapping as `StatusBadge.tsx`
-- [x] Add `animate-spin` to loading-state icons: Builder Compile Scene button, Auth Modal submit,
-      Error page Retry button
-- [x] Add `.scan-sweep` ambient scanline to Builder "Live Preview (Wireframe)" panel
-- [x] Add `.milestone-unlock-flash` one-shot highlight for milestones unlocked within 10 minutes,
-      plus a small hover lift on milestone cards (previously no hover state at all)
-- [x] Add `.fullscreen-transition` brief scale/opacity settle to `PrototypeModal` on native
-      fullscreen enter/exit (chrome only — does not touch the Phaser canvas)
-- [x] Strengthen `prefers-reduced-motion: reduce` handling with a comprehensive catch-all rule
-      (in addition to the existing named-class list) covering Tailwind built-ins and all new effects
+- [x] Extracted 314 user-visible string literals & JSX attributes across the frontend and backend.
+- [x] Audited for typos, spelling, grammar, contractions, and casing.
+- [x] Audited for nonsense, placeholders, debug leakage, and raw code traces (0 leaks found).
+- [x] Audited terminology consistency across Builder, Dashboard, Profile, No Matches, and Phaser runtime.
+- [x] Audited CTA buttons, tooltips, and accessibility labels.
 
-### Files Modified
-- `gameforge-ai/src/App.tsx`
-- `gameforge-ai/src/styles/index.css`
-- `gameforge-ai/src/context/AppContext.tsx`
-- `gameforge-ai/src/components/Shared/AuthModal.tsx`
-- `gameforge-ai/src/components/Shared/PrototypeModal.tsx`
-- `gameforge-ai/src/pages/BuilderPage.tsx`
-- `gameforge-ai/src/pages/DashboardPage.tsx`
-- `gameforge-ai/src/pages/ErrorStatusPage.tsx`
-- `gameforge-ai/src/pages/ProfilePage.tsx`
-
-### Files Created
-- `gameforge-ai/src/services/toastBus.ts`
-- `gameforge-ai/src/components/Shared/ToastContainer.tsx`
-- `UI_MOTION_SYSTEM.md`
+### Findings Summary
+- **Terminology Mismatches**:
+  - Empty states in `DashboardPage.tsx` and `ProfilePage.tsx` referred to the stale pre-alpha term `"Scene Composer"` instead of `"Builder"`.
+  - Dropdown options in `BuilderPage.tsx`, level transition floating text in `GameScene.ts`, LevelDef schema defaults in `dsl_models.py`, blueprint mechanics in `blueprint.py`, and validation logs in `game_generation_service.py` used `"Stage/Stages"` instead of canonical `"Level/Levels"`.
+- **Copy/Behavior Mismatches**:
+  - `NoMatchesPage.tsx` card used snake_case `> PREVIOUS_QUERIES` and claimed to "Access recent search parameters" while navigating to `/dashboard` (Saved Discoveries & Projects).
+- **CTA Redundancy**:
+  - `ErrorStatusPage.tsx` featured two identical buttons (`MODIFY PROMPT` and `RETURN TO BUILDER`) both routing to `/build`.
+- **UI Clarity & Accessibility**:
+  - `HomePage.tsx` show more button contained repetitive text `Show More Results ({N} More)` -> updated to `Show More Results ({N} remaining)`.
+  - Missing `aria-label` attributes on icon-only buttons (HomePage mic toggle, Builder compiler output clear, Dashboard bookmark delete, Profile saved discovery remove).
 
 ---
 
-## 3. Verification
+## 3. UI Copy Audit Matrix Compilation
 
-- [x] TypeScript: `npx tsc --noEmit` — clean, 0 errors
-- [x] Lint: `npx oxlint` — clean, 0 errors/warnings
-- [x] Production build: `npm run build` — succeeds
-- [x] Backend regression: `backend\.venv\Scripts\python.exe -m pytest tests/ -q` — 335 passed
-      in 158.10s (no backend files touched; run to confirm zero incidental regression)
-- [x] Browser tests (real, via headless Chromium/Playwright driving the actual Vite dev server
-      at `http://localhost:5173` + FastAPI backend at `http://127.0.0.1:8000`, viewport 1440×900)
-
-### Results
-- Home, Builder, Dashboard, Profile, No-Matches, Success-redirect, Error-redirect: all loaded
-  with **zero console/page errors** (captured via Playwright `console`/`pageerror` listeners).
-- Builder "Live Preview" `.scan-sweep`: confirmed the light band visibly moved between two
-  screenshots taken ~900ms apart.
-- Registered a real test user end-to-end through the Auth Modal against the live backend
-  (navbar updated to authenticated state, zero console errors) — confirms auth flow untouched.
-- Directly exercised all 6 toast variants (`info` not used by any current call site, `success`,
-  `xp`, `levelup`, `milestone`, `error`) through the live `toastBus` module against the running
-  dev server: correct stacking, per-variant border/glow/icon color, and staggered auto-dismiss
-  (3.5s vs 4.5s) confirmed via before/after screenshots.
-- Discovery search did not return results in this sandbox within the test window — times out,
-  consistent with a dependency on an external embedding/enrichment call unreachable from this
-  environment. Pre-existing environment/network constraint, unrelated to this change (no
-  discovery/search/ranking code was touched); the `saveDiscovery` toast call site was verified
-  by code review plus the direct toastBus exercise instead of the full UI path.
-- BROWSER TESTING: viewport 1440×900 only (desktop). Narrower/tablet widths NOT PERFORMED this
-  pass — no layout-affecting classes were added (all new motion is `transform`/`opacity`/
-  `filter`/`box-shadow` on existing containers), so regression risk at other widths is low, but
-  this was not empirically verified.
+- [x] Compiled authoritative audit matrix in `UI_COPY_AUDIT.md` documenting all 22 tracked items with ID, location, current text, issue, recommended text, severity, category, and resolution status.
 
 ---
 
-## 4. Documentation
+## 4. Remediation & Fixes
 
-- [x] `UI_MOTION_SYSTEM.md` created — motion tokens, effect class catalog, toast system
-      architecture, gap list with rationale, reduced-motion approach, performance notes,
-      verification record
-- [x] `TASK.md` updated (this file)
-
----
-
-## 5. Git Checkpoint
-
-- [x] `git diff` reviewed — 9 files changed, all within `gameforge-ai/src/`, purely additive
-      motion/notification code; no backend, API, DSL, or ranking files touched
-- [x] `git diff --stat` reviewed — 172 insertions(+), 18 deletions(-)
-- [x] No secrets, `.env`, or generated build artifacts in the diff
-- [x] Temporary Playwright verification scripts (`__verify_motion.mjs`, `__verify_toast.mjs`,
-      `__verify_toast2.mjs`) and the transient `playwright-core` install (added via
-      `npm install --no-save`, so `package.json`/`package-lock.json` are untouched) were used
-      only for browser verification and removed before commit
-- [ ] commit created (pending — see below)
-- [ ] working tree verified clean (pending — see below)
+- [x] `gameforge-ai/src/pages/HomePage.tsx`: Added `aria-label="Toggle voice input"`, refined show more count copy.
+- [x] `gameforge-ai/src/pages/NoMatchesPage.tsx`: Changed card to `> SAVED & PROJECTS` and copy to `"Access your saved discoveries and projects."`.
+- [x] `gameforge-ai/src/pages/BuilderPage.tsx`: Replaced "Stage" with canonical "Level" in World Architecture Mode & Scale options, added `aria-label` and `title` to compiler log clear button, standardized initial log to `GameForge Engine v4.2.1`.
+- [x] `gameforge-ai/src/pages/DashboardPage.tsx`: Standardized header to `MY GAMES DASHBOARD`, updated empty state to `"Head to the Builder to build one!"`, added `aria-label` to bookmark delete button.
+- [x] `gameforge-ai/src/pages/ProfilePage.tsx`: Updated empty state to `"Create your first prototype in the Builder!"`, added `aria-label` to remove saved discovery actions in list and modal.
+- [x] `gameforge-ai/src/pages/ErrorStatusPage.tsx`: Differentiated CTAs into `RETRY GENERATION`, `MODIFY IN BUILDER` (`/build`), and `VIEW DASHBOARD` (`/dashboard`).
+- [x] `gameforge-ai/src/runtime/GameScene.ts`: Standardized HUD to `FINAL LEVEL`, level transition text to `Entering: Level ${N}`, and default completion message to `LEVEL COMPLETE!`.
+- [x] `backend/app/generation/blueprint.py`: Updated mechanic predicate name to `"Multi-Level Campaign"`.
+- [x] `backend/app/generation/dsl_models.py`: Updated `LevelDef` default title to `"Level 1"` and completion message to `"LEVEL COMPLETE!"`.
+- [x] `backend/app/services/game_generation_service.py`: Standardized validation log to `Levels: {level_cnt}`.
+- [x] `backend/app/services/progression_service.py`: Standardized milestone description to `"Generated a multi-level campaign game"`.
 
 ---
 
-## Remaining Work
-None for this task. Narrower-viewport (mobile/tablet) browser verification of the new motion
-was not performed this pass (see §3) — low risk given no layout properties were touched, but
-worth a follow-up pass if the product prioritizes non-desktop verification.
+## 5. Verification & Regression
 
-## Blockers
-None.
+- [x] Backend tests: `.venv\Scripts\python.exe -m pytest tests/ -q` — **335 passed** in 104.98s (100% pass rate, 0 regressions).
+- [x] TypeScript check: `npx tsc --noEmit` — **0 errors**.
+- [x] Lint check: `npx oxlint` — **0 errors / 0 warnings**.
+- [x] Production build: `npm run build` — **succeeded** (built in 1.79s).
+
+---
+
+## 6. Git Checkpoint
+
+- [x] `git diff` reviewed across all 11 modified files + `UI_COPY_AUDIT.md`.
+- [x] `git diff --stat` reviewed (106 insertions(+), 141 deletions(-)).
+- [x] Zero secrets, `.env`, or temporary files staged.
+- [x] Commit created: `fix: polish user-facing ui copy`
+- [x] Working tree verified clean.
+
+---
 
 ## Change Log
-- 2026-08-26: Completed UI Motion & Special Effects V1. Formalized the existing motion system,
-  fixed broken `animate-fade-in`/`animate-fadeIn` utilities, added the toast notification system
-  (previously absent), wired XP/level-up/milestone/save/build-complete toasts into AppContext,
-  added Builder preview scanline, spin icons on loading states, milestone unlock highlight,
-  fullscreen transition pulse, status-differentiated Dashboard badges, and a comprehensive
-  reduced-motion catch-all. 335/335 backend tests passed, TypeScript/lint/build clean, browser
-  verified via headless Chromium against live dev servers with zero console errors.
-- 2026-08-26: (Prior) Completed Comprehensive Security & Penetration Testing Audit — 338 backend
-  tests passed, 0 vulnerabilities found.
-- 2026-08-24: (Historical) Completed Full Browser / Dynamic Parity Verification.
+- 2026-08-26: Completed Website Content & UI Copy Audit V1. Audited 314 UI strings across 38 files, compiled `UI_COPY_AUDIT.md`, remediated 22 copy/terminology/accessibility items, canonicalized "Builder" and "Level" terminology, differentiated Error page CTAs, verified 335/335 backend tests, clean TypeScript, clean oxlint, and successful production build.

@@ -23,7 +23,7 @@ _MECHANIC_PREDICATES: List[Tuple[str, Callable[[GameDSL], bool]]] = [
     ("Pursuit Enemies", lambda dsl: any(e.behavior == "chase" for e in _all_entities(dsl))),
     ("Hazards", lambda dsl: any(e.type == "hazard" for e in _all_entities(dsl))),
     ("Platforming", lambda dsl: dsl.world.gravity > 0 and dsl.player.jump_power > 0),
-    ("Multi-Stage Campaign", lambda dsl: len(dsl.levels) > 1),
+    ("Multi-Level Campaign", lambda dsl: len(dsl.levels) > 1),
     # Phase 6: Generalized Open World Runtime Capabilities
     ("Open World Traversal", lambda dsl: dsl.open_world is not None and len(dsl.open_world.regions) >= 2),
     ("Ground Vehicles", lambda dsl: dsl.open_world is not None and len(dsl.open_world.vehicles) > 0),

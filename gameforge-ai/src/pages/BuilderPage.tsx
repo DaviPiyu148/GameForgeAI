@@ -225,8 +225,8 @@ const BuilderPage = () => {
                     value={state.currentBuildParams.world_mode || 'linear'}
                     onChange={(e) => updateBuildParams({ world_mode: e.target.value as 'linear' | 'campaign' | 'open_world' })}
                   >
-                    <option value="linear">Linear Arena / Single Stage</option>
-                    <option value="campaign">Sequential Multi-Stage Campaign</option>
+                    <option value="linear">Linear Arena / Single Level</option>
+                    <option value="campaign">Sequential Multi-Level Campaign</option>
                     <option value="open_world">Generalized Open World (Districts & Vehicles)</option>
                   </select>
                 </div>
@@ -244,8 +244,8 @@ const BuilderPage = () => {
                     onChange={(e) => updateBuildParams({ scale: e.target.value as 'prototype' | 'standard' | 'campaign' })}
                   >
                     <option value="prototype">Fast Prototype (1 Level / Small World)</option>
-                    <option value="standard">Standard Scale (2-3 Stages / Mid World)</option>
-                    <option value="campaign">Expanded Scale (3-5 Stages / Large World)</option>
+                    <option value="standard">Standard Scale (2-3 Levels / Mid-Size World)</option>
+                    <option value="campaign">Expanded Scale (3-5 Levels / Large World)</option>
                   </select>
                 </div>
 
@@ -325,14 +325,19 @@ const BuilderPage = () => {
                 <span className="material-symbols-outlined text-[14px]">dvr</span>
                 Compiler Output
               </h2>
-              <button onClick={clearCompilerLogs} className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors cursor-pointer rounded">
+              <button
+                onClick={clearCompilerLogs}
+                title="Clear compiler output"
+                aria-label="Clear compiler logs"
+                className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors cursor-pointer rounded"
+              >
                 <span className="material-symbols-outlined text-[14px]">clear_all</span>
               </button>
             </div>
             <div className="flex-1 p-4 font-mono text-xs text-primary/80 overflow-y-auto space-y-1">
               {state.compilerLogs.length === 0 ? (
                 <>
-                  <div className="text-primary opacity-90">[SYS] Environment ready. Forge Engine v4.2.1 initialized.</div>
+                  <div className="text-primary opacity-90">[SYS] Environment ready. GameForge Engine v4.2.1 initialized.</div>
                   {state.currentBuildParams.modules.map(mod => (
                     <div key={mod}><span className="text-secondary-soft font-bold">[MOD]</span> Loaded Logic Module: {mod}</div>
                   ))}
