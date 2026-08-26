@@ -11,12 +11,13 @@ Keep these distinct:
 
 ## Implemented Database Entities (B1–B7)
 
-### User (SQLAlchemy Model: `users`, B7)
+### User (SQLAlchemy Model: `users`, B7, extended Product Expansion V1)
 - `id`: String(36) (Primary Key, server-generated UUID)
 - `email`: String(254), unique, non-null, indexed (stored lowercase)
 - `username`: String(50), unique, non-null, indexed
 - `password_hash`: String(255), non-null (Argon2 hash via `pwdlib`; NEVER returned in API responses)
 - `level`: Integer, non-null, default: `1`
+- `avatar_url`: String(500), nullable (uploaded profile picture path, added in Product Expansion V1)
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 - `updated_at`: DateTime(timezone=True), non-null, auto timestamp
 
@@ -27,7 +28,7 @@ Keep these distinct:
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 - Constraint: `UNIQUE(user_id, steam_app_id)`
 
-### Project (SQLAlchemy Model: `projects`, B1, extended B5, B7, G12)
+### Project (SQLAlchemy Model: `projects`, B1, extended B5, B7, G12, Phase 5, Phase 6)
 - `id`: String(36) (Primary Key, server-generated UUID)
 - `user_id`: String(36), nullable, indexed (FK to `users.id` with `ondelete="SET NULL"`, added in B7)
 - `title`: String(255), non-null
@@ -38,6 +39,8 @@ Keep these distinct:
 - `art_density`: Integer, non-null, default: `50` (0-100)
 - `physics`: Integer, non-null, default: `80` (0-100)
 - `modules`: JSON, non-null, default: `[]`
+- `scale`: String(20), non-null, default: `"standard"` (Phase 5: `"prototype"`/`"standard"`/`"campaign"` generation budget tier)
+- `world_mode`: String(20), non-null, default: `"linear"` (Phase 6: `"linear"`/`"campaign"`/`"open_world"`)
 - `design_spec`: JSON, nullable (Structured GameDesignSpec added in G12)
 - `game_dsl`: JSON, nullable (Accepted/current playable Game DSL snapshot, added in B5)
 - `runtime_metadata`: JSON, nullable (Engine versioning and deterministic seed, added in B5)
@@ -81,6 +84,7 @@ Keep these distinct:
 - `physics`: Integer, non-null, default: `80` (0-100)
 - `modules`: JSON, non-null, default: `[]`
 - `scale`: String, non-null, default: `"standard"` (Phase 5: `"prototype"`/`"standard"`/`"campaign"` generation scale tier, threaded into `generate_game_dsl`)
+- `world_mode`: String, non-null, default: `"linear"` (Phase 6: `"linear"`/`"campaign"`/`"open_world"`, threaded into `generate_game_dsl`)
 - `status`: String(50), non-null, indexed (`QUEUED`, `RUNNING`, `VALIDATING`, `SUCCESS`, `ERROR`)
 - `error_code`: String(100), nullable
 - `error_message`: Text, nullable
@@ -97,6 +101,43 @@ Keep these distinct:
 - `message`: Text, non-null
 - `timestamp`: DateTime(timezone=True), non-null, auto timestamp
 - Unique index: `(build_id, sequence_number)`
+
+### UserProgress (SQLAlchemy Model: `user_progress`, Product Expansion V1)
+Server-authoritative Creator Progression state — one row per user.
+- `user_id`: String(36) (Primary Key, FK to `users.id` with `ondelete="CASCADE"`)
+- `total_xp`: Integer, non-null, default: `0`
+- `current_level`: Integer, non-null, default: `1`
+- `created_at` / `updated_at`: DateTime(timezone=True), non-null, auto timestamp
+
+### XPEvent (SQLAlchemy Model: `xp_events`, Product Expansion V1)
+Audit log of every discrete XP grant (search, save, build, playtest, milestone, etc.).
+- `id`: String(36) (Primary Key, server-generated UUID)
+- `user_id`: String(36), non-null, indexed (FK to `users.id` with `ondelete="CASCADE"`)
+- `event_type`: String(50), non-null (e.g. `SEARCH`, `SAVE_GAME`, `BUILD_GAME`, `PLAYTEST_WIN`)
+- `xp_amount`: Integer, non-null
+- `source_reference`: String(255), nullable (e.g. a project ID)
+- `created_at`: DateTime(timezone=True), non-null, indexed, auto timestamp
+
+### UserMilestone (SQLAlchemy Model: `user_milestones`, Creator Progression V1)
+Server-validated, unlocked creator milestone badges. Only a row that exists here counts as unlocked — the milestone catalog itself is defined in code, not persisted.
+- `id`: String(36) (Primary Key, server-generated UUID)
+- `user_id`: String(36), non-null, indexed (FK to `users.id` with `ondelete="CASCADE"`)
+- `milestone_key`: String(50), non-null, indexed
+- `title`: String(100), non-null
+- `description`: String(255), non-null
+- `icon`: String(50), non-null
+- `unlocked_at`: DateTime(timezone=True), non-null, auto timestamp
+- Constraint: `UNIQUE(user_id, milestone_key)`
+
+### UserGenrePreference (SQLAlchemy Model: `user_genre_preferences`, Product Expansion V1 — "Game DNA")
+Implicit behavioral genre-affinity score per user, one row per (user, genre) pair.
+- `id`: String(36) (Primary Key, server-generated UUID)
+- `user_id`: String(36), non-null, indexed (FK to `users.id` with `ondelete="CASCADE"`)
+- `genre`: String(50), non-null, indexed
+- `score`: Float, non-null, default: `0.0`
+- `interaction_count`: Integer, non-null, default: `1`
+- `last_interaction_at`: DateTime(timezone=True), non-null, auto timestamp
+- Constraint: `UNIQUE(user_id, genre)`
 
 ---
 

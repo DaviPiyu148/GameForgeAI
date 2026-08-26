@@ -200,7 +200,7 @@ Then open **http://127.0.0.1:5173/#/** in your browser.
 | Backend health | http://127.0.0.1:8000/api/health |
 | API docs (Swagger) | http://127.0.0.1:8000/docs |
 | Frontend app | http://127.0.0.1:5173/#/ |
-| Backend tests | `cd backend && pytest -v` (expects 61 tests passing) |
+| Backend tests | `cd backend && pytest -v` (335 passing at time of writing — the suite has grown well past its original count, so treat this as directional and trust the actual run) |
 
 ---
 

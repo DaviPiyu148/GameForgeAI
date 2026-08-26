@@ -1,127 +1,134 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Full Repository Hygiene & Dead-Code Audit V1 (+ approved cleanup execution)
+Living Documentation Refresh V1
 
 ## Status
 COMPLETE
 
 ## Objective
-Identify obsolete files, unused folders, abandoned implementations, duplicate systems, stale
-artifacts, unused dependencies, and dead documentation across the entire tracked repository —
-without breaking imports, runtime loading, build scripts, tests, Alembic migrations, documentation
-workflows, `start.bat`, frontend routing, backend startup, the Phaser runtime, AI generation, Open
-World, telemetry, or SSE. Executed in two explicitly-gated passes: (1) full audit, no changes; (2)
-after explicit user approval of the HIGH-confidence findings only, execute exactly that scope.
+Synchronize CURRENT documentation with the actual implemented repository (post repository-hygiene-
+cleanup commit `390961e`) — remove stale/inaccurate claims from living documents, without adding
+features, refactoring code, changing APIs/schema/behavior, deleting historical reports/migrations,
+or claiming Phase 7/8 functionality exists. Documentation-only task.
 
 ## Started
 2026-08-26
 
 ---
 
-## 1. Audit Phase (RH1-RH13) — COMPLETE
+## 1. Reconnaissance
 
-- [x] Confirmed execution mode with user up front: **"Audit first, pause before deleting"**
-- [x] Full tracked-file inventory (294 files) via `git ls-files`
-- [x] Reference-graph audit across frontend (components/pages/runtime/services), backend
-      (routes/services/models/schemas/repos), scripts, config, dependencies, assets, CSS,
-      migrations, and documentation — delegated to 3 parallel read-only investigation agents,
-      personally synthesized and corrected into `REPOSITORY_HYGIENE_AUDIT.md`
-- [x] **Methodology issue caught and corrected mid-audit**: 2 of 3 agents were investigating a
-      git snapshot 9 commits behind real HEAD (worktree-isolation quirk). Caught by cross-checking
-      "file does not exist" claims against the real working tree; every affected claim was
-      independently re-verified against real HEAD before inclusion. Full account in
-      `REPOSITORY_HYGIENE_AUDIT.md`.
-- [x] Produced `REPOSITORY_HYGIENE_AUDIT.md`: 12 HIGH-confidence dead frontend files + 1 broken
-      favicon reference identified and evidenced; zero dead backend code; zero unused dependencies;
-      zero migration issues; zero accidentally-committed artifacts; 15 documentation-staleness
-      findings and several other judgment calls explicitly deferred, not auto-actioned
-- [x] **No deletions performed in this phase** — presented findings and stopped, per user's chosen
-      execution mode
-
-### Evidence
-`REPOSITORY_HYGIENE_AUDIT.md` (full detail, all confidence ratings, all evidence).
+- [x] Read all 33 documents listed in the task brief (READMEs, `SETUP.md`, `DESIGN.md`, all 16
+      `docs/*.md`, all 7 `decisions/ADR-*.md`, `TASK.md`, `REPOSITORY_HYGIENE_AUDIT.md`, and the
+      historical audit/report `.md` files)
+- [x] Gathered ground truth directly from current code (not from any agent, to avoid repeating the
+      git-worktree-staleness issue from the prior hygiene-audit task): `backend/app/models/*.py`
+      (all 9), `backend/app/config.py`, `backend/app/api/profile.py`, `backend/app/api/auth.py`
+      (avatar routes), `backend/app/api/projects.py` (blueprint/remix routes),
+      `backend/app/api/builds.py` (cancel route), `backend/app/schemas/profile.py`,
+      `backend/app/schemas/remix.py`
+- [x] Confirmed one discrepancy in the task brief itself: `FULL_STACK_SECURITY_ASSESSMENT.md`
+      (referenced by the brief as where security findings live) does not exist as a tracked file —
+      that audit was delivered as a Claude Artifact, not committed under that filename. Flagged,
+      not fabricated, not referenced anywhere in the edited docs.
 
 ---
 
-## 2. Cleanup Phase (RH14) — COMPLETE
+## 2. Documentation Updates — COMPLETE
 
-User reviewed the audit and issued an explicit, scoped approval: delete exactly the 12
-HIGH-confidence files, fix exactly the 1 favicon reference, touch nothing else. Executed precisely
-to that scope — no second sweep, no uncertain candidates removed.
+13 files updated, all documentation/config-example, zero source code:
 
-- [x] **Final safety check** (immediately before deletion, at real HEAD): repeated the reference
-      search for all 12 files across `gameforge-ai/src`, `vite.config.ts`, `package.json`,
-      `backend/`, and `start.bat` — zero live references found for any of the 12; none skipped
-- [x] Deleted (via `git rm`):
-      `gameforge-ai/src/components/Shared/{Button,DiscoveryCard,ProjectCard,StatusBadge,
-      TerminalPane,ParameterControl,ProgressBar,ScanlineOverlay,SectionHeader}.tsx`,
-      `gameforge-ai/src/assets/{react.svg,vite.svg,hero.png}`
-- [x] Fixed `gameforge-ai/index.html:5` — `href="/vite.svg"` → `href="/favicon.svg"`
-      (verified `public/favicon.svg` exists first; asset itself untouched)
-- [x] CSS safety check: confirmed no deleted component owned a CSS class/keyframe without another
-      live consumer (one class, `slider-thumb-primary`, turned out to be a pre-existing dangling
-      reference never actually defined in CSS — zero effect either way). `styles/index.css` **not
-      modified**.
-- [x] Confirmed zero uncertain candidates touched — `public/icons.svg`, `backend/scripts/*.py`,
-      `test_generation_live.py`, `AI_PROVIDER` config, `evaluate_discovery*.py`, all historical
-      reports, all migrations, `stitch_gameforge_ai/`, `DESIGN.md` all untouched
-- [x] Updated `REPOSITORY_HYGIENE_AUDIT.md`: FE-01 through FE-12 marked FIXED, Cleanup
-      Results/Regression/Browser Smoke Test sections completed with evidence, FE-13 and all
-      deferred candidates left explicitly deferred, historical findings left unrewritten
+- [x] `README.md` — full rewrite; removed "not yet implemented" claims, added current capabilities
+- [x] `backend/README.md` — full rewrite; removed "Current Phase: B5" / "61 tests"
+- [x] `gameforge-ai/README.md` — full rewrite; was generic Vite template boilerplate
+- [x] `docs/02-PRODUCT-SPEC.md` — fixed "Persistent objects eventually include..." stale line
+- [x] `docs/06-BACKEND-ARCHITECTURE.md` — completed migration list (6→12), added missing
+      controllers/services/tables
+- [x] `docs/07-DATA-MODEL.md` — added `scale`/`world_mode`/`avatar_url` fields; added 4 entirely
+      undocumented tables (`UserProgress`, `XPEvent`, `UserMilestone`, `UserGenrePreference`)
+- [x] `docs/08-API-CONTRACT.md` — added 6 missing routes + a new Profile & Personalization section
+      + 7 new error codes
+- [x] `docs/13-SECURITY.md` — added newer authenticated surfaces to the ownership-protection list
+- [x] `docs/15-CURRENT-STATUS.md` — complete refresh, re-dated 2026-08-26, explicit roadmap table
+- [x] `docs/DOCUMENTATION-MAP.md` — fixed the stale "Planned backend" label
+- [x] `decisions/ADR-004-BUILD-JOBS.md` — stale exception section relabeled
+      HISTORICAL/SUPERSEDED, original text preserved verbatim underneath
+- [x] `backend/.env.example` — added 10 genuinely-live config fields (verified against
+      `config.py` one-by-one), no secrets exposed, nothing speculative
+- [x] `SETUP.md` — fixed "expects 61 tests passing" (found during the validation pass, not in the
+      original file list — exactly what that pass is for)
+
+### Stale claims removed
+"Backend and AI are not yet implemented" (README.md), "Current Phase: B5" + "61 unit and
+integration tests passing" (backend/README.md), "expects 61 tests passing" (SETUP.md), "Planned
+backend" (docs/DOCUMENTATION-MAP.md), "Persistent objects eventually include..." (docs/02), an
+entirely-undocumented Creator Progression/Game DNA data layer (docs/07), 6 undocumented live API
+routes (docs/08), a superseded frontend-mock exception presented without historical framing
+(ADR-004).
 
 ### Evidence
-See `REPOSITORY_HYGIENE_AUDIT.md` §§ "Cleanup Results", "Regression Results", "start.bat / App
-Startup", "Browser Smoke Test", "Before / After Inventory".
+Full detail: `DOCUMENTATION_REFRESH_REPORT.md`.
 
 ---
 
-## 3. Verification
+## 3. Validation Pass
+
+- [x] Searched all living docs for stale phrases: `"not yet implemented"`, `"Current Phase: B5"`,
+      `"61 tests"`, `"planned backend"`, `"eventually include"` — 2 real hits found (1 in the
+      brief's own list already covered by `backend/README.md`'s edit; 1 in `SETUP.md`, not in the
+      brief's file list, caught by this pass and fixed). Remaining `"not yet implemented"` hit is
+      `backend/README.md`'s own new, accurate "Explicitly Not Yet Implemented" heading.
+- [x] Confirmed no document claims Phase 7 (AI Game Director) or Phase 8 (Monetization/BYOK)
+      functionality exists.
+
+---
+
+## 4. Verification & Regression
 
 | Check | Result |
 |---|---|
-| Backend tests (`pytest tests/ -q`) | **335 passed**, 131.45s |
+| Backend tests (`pytest tests/ -q`) | **335 passed**, 130.03s |
 | TypeScript (`tsc --noEmit`) | **0 errors** |
 | Lint (`oxlint`) | **0 errors, 0 warnings** |
-| Production build (`npm run build`) | **Succeeded**, 1.49s (CSS bundle shrank 129.47kB→128.40kB, expected) |
-| Alembic (`current`/`heads`) | **`bc9ae398f146` (head)** — single head, unchanged |
-| `start.bat`'s two components (backend + frontend) | Both start cleanly; `/api/health` returns the expected payload; frontend serves with zero import/module-resolution errors and the corrected favicon link |
-| Browser smoke test (7 routes + Builder/Dashboard/Profile regression checks) | **PASS** — no missing components, no broken CSS/animation, no blank pages; zero console errors attributable to the cleanup (only the pre-existing, already-documented `FS-034` dev-proxy memory-pressure issue observed, reconfirmed via a fresh memory reading during this exact test) |
+| Production build (`npm run build`) | **Succeeded** |
+| Alembic (`current`/`heads`) | **`bc9ae398f146` (head)** — unchanged |
+| Browser smoke test | Not performed — no code changed this pass; nothing new for a browser test to reveal beyond the repository hygiene cleanup's already-completed browser verification on this same code |
 
-### Before / After
-294 tracked files → 282 after the 12 deletions → 283 after this commit (the +1 is
-`REPOSITORY_HYGIENE_AUDIT.md` itself, newly tracked — expected, not a discrepancy).
+No code regression possible by construction — `git diff --stat` confirms only documentation/config-
+example files changed (13 files, 339 insertions, 340 deletions; zero `.py`/`.ts`/`.tsx` files).
 
 ---
 
-## 4. Git Checkpoint
+## 5. Git Checkpoint
 
-- [x] `git status`/`git diff`/`git diff --stat` reviewed — confirmed the only changes are the 12
-      approved deletions, the `index.html` favicon fix, `TASK.md`, and `REPOSITORY_HYGIENE_AUDIT.md`
-- [x] No secrets, no unrelated files
-- [x] Commit: `chore: remove obsolete repository artifacts`
+- [x] `git diff` / `git diff --stat` / `git status` reviewed — confirmed only the 13 intended
+      documentation/config-example files changed, plus `TASK.md` and the new
+      `DOCUMENTATION_REFRESH_REPORT.md`
+- [x] No secrets, no source-code changes, no unrelated files
+- [x] Commit: `docs: synchronize project documentation with current implementation`
 - [x] Working tree verified clean post-commit
 
 ---
 
 ## Remaining Work
-Everything explicitly deferred in `REPOSITORY_HYGIENE_AUDIT.md`'s "Deferred / Uncertain Candidates"
-section remains open for a future, separately-scoped decision: 15 documentation-staleness findings,
-`public/icons.svg`, the R&D scripts in `backend/scripts/`, `test_generation_live.py`'s disposition,
-and the unread `AI_PROVIDER` config field. None of these block this task's completion — they were
-intentionally out of scope for this pass.
+- The `FULL_STACK_SECURITY_ASSESSMENT.md` filename discrepancy (see § "Reconnaissance") — a human
+  should decide whether to commit that audit's findings as a real file, or leave it as an Artifact.
+- `docs/12-TESTING-QA.md` wasn't independently re-verified line-by-line against the current test
+  suite this pass (spot-checked plausible in the repository hygiene audit; a full reconciliation is
+  a reasonable future pass, not required for this task's scope).
+- All items already deferred in `REPOSITORY_HYGIENE_AUDIT.md` remain deferred and unchanged by this
+  documentation-only pass.
 
 ## Blockers
 None.
 
 ## Change Log
-- 2026-08-26: Completed the approved cleanup phase (RH14) — deleted the 12 HIGH-confidence dead
-  frontend files, fixed the broken favicon reference, ran full regression (335/335 backend tests,
-  clean TypeScript/lint/build, single Alembic head), verified `start.bat`'s components and a real
-  browser smoke test across all 7 routes, and committed. Zero uncertain candidates touched.
-- 2026-08-26: Completed the audit phase (RH1-RH13) — produced `REPOSITORY_HYGIENE_AUDIT.md` with a
-  full evidence-backed inventory and findings, caught and corrected a mid-audit git-worktree
-  staleness issue, stopped before any deletion pending explicit approval.
+- 2026-08-26: Completed Living Documentation Refresh V1 — 13 documentation/config-example files
+  synchronized with the actual implemented repository, zero source-code changes, full regression
+  clean (335/335 backend tests, clean TypeScript/lint/build, single Alembic head), committed.
+- 2026-08-26: (Prior) Completed Full Repository Hygiene & Dead-Code Audit + approved cleanup
+  (commit `390961e`).
 - 2026-08-26: (Prior) Completed Dev Proxy 502 Investigation (commit `fc504c3`).
 - 2026-08-26: (Prior) Completed browser verification for the UI Copy Audit (commit `db61452`).
 - 2026-08-26: (Prior) Completed Website Content & UI Copy Audit V1 (commit `b192bc1`).

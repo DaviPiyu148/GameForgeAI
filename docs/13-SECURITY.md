@@ -20,7 +20,10 @@
   - Playtest Sessions (`/api/projects/{id}/playtests`)
   - AI Playtest Analysis (`/api/projects/{id}/analyze-playtest`)
   - Improvements (`/api/projects/{id}/improvements`)
+  - Blueprint & Remix (`/api/projects/{id}/blueprint`, `/api/projects/{id}/remix`)
   - Project Versions (`/api/projects/{id}/versions`)
+  - Profile & Personalization (`/api/profile/progress`, `/api/profile/preferences`) — `user_id` resolved from the JWT, no cross-user query path exists
+  - Avatar upload/delete (`/api/auth/avatar`) — scoped to the authenticated user; the public `GET /api/auth/avatar/{filename}` serve route is intentionally unauthenticated (an unguessable server-generated filename, not a directory listing) since it backs plain `<img>` tags
 - Cross-user access returns HTTP 404 (never 403) to prevent resource ID enumeration.
 
 ## Game Generation V2 AI Safety Boundary

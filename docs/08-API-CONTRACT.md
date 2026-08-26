@@ -5,10 +5,13 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 
 ---
 
-## Authentication & Identity (IMPLEMENTED — B7)
+## Authentication & Identity (IMPLEMENTED — B7, extended Product Expansion V1)
 - `POST /api/auth/register` -> Register a new account. Body: `{ email, username, password }`. Rate limit: 5/hr/IP. Returns `201 Created` with `{ user, access_token, token_type }`.
 - `POST /api/auth/login` -> Authenticate existing user. Body: `{ email, password }`. Rate limit: 10/15min/IP. Returns `200 OK` with `{ user, access_token, token_type }`. Generic error on failure.
-- `GET /api/auth/me` -> Fetch profile of current authenticated user. Requires `Authorization: Bearer <token>`. Returns `{ id, email, username, level, created_at, updated_at }`.
+- `GET /api/auth/me` -> Fetch profile of current authenticated user. Requires `Authorization: Bearer <token>`. Returns `{ id, email, username, level, avatar_url, created_at, updated_at }`.
+- `POST /api/auth/avatar` -> Upload/replace profile picture. Requires `Authorization: Bearer <token>`. Body: multipart form file (PNG/JPEG/WebP, max 2MB). Returns `200 OK` with `{ avatar_url, message }`. Invalid file returns `422` (`INVALID_AVATAR`).
+- `DELETE /api/auth/avatar` -> Remove custom avatar, revert to default placeholder. Requires `Authorization: Bearer <token>`. Returns `200 OK` with `{ avatar_url: null, message }`.
+- `GET /api/auth/avatar/{filename}` -> Serve an uploaded avatar image file. No authentication (publicly servable static asset by design — the filename is an unguessable server-generated identifier, not a listing). Returns the image, or `404` (`AVATAR_NOT_FOUND`).
 
 ---
 
@@ -26,19 +29,29 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 - `GET /api/projects/{id}/playtests` -> List all playtest sessions for the owned project. Returns `200 OK`.
 - `POST /api/projects/{id}/analyze-playtest` -> Run AI Playtest Critique on gameplay telemetry. Returns structured `PlaytestAnalysisResponse` with `fun_rating`, `difficulty_rating`, `clarity_rating`, `strengths`, `problems`, and `recommendations`.
 - `POST /api/projects/{id}/improvements` -> Apply approved recommendations to create a new project version revision (`version_number` incremented, `game_dsl` patched). Returns `200 OK`.
+- `GET /api/projects/{id}/blueprint` -> Derive and return the nontechnical `GameBlueprint` (title, genre, core loop, levels, objectives, progression, allowlist-derived `supported_mechanics`, finale) purely from the project's already-validated `GameDesignSpec` + `GameDSL`. Returns `200 OK`. Owner mismatch returns 404; unavailable (e.g. missing design_spec) returns `400` (`BLUEPRINT_UNAVAILABLE`).
+- `POST /api/projects/{id}/remix` -> Apply 1-3 structured `RemixIntent` objects from a closed catalog (`increase_combat`, `increase_exploration`, `increase_difficulty`, `decrease_difficulty`, `add_levels`, `more_story`, `faster_pace`, `more_enemies`, `change_theme`) to create a new immutable project version, through the same validation/repair pipeline as fresh generation. Body: `{ intents: [{ type, strength? }] }`. Duplicate or mutually-exclusive intents (`increase_difficulty` + `decrease_difficulty`) are rejected with `422` before any AI call. Returns `200 OK` with `{ project_id, version_number, game_dsl, design_spec, blueprint, change_summary, status }`. Owner mismatch returns 404.
 - `GET /api/projects/{id}/versions` -> List revision history of the project. Returns `200 OK`.
 
 *Note: Project creation is internal to the build pipeline upon successful build compilation.*
 
 ---
 
-## Builds (IMPLEMENTED — B2, extended B7, SecFix)
+## Builds (IMPLEMENTED — B2, extended B7, Phase 5/6, SecFix)
 *All routes require `Authorization: Bearer <token>`.*
-- `POST /api/builds` -> Submit new build job (request contains prompt + parameters; returns HTTP 202 Accepted with server-generated `build_id`, `user_id` bound from token, and initial status).
+- `POST /api/builds` -> Submit new build job (request contains prompt + parameters including `scale` and `world_mode`; returns HTTP 202 Accepted with server-generated `build_id`, `user_id` bound from token, and initial status).
 - `GET /api/builds/{id}` -> Authoritative build status, timestamps, `project_id` (if SUCCESS), or error details (if ERROR). Owner mismatch returns 404.
 - `GET /api/builds/{id}/logs` -> Retrieve all persisted logs in ascending sequence order. Owner mismatch returns 404.
 - `POST /api/builds/{id}/sse-token` -> Issue a short-lived (90s TTL) SSE credential bound to `{id}` for secure EventSource streaming without exposing long-lived JWT bearer tokens in URLs. Returns `{ "sse_token": "...", "expires_in_seconds": 90 }`.
 - `GET /api/builds/{id}/events` -> Server-Sent Events (`text/event-stream`) streaming live logs and status transitions until terminal state. Authenticated via `?sse_token=<short-lived-token>` or `Authorization: Bearer <token>`. Owner mismatch returns 404 before stream starts.
+- `POST /api/builds/{id}/cancel` -> Cancel an active (non-terminal) build job. Returns `200 OK` with the updated `BuildResponse` (`status: "CANCELLED"`). Owner mismatch returns 404.
+
+---
+
+## Profile & Personalization (IMPLEMENTED — Product Expansion V1 / Creator Progression V1)
+*All routes require `Authorization: Bearer <token>`.*
+- `GET /api/profile/progress` -> Server-authoritative XP/level/milestone status. Returns `200 OK` with `{ user_id, total_xp, current_level, creator_title, current_level_base_xp, next_level_xp, xp_into_level, xp_needed_for_next, progress_percentage, milestones: [{ milestone_key, title, description, icon, xp_bonus, is_unlocked, unlocked_at }], unlocked_milestone_count, total_milestone_count, recent_events: [{ id, event_type, xp_amount, source_reference, created_at }] }`.
+- `GET /api/profile/preferences` -> Behavioral genre-affinity distribution ("Game DNA") derived from search/save/build/play activity. Returns `200 OK` with `{ user_id, top_genres: [{ genre, score, percentage, interaction_count, affinity_tier }], total_interactions, strongest_match, recent_interest, confidence_level, summary_headline, has_sufficient_data }`.
 
 ---
 
@@ -81,5 +94,5 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 }
 ```
 
-Standard codes supported: `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `EMAIL_ALREADY_EXISTS`, `USERNAME_TAKEN`, `RATE_LIMITED`, `PROJECT_NOT_FOUND`, `BUILD_NOT_FOUND`, `SAVED_DISCOVERY_NOT_FOUND`, `ALREADY_SAVED`, `VALIDATION_FAILED`.
+Standard codes supported: `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `EMAIL_ALREADY_EXISTS`, `USERNAME_TAKEN`, `RATE_LIMITED`, `PROJECT_NOT_FOUND`, `BUILD_NOT_FOUND`, `SAVED_DISCOVERY_NOT_FOUND`, `ALREADY_SAVED`, `VALIDATION_FAILED`, `BLUEPRINT_UNAVAILABLE`, `REMIX_FAILED`, `IMPROVEMENT_FAILED`, `INVALID_AVATAR`, `AVATAR_UPLOAD_FAILED`, `AVATAR_DELETE_FAILED`, `AVATAR_NOT_FOUND`.
 Do not expose tracebacks. Do not let clients arbitrarily mutate build status or bypass ownership.

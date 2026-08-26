@@ -22,7 +22,7 @@ A build is a backend-owned asynchronous job. Success produces a validated Game D
 User can request natural-language changes. Prefer structured patches/version creation over unconstrained full regeneration.
 
 ## Persistence
-Persistent objects eventually include User, Project, ProjectVersion, BuildJob, GameArtifact, Discovery, and SavedDiscovery.
+Persistent objects: User, Project, ProjectVersion, BuildJob, BuildLog, SavedDiscovery, PlaytestSession, and the Creator Progression / Game DNA tables (UserProgress, XPEvent, UserMilestone, UserGenrePreference). The Discovery catalog itself is a normalized, offline-built dataset rather than a per-user persisted entity; there is no separate `GameArtifact` table — the artifact a build produces is `Project.game_dsl` plus `runtime_metadata`.
 
 ## State Ownership
 Frontend: UI/transient state. Backend: persistent business state and build truth.

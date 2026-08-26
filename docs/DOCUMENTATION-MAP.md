@@ -9,7 +9,7 @@
 | `03-TECH-STACK.md` | Technology decisions |
 | `04-SYSTEM-ARCHITECTURE.md` | System architecture |
 | `05-FRONTEND-ARCHITECTURE.md` | Current frontend |
-| `06-BACKEND-ARCHITECTURE.md` | Planned backend |
+| `06-BACKEND-ARCHITECTURE.md` | Backend architecture (implemented) |
 | `07-DATA-MODEL.md` | Persisted entities |
 | `08-API-CONTRACT.md` | Frontend/backend contract |
 | `09-AI-GAME-GENERATION.md` | AI + DSL pipeline |
