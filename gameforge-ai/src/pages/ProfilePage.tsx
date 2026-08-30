@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
+import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
 import type { GameProject } from '../types';
 
 export default function ProfilePage() {
@@ -694,14 +695,15 @@ export default function ProfilePage() {
                     key={game.id}
                     className="bg-surface border border-outline-variant p-4 flex flex-col rounded-sm relative overflow-hidden group hover:border-tertiary/50 transition-colors"
                   >
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-tertiary/10 to-transparent pointer-events-none"></div>
                     <div className="flex justify-between items-start mb-3">
                       <h3 className="font-bold text-lg group-hover:text-tertiary transition-colors truncate max-w-[180px]" title={game.title}>{game.title}</h3>
                       <span className="bg-surface-container-highest text-xs px-2 py-0.5 rounded border border-outline-variant/50 font-mono text-tertiary">
                         {game.status}
                       </span>
                     </div>
-                    <p className="text-sm text-on-surface-variant line-clamp-3 mb-4 flex-1">{game.prompt}</p>
+                    {/* Procedural cover thumbnail */}
+                    <ProjectCoverArt project={game} className="h-24 w-full border border-outline-variant mb-3" />
+                    <p className="text-sm text-on-surface-variant line-clamp-2 mb-4 flex-1">{game.prompt}</p>
                     <div className="flex flex-wrap gap-2 mb-4">
                       <span className="text-xs bg-surface-container-highest px-2 py-1 rounded-sm border border-outline-variant/30">
                         {game.genre}

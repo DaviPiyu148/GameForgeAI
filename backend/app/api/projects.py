@@ -114,6 +114,49 @@ def update_project(
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
 
 
+@router.delete(
+    "/{project_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Permanently delete a Game Project",
+)
+def delete_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> None:
+    """Permanently delete an owned project and all its version/playtest rows.
+    Returns 204 No Content on success, 404 if not found or not owned by requester.
+    """
+    try:
+        service.delete_project(db, project_id, user_id=current_user.id)
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+
+
+@router.post(
+    "/{project_id}/duplicate",
+    response_model=ProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate a Game Project (snapshot copy, fresh version history)",
+)
+def duplicate_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> ProjectResponse:
+    """Create an independent snapshot copy of an owned project with a fresh v1 version
+    history. The copy inherits the original's current playable configuration and DSL
+    but none of its playtest sessions, build jobs, or telemetry history.
+    Returns 201 Created on success, 404 if not found or not owned by requester.
+    """
+    try:
+        return service.duplicate_project(db, project_id, user_id=current_user.id)
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+
+
 # -----------------------------------------------------------------------------
 # Playtest & Telemetry Endpoints
 # -----------------------------------------------------------------------------

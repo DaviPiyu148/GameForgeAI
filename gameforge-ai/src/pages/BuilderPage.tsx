@@ -1,7 +1,8 @@
 import { Navbar } from '../components/Shared/Navbar';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BUILDER_PRESETS, applyPreset, detectActivePreset } from '../data/builderPresets';
 
 const BuilderPage = () => {
   const { state, setPrompt, updateBuildParams, compileProject, cancelCurrentBuild, clearCompilerLogs } = useAppContext();
@@ -10,6 +11,16 @@ const BuilderPage = () => {
   
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Derive which preset (if any) matches the current builder params
+  const activePresetKey = useMemo(
+    () => detectActivePreset(state.currentBuildParams),
+    [state.currentBuildParams]
+  );
+
+  const handleApplyPreset = (preset: typeof BUILDER_PRESETS[number]) => {
+    updateBuildParams(applyPreset(preset));
+  };
 
   useEffect(() => {
     if (logsEndRef.current) {
@@ -191,10 +202,39 @@ const BuilderPage = () => {
             </div>
 
             <div className="p-4 flex-1">
-              <h3 className="font-mono text-[10px] text-primary mb-4 flex items-center gap-2 uppercase tracking-wide">
+              <h3 className="font-mono text-[10px] text-primary mb-3 flex items-center gap-2 uppercase tracking-wide">
                 <span className="material-symbols-outlined text-[14px]">tune</span>
                 Parameters
               </h3>
+
+              {/* ── Quick Presets ── */}
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="font-mono text-[10px] text-on-surface-variant uppercase">Quick Presets</span>
+                  {!activePresetKey && (
+                    <span className="font-mono text-[9px] text-on-surface-variant/60 bg-surface-container border border-outline-variant px-1.5 py-0.5 rounded-xs uppercase">Custom</span>
+                  )}
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {BUILDER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      onClick={() => handleApplyPreset(preset)}
+                      disabled={state.buildStatus === 'COMPILING'}
+                      className={`flex items-center gap-1 px-2 py-1 font-mono text-[10px] uppercase border transition-all cursor-pointer btn-interactive disabled:opacity-40 rounded-xs ${
+                        activePresetKey === preset.key
+                          ? 'bg-primary/20 border-primary text-primary shadow-[0_0_8px_rgba(76,224,210,0.3)]'
+                          : 'border-outline-variant text-on-surface-variant hover:border-primary/60 hover:text-primary/80'
+                      }`}
+                      title={`Apply ${preset.label} preset`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">{preset.icon}</span>
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-5">
                 <div>
                   <div className="flex justify-between items-center mb-1.5">

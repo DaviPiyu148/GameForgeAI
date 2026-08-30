@@ -39,5 +39,21 @@ class ProjectRepository:
         db.refresh(project)
         return project
 
+    def delete(self, db: Session, project: Project) -> None:
+        """
+        Permanently delete a project and all its CASCADE-linked child rows.
+
+        SQLAlchemy / SQLite will automatically cascade to:
+          - project_versions (ondelete=CASCADE)
+          - playtest_sessions (ondelete=CASCADE)
+
+        build_jobs.project_id and xp_events.source_reference are plain string
+        references with no FK constraint, so they are independent audit records
+        that are intentionally not deleted — they are build/XP audit history,
+        not project children.
+        """
+        db.delete(project)
+        db.commit()
+
 
 project_repository = ProjectRepository()

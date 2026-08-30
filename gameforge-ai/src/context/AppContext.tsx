@@ -443,6 +443,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const clearDiscoveryResults = () => setState((s) => ({ ...s, discoveryResults: [] }));
 
+  // Sprint A — Project Management
+  const deleteProject = async (id: string): Promise<void> => {
+    await projectService.deleteProject(id);
+    setState((s) => ({
+      ...s,
+      myGames: s.myGames.filter((g) => g.id !== id),
+    }));
+    pushToast({ variant: 'success', title: 'PROJECT DELETED', description: 'The project has been permanently removed.' });
+  };
+
+  const duplicateProject = async (id: string): Promise<void> => {
+    const copy = await projectService.duplicateProject(id);
+    setState((s) => ({
+      ...s,
+      myGames: [copy, ...s.myGames],
+    }));
+    pushToast({ variant: 'success', title: 'PROJECT DUPLICATED', description: `'${copy.title}' created.` });
+  };
+
   // 5. Real Discovery Search Flow (Public, zero auth requirement)
   const searchDiscovery = async (promptText: string, navigate: (path: string) => void) => {
     const trimmed = promptText.trim();
@@ -659,6 +678,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         refreshPreferences,
         uploadAvatar,
         deleteAvatar,
+        deleteProject,
+        duplicateProject,
       }}
     >
       {children}

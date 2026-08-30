@@ -176,6 +176,76 @@ class ProjectService:
         projects = self.repo.list(db, limit=limit, offset=offset, user_id=user_id)
         return [self.to_response(p) for p in projects]
 
+    def delete_project(
+        self, db: Session, project_id: str, user_id: Optional[str] = None
+    ) -> None:
+        """
+        Permanently delete an owned project.
+
+        CASCADE constraints on project_versions and playtest_sessions handle
+        their dependent rows automatically.  build_jobs.project_id is a plain
+        string reference (no FK), so those audit records are intentionally
+        retained as build history and do NOT create orphan rows in the
+        relational sense.
+        """
+        project = self._get_owned_project(db, project_id, user_id)
+        self.repo.delete(db, project)
+
+    def duplicate_project(
+        self, db: Session, project_id: str, user_id: Optional[str] = None
+    ) -> ProjectResponse:
+        """
+        Create an independent copy of an existing project.
+
+        The duplicate:
+          - Inherits the current playable configuration (engine, scale, world_mode,
+            art_density, physics, modules, prompt, genre, title + " (Copy)") and
+            the latest design_spec and game_dsl so it is immediately playable.
+          - Starts with a fresh version history (v1 only, new ProjectVersion row).
+          - Gets its own new UUID.
+          - Does NOT inherit playtest_sessions, build_jobs, or telemetry/analysis
+            records — those are runtime/session history tied to the original.
+          - Has status PLAYABLE if original has a game_dsl; otherwise PLAYABLE with
+            no DSL (the project row is still valid; just needs a new build).
+        """
+        original = self._get_owned_project(db, project_id, user_id)
+
+        copy = Project(
+            user_id=user_id,
+            title=f"{original.title} (Copy)",
+            genre=original.genre,
+            prompt=original.prompt,
+            status="PLAYABLE",
+            engine=original.engine,
+            art_density=original.art_density,
+            physics=original.physics,
+            modules=list(original.modules) if original.modules else [],
+            scale=original.scale or "standard",
+            world_mode=original.world_mode or "linear",
+            # Snapshot current playable design artifacts.
+            design_spec=original.design_spec,
+            game_dsl=original.game_dsl,
+            runtime_metadata=original.runtime_metadata,
+            current_version=1,
+        )
+        db.add(copy)
+        db.flush()  # Assign copy.id before creating the v1 version record.
+
+        # Create a fresh v1 ProjectVersion for the duplicate.
+        if copy.game_dsl:
+            v1 = ProjectVersion(
+                project_id=copy.id,
+                version_number=1,
+                game_dsl=copy.game_dsl,
+                design_spec=copy.design_spec,
+                change_summary="Duplicated from project '{}'.".format(original.title),
+            )
+            db.add(v1)
+
+        db.commit()
+        db.refresh(copy)
+        return self.to_response(copy)
+
     def update_project(
         self, db: Session, project_id: str, data: ProjectUpdate, user_id: Optional[str] = None
     ) -> ProjectResponse:

@@ -57,5 +57,19 @@ export const projectService = {
   async getVersions(id: string): Promise<ProjectVersionSummary[]> {
     return await apiClient.get<ProjectVersionSummary[]>(`/projects/${id}/versions`);
   },
-};
 
+  /**
+   * Permanently delete an owned project (204 No Content on success).
+   */
+  async deleteProject(id: string): Promise<void> {
+    await apiClient.delete<void>(`/projects/${id}`);
+  },
+
+  /**
+   * Create an independent snapshot copy of an owned project.
+   * The duplicate gets a fresh v1 version history and no runtime history.
+   */
+  async duplicateProject(id: string): Promise<GameProject> {
+    return await apiClient.post<GameProject>(`/projects/${id}/duplicate`);
+  },
+};

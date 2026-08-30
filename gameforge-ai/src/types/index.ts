@@ -414,4 +414,7 @@ export interface AppContextType {
   refreshPreferences: () => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
   deleteAvatar: () => Promise<void>;
+  // Sprint A — Project Management
+  deleteProject: (id: string) => Promise<void>;
+  duplicateProject: (id: string) => Promise<void>;
 }
