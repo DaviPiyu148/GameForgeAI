@@ -33,6 +33,7 @@ class CatalogManager:
     def __init__(self, catalog_path: str = "data/processed/games_catalog.json"):
         self.catalog_path = resolve_catalog_path(catalog_path)
         self._games_by_id: Dict[str, Dict[str, Any]] = {}
+        self._games_by_external_id: Dict[str, Dict[str, Any]] = {}
         self._catalog_list: List[Dict[str, Any]] = []
         self._lexical_index: Optional[LexicalIndex] = None
         self._load_catalog()

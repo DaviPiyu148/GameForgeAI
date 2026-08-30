@@ -431,14 +431,14 @@ def test_ai_analysis_is_read_only(test_context):
     assert rec_res.status_code == 201
     session_id = rec_res.json()["id"]
 
+    # Trigger AI critique
     from unittest.mock import AsyncMock, patch
     from app.schemas.playtest import PlaytestAnalysisResponse
-
     mock_analysis = PlaytestAnalysisResponse(
         fun_rating=8,
         difficulty_rating=6,
         clarity_rating=9,
-        strengths=["Responsive controls", "Engaging progression"],
+        strengths=["Great combat feel"],
         problems=[],
         recommendations=[
             {
@@ -446,14 +446,12 @@ def test_ai_analysis_is_read_only(test_context):
                 "category": "mobility",
                 "description": "Increase player speed",
                 "dsl_change_type": "player_speed",
-                "suggested_patch": {"player": {"speed": 280}},
+                "suggested_patch": {"player": {"speed": 290}},
             }
         ],
     )
-
-    # Trigger AI critique (mocked for offline test hermeticity)
-    with patch("app.services.project_service.project_service.analyze_playtest_session", new_callable=AsyncMock) as mock_analyze:
-        mock_analyze.return_value = mock_analysis
+    with patch("app.services.project_service.project_service.analyze_playtest_session", new_callable=AsyncMock) as mock_crit:
+        mock_crit.return_value = mock_analysis
         critique_res = client.post(
             f"/api/projects/{proj_a.id}/analyze-playtest",
             json={"session_id": session_id},

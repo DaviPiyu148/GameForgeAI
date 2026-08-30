@@ -1,18 +1,22 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+
 Living Documentation Refresh V1
 
 ## Status
+
 COMPLETE
 
 ## Objective
+
 Synchronize CURRENT documentation with the actual implemented repository (post repository-hygiene-
 cleanup commit `390961e`) — remove stale/inaccurate claims from living documents, without adding
 features, refactoring code, changing APIs/schema/behavior, deleting historical reports/migrations,
 or claiming Phase 7/8 functionality exists. Documentation-only task.
 
 ## Started
+
 2026-08-26
 
 ---
@@ -60,6 +64,7 @@ or claiming Phase 7/8 functionality exists. Documentation-only task.
       original file list — exactly what that pass is for)
 
 ### Stale claims removed
+
 "Backend and AI are not yet implemented" (README.md), "Current Phase: B5" + "61 unit and
 integration tests passing" (backend/README.md), "expects 61 tests passing" (SETUP.md), "Planned
 backend" (docs/DOCUMENTATION-MAP.md), "Persistent objects eventually include..." (docs/02), an
@@ -68,6 +73,7 @@ routes (docs/08), a superseded frontend-mock exception presented without histori
 (ADR-004).
 
 ### Evidence
+
 Full detail: `DOCUMENTATION_REFRESH_REPORT.md`.
 
 ---
@@ -87,7 +93,7 @@ Full detail: `DOCUMENTATION_REFRESH_REPORT.md`.
 ## 4. Verification & Regression
 
 | Check | Result |
-|---|---|
+| --- | --- |
 | Backend tests (`pytest tests/ -q`) | **335 passed**, 130.03s |
 | TypeScript (`tsc --noEmit`) | **0 errors** |
 | Lint (`oxlint`) | **0 errors, 0 warnings** |
@@ -112,6 +118,7 @@ example files changed (13 files, 339 insertions, 340 deletions; zero `.py`/`.ts`
 ---
 
 ## Remaining Work
+
 - The `FULL_STACK_SECURITY_ASSESSMENT.md` filename discrepancy (see § "Reconnaissance") — a human
   should decide whether to commit that audit's findings as a real file, or leave it as an Artifact.
 - `docs/12-TESTING-QA.md` wasn't independently re-verified line-by-line against the current test
@@ -121,15 +128,21 @@ example files changed (13 files, 339 insertions, 340 deletions; zero `.py`/`.ts`
   documentation-only pass.
 
 ## Blockers
+
 None.
 
 ## Change Log
-- 2026-08-26: Completed Living Documentation Refresh V1 — 13 documentation/config-example files
-  synchronized with the actual implemented repository, zero source-code changes, full regression
-  clean (335/335 backend tests, clean TypeScript/lint/build, single Alembic head), committed.
-- 2026-08-26: (Prior) Completed Full Repository Hygiene & Dead-Code Audit + approved cleanup
-  (commit `390961e`).
-- 2026-08-26: (Prior) Completed Dev Proxy 502 Investigation (commit `fc504c3`).
-- 2026-08-26: (Prior) Completed browser verification for the UI Copy Audit (commit `db61452`).
-- 2026-08-26: (Prior) Completed Website Content & UI Copy Audit V1 (commit `b192bc1`).
-- 2026-08-26: (Prior) Completed UI Motion & Special Effects V1 (commit `4e7fc90`).
+
+- 2026-08-24: Full-stack operational health audit — reconnaissance, live `start.bat` execution, 9 confirmed defects found and fixed (3 CRITICAL, 2 HIGH, 3 MEDIUM/LOW, 1 self-introduced-and-caught), regression tests added, full suite + typecheck + lint + build all green, two clean restart cycles verified.
+- 2026-08-24 (same day, post-report): live user testing on the actual target machine surfaced 3 further issues. One (FS-018) was a regression in this audit's own initial fix — reverted. One (FS-019) was a real, minor, fixed defect. One (FS-020) is a genuine environmental memory constraint on this machine, disclosed with evidence and mitigation rather than fixed, since no application code can substitute for physical RAM.
+- 2026-08-30: Full environment initialization and configuration from clean state:
+  - Created Python virtual environment (`backend/.venv`) and installed all dependencies from `requirements.txt`.
+  - Configured `backend/.env` with generated secure `AUTH_JWT_SECRET`.
+  - Installed frontend dependencies (`gameforge-ai/node_modules`).
+  - Executed Alembic database migrations up to head (`bc9ae398f146`).
+  - Downloaded Steam raw datasets, ingested 121,625 games into `data/processed/games_catalog.json`.
+  - Built FAISS vector index (`games_index.faiss` with 20,000 embedded records).
+  - Executed full test suite: 328 passed in `pytest backend/tests`.
+  - Verified frontend build with TypeScript check (`tsc -b && vite build` passed).
+  - Executed `start.bat` dev launcher: Backend API running on `http://127.0.0.1:8000`, Frontend UI running on `http://127.0.0.1:5173/#/`.
+  - Verified health checks and Discovery search live across both ports.

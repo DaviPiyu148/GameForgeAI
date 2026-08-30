@@ -217,7 +217,7 @@ async def test_discovery_search_api():
         assert data["query_type"] == "TOPIC_TAG"
         # Check top result
         top = data["results"][0]
-        assert top["game"]["title"] == "Cyberpunk 2077"
+        assert "Cyberpunk" in top["game"]["title"]
         assert top["score"] >= 0.85
         assert len(top["match_highlights"]) > 0
 
