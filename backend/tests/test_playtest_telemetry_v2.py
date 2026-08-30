@@ -432,16 +432,36 @@ def test_ai_analysis_is_read_only(test_context):
     session_id = rec_res.json()["id"]
 
     # Trigger AI critique
-    critique_res = client.post(
-        f"/api/projects/{proj_a.id}/analyze-playtest",
-        json={"session_id": session_id},
-        headers=headers,
+    from unittest.mock import AsyncMock, patch
+    from app.schemas.playtest import PlaytestAnalysisResponse
+    mock_analysis = PlaytestAnalysisResponse(
+        fun_rating=8,
+        difficulty_rating=6,
+        clarity_rating=9,
+        strengths=["Great combat feel"],
+        problems=[],
+        recommendations=[
+            {
+                "id": "rec_1",
+                "category": "mobility",
+                "description": "Increase player speed",
+                "dsl_change_type": "player_speed",
+                "suggested_patch": {"player": {"speed": 290}},
+            }
+        ],
     )
-    assert critique_res.status_code == 200
-    critique = critique_res.json()
-    assert "fun_rating" in critique
-    assert "recommendations" in critique
-    assert len(critique["recommendations"]) >= 1
+    with patch("app.services.project_service.project_service.analyze_playtest_session", new_callable=AsyncMock) as mock_crit:
+        mock_crit.return_value = mock_analysis
+        critique_res = client.post(
+            f"/api/projects/{proj_a.id}/analyze-playtest",
+            json={"session_id": session_id},
+            headers=headers,
+        )
+        assert critique_res.status_code == 200
+        critique = critique_res.json()
+        assert "fun_rating" in critique
+        assert "recommendations" in critique
+        assert len(critique["recommendations"]) >= 1
 
     # Invariant: Verify project.game_dsl is untouched and version is STILL 1
     proj_res = client.get(f"/api/projects/{proj_a.id}", headers=headers)

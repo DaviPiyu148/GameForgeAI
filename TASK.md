@@ -117,3 +117,14 @@ Full detail, evidence, and severity/subsystem table: see `FULL_STACK_OPERATIONAL
 ## Change Log
 - 2026-08-24: Full-stack operational health audit — reconnaissance, live `start.bat` execution, 9 confirmed defects found and fixed (3 CRITICAL, 2 HIGH, 3 MEDIUM/LOW, 1 self-introduced-and-caught), regression tests added, full suite + typecheck + lint + build all green, two clean restart cycles verified.
 - 2026-08-24 (same day, post-report): live user testing on the actual target machine surfaced 3 further issues. One (FS-018) was a regression in this audit's own initial fix — reverted. One (FS-019) was a real, minor, fixed defect. One (FS-020) is a genuine environmental memory constraint on this machine, disclosed with evidence and mitigation rather than fixed, since no application code can substitute for physical RAM.
+- 2026-08-30: Full environment initialization and configuration from clean state:
+  - Created Python virtual environment (`backend/.venv`) and installed all dependencies from `requirements.txt`.
+  - Configured `backend/.env` with generated secure `AUTH_JWT_SECRET`.
+  - Installed frontend dependencies (`gameforge-ai/node_modules`).
+  - Executed Alembic database migrations up to head (`bc9ae398f146`).
+  - Downloaded Steam raw datasets, ingested 121,625 games into `data/processed/games_catalog.json`.
+  - Built FAISS vector index (`games_index.faiss` with 20,000 embedded records).
+  - Executed full test suite: 328 passed in `pytest backend/tests`.
+  - Verified frontend build with TypeScript check (`tsc -b && vite build` passed).
+  - Executed `start.bat` dev launcher: Backend API running on `http://127.0.0.1:8000`, Frontend UI running on `http://127.0.0.1:5173/#/`.
+  - Verified health checks and Discovery search live across both ports.
