@@ -162,6 +162,32 @@ system-wide physical memory exhaustion on this specific development machine (fre
 request across either session. This is consistent with, not contradictory to, this report's
 original "0 network failures" result: memory availability at the time of *this* report's testing
 was evidently sufficient for the proxy to behave reliably. Classified **KNOWN
-DEVELOPMENT-ONLY LIMITATION** — reproducible, environment-dependent, not a GameForge application
-defect, and not applicable to a production deployment (no dev proxy exists in that path). No code
-changes were made as a result.
+defect, and not applicable to a production deployment (no dev proxy exists in that path). No code changes were made as a result.
+
+# Generation Resilience Browser Verification
+
+## Date
+2026-08-30
+
+## Objective
+Browser-verify the live generation pipeline, compiler logs, SSE event streaming, deterministic normalization, terminal state transitions, and error handling following the Game Generation Reliability & Hardening V1 implementation.
+
+## Distinction of Verification Sources
+- **LIVE MODEL OBSERVED**: A real browser session submitted the prompt `"Create a compact cyberpunk open-world courier game spanning three connected city districts. Include vehicles, rival factions, several activities, a dynamic threat system, accelerated world time, and one world event."` with Open World preset and Campaign scale. The build transitioned cleanly: `QUEUED` → `RUNNING` → honest terminal `ERROR` (`MODEL_TIMEOUT` after 150.0s provider timeout) with no UI freeze, no fake success, and an actionable retry CTA.
+- **CONTROLLED FIXTURE VERIFIED**: The malformed-schema recovery path (`levels[0].width` schema drift), legacy alias mappings, scalar string coercions, markdown stripping, and unsafe script rejections are verified by 10/10 automated tests in `backend/tests/test_generation_resilience.py` (specifically proving 0 LLM repair calls on recoverable schema drift and immediate fail with 0 repair calls on unsafe keys).
+
+## Browser Observations
+
+| Dimension | Result | Details |
+|---|---|---|
+| **Generation Request** | PASS | Successfully submitted build job via `POST /api/builds` with prompt, preset, and scale. |
+| **SSE Event Streaming** | PASS | SSE connection negotiated via `POST /api/builds/{id}/sse-token` and stream established on `GET /api/builds/{id}/events`. |
+| **Build Terminal Behavior** | PASS | Clean terminal state reached (`QUEUED` → `RUNNING` → `ERROR`). Never stuck in `RUNNING` or `VALIDATING`. Never produced a fake success. |
+| **UI Resilience & Retry** | PASS | UI displayed honest compiler failure message with `RETRY GENERATION` button and preserved draft prompt. |
+| **Console Audit** | PASS | Zero unhandled promise rejections; zero unexpected application crashes. |
+| **Network Audit** | PASS | Clean request lifecycle; no infinite retry loops; single active SSE stream per job. |
+
+## Verdict
+**GENERATION RESILIENCE: PASS**
+
+The generation pipeline is resilient to the tested classes of malformed AI output and provider failure, while preserving strict DSL and security validation.
