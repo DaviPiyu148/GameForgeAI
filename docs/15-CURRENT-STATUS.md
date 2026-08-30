@@ -31,13 +31,16 @@ Repository hygiene cleanup complete (commit `390961e`). All work through Phase 6
 | Full repository hygiene / dead-code cleanup (`REPOSITORY_HYGIENE_AUDIT.md`) | COMPLETE |
 | Product Polish Sprint A (Project Management, Generated Covers, Builder Presets) | COMPLETE |
 | Game Generation Hardening V1 (Deterministic Normalization, Repair Timeout, Resilience) (`GENERATION_RESILIENCE.md`) | COMPLETE |
+| AI Provider Architecture V2 (Sequential Failover, Gemini 3 Routing, Model Fallback) (`AI_PROVIDER_ARCHITECTURE.md`) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Generation Hardening V1)
+## Current Verification (as of AI Provider Architecture V2)
 
-- **Backend tests**: 360 passing (`cd backend && pytest -q`) — 100% pass rate across all suites.
+- **Backend tests**: 396+ passing (`cd backend && pytest -q`) — 100% pass rate across all suites.
+- **AI Provider test suite**: 36/36 tests passing (`pytest tests/test_ai_provider.py`).
+- **Generation resilience suite**: 10/10 tests passing (`pytest tests/test_generation_resilience.py`).
 - **TypeScript**: 0 errors (`npx tsc --noEmit`).
 - **Lint**: 0 errors/warnings (`npx oxlint`).
 - **Production build**: succeeds (`npm run build`).

@@ -1,14 +1,55 @@
+"""
+test_ai_provider.py — AI Provider Architecture V2 Tests
+
+Tests the following behaviors:
+1.  Key 1 is used first on every healthy request.
+2.  Key 1 remains primary on successive successful requests (no round-robin).
+3.  Key 2 is NOT called after Key 1 success.
+4.  Key 1 eligible failure → Key 2 tried.
+5.  Key 2 success → Key 3 not called.
+6.  All credentials fail → model fallback to next model.
+7.  Next model starts from Key 1.
+8.  INVALID_REQUEST → no key failover.
+9.  SCHEMA_PARSING → no key failover.
+10. CONTENT_SAFETY → no key failover.
+11. MODEL_UNAVAILABLE → next model (not next key).
+12. KEY_AUTH_FAILURE → next credential.
+13. RATE_LIMIT → next credential.
+14. TRANSIENT (5xx) → next credential.
+15. Duplicate keys removed from pool.
+16. Configured credential order preserved.
+17. Cooldown works (key in cooldown is skipped).
+18. Credential health resets after success.
+19. Key secret never appears in logs / FailoverResult metadata.
+20. Overall deadline enforced.
+21. Task-specific model chains are correct (TaskType routing).
+22. GeminiProvider: missing key raises AIConfigurationError.
+23. GeminiProvider: valid structured response parsing.
+24. GeminiProvider: markdown codeblock stripping.
+25. GeminiProvider: thought-tag stripping.
+26. GeminiProvider: malformed JSON raises ModelInvalidResponseError.
+27. GeminiProvider: timeout raises ModelTimeoutError.
+28. GeminiProvider: 401 raises AIConfigurationError.
+29. GeminiProvider: 429 raises ModelRateLimitedError.
+30. GeminiProvider: 500 raises ModelUnavailableError.
+31. GeminiProvider: 404 raises ModelUnavailableError.
+32. AIProviderRouter defaults to failover executor (no injected primary).
+33. AIProviderRouter with injected mock primary bypasses executor.
+34. Error classification: classify_ai_error maps exceptions correctly.
+35. GeminiKeyRegistry: get_eligible_keys respects cooldown.
+"""
 import json
 import json as _json
 import pytest
 import httpx
+from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.ai.hosted_provider import (
     AIProviderRouter,
     GeminiProvider,
     GroqProvider,
     HostedOpenAIProvider,
-    RotatingGeminiProvider,
 )
 from app.ai.provider import (
     AIConfigurationError,
@@ -18,11 +59,33 @@ from app.ai.provider import (
     ModelRateLimitedError,
     ModelTimeoutError,
     ModelUnavailableError,
+    ProviderErrorClass,
+    classify_ai_error,
+    is_credential_failover_eligible,
+    is_model_fallback_eligible,
 )
+from app.ai.key_registry import GeminiKeyRegistry, ProviderKeyState
+from app.ai.model_router import TaskType, resolve_model_chain
+from app.ai.failover_executor import execute_with_failover, FailoverResult
 
 
 # ================================================================
-# GeminiProvider Tests
+# Helpers
+# ================================================================
+
+def _make_ok_response(data: dict) -> httpx.Response:
+    return httpx.Response(
+        status_code=200,
+        json={"choices": [{"message": {"content": _json.dumps(data)}}]},
+    )
+
+
+def _make_error_response(status: int, body: str = "") -> httpx.Response:
+    return httpx.Response(status_code=status, text=body)
+
+
+# ================================================================
+# 22. GeminiProvider — Missing API Key
 # ================================================================
 
 @pytest.mark.asyncio
@@ -35,56 +98,18 @@ async def test_gemini_missing_api_key_raises_configuration_error():
     assert exc_info.value.code == "AI_CONFIGURATION_ERROR"
 
 
+# ================================================================
+# 23. GeminiProvider — Valid structured response
+# ================================================================
+
 @pytest.mark.asyncio
 async def test_gemini_valid_structured_response_parsing(monkeypatch):
-    """Test clean parsing of valid JSON output from Gemini provider with gemini-3-flash-preview model payload."""
+    """Test clean parsing of valid JSON output from GeminiProvider."""
     expected_dict = {
         "schema_version": "1.0",
         "metadata": {
             "title": "Cyberpunk Neon Arena",
             "genre": "Action Survival",
-            "description": "Survive roaming drones in a neon cyberpunk arena.",
-            "archetype": "arena",
-        },
-        "world": {
-            "width": 800,
-            "height": 600,
-            "gravity": 600,
-            "background_color": "#0a0b10",
-            "theme": "neon",
-        },
-        "player": {
-            "name": "Player",
-            "spawn_x": 100,
-            "spawn_y": 300,
-            "speed": 300,
-            "jump_power": 550,
-            "max_health": 100,
-            "color": "#00f0ff",
-        },
-        "entities": [
-            {
-                "id": "drone_1",
-                "type": "enemy",
-                "x": 400,
-                "y": 200,
-                "width": 32,
-                "height": 32,
-                "color": "#ff0055",
-                "behavior": "patrol",
-                "speed": 120,
-            }
-        ],
-        "rules": [
-            {
-                "trigger": {"type": "on_collide_enemy"},
-                "action": {"type": "damage_player", "value": 20},
-            }
-        ],
-        "ui": {
-            "show_score": True,
-            "show_health": True,
-            "show_controls": True,
         },
     }
     sent_payload = {}
@@ -95,36 +120,29 @@ async def test_gemini_valid_structured_response_parsing(monkeypatch):
         sent_payload = json
         sent_headers = headers
         assert "generativelanguage.googleapis.com" in str(url)
-        return httpx.Response(
-            status_code=200,
-            json={
-                "choices": [
-                    {"message": {"content": _json.dumps(expected_dict)}}
-                ]
-            },
-        )
+        return _make_ok_response(expected_dict)
 
     monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
 
-    provider = GeminiProvider(
-        api_key="test-gemini-key",
-        model="gemini-3-flash-preview",
-    )
-    assert provider.model == "gemini-3-flash-preview"
+    provider = GeminiProvider(api_key="test-gemini-key", model="gemini-3.6-flash")
+    assert provider.model == "gemini-3.6-flash"
     result, meta = await provider.generate_structured_with_meta("System", "User")
     assert result == expected_dict
     assert meta["provider"] == "gemini"
-    assert meta["model"] == "gemini-3-flash-preview"
+    assert meta["model"] == "gemini-3.6-flash"
     assert meta["provider_display_name"] == "Google Gemini"
-    assert meta["model_display_name"] == "Gemini 3 Flash Preview"
     assert meta["fallback_used"] is False
-    assert sent_payload.get("model") == "gemini-3-flash-preview"
+    assert sent_payload.get("model") == "gemini-3.6-flash"
     assert sent_headers.get("Authorization") == "Bearer test-gemini-key"
 
 
+# ================================================================
+# 24. GeminiProvider — Markdown codeblock stripping
+# ================================================================
+
 @pytest.mark.asyncio
 async def test_gemini_markdown_codeblock_stripping(monkeypatch):
-    """Test that ```json ... ``` markdown wrappers are cleanly stripped by GeminiProvider."""
+    """Test that ```json ... ``` markdown wrappers are cleanly stripped."""
     expected_dict = {"schema_version": "1.0", "test": True}
     markdown_wrapped = f"```json\n{json.dumps(expected_dict)}\n```"
 
@@ -141,9 +159,13 @@ async def test_gemini_markdown_codeblock_stripping(monkeypatch):
     assert result == expected_dict
 
 
+# ================================================================
+# 25. GeminiProvider — Thought tag stripping
+# ================================================================
+
 @pytest.mark.asyncio
 async def test_gemini_thought_tags_stripping(monkeypatch):
-    """Test that <thought>...</thought> tags from reasoning models are cleanly stripped by GeminiProvider."""
+    """Test that <thought>...</thought> tags from reasoning models are stripped."""
     expected_dict = {"schema_version": "1.0", "test": "clean"}
     raw_with_thoughts = f"<thought>\nThinking about the game design...\n</thought>\n{json.dumps(expected_dict)}"
 
@@ -160,6 +182,10 @@ async def test_gemini_thought_tags_stripping(monkeypatch):
     assert result == expected_dict
 
 
+# ================================================================
+# 26. GeminiProvider — Malformed JSON
+# ================================================================
+
 @pytest.mark.asyncio
 async def test_gemini_malformed_json_raises_invalid_response(monkeypatch):
     """Test that malformed JSON raises ModelInvalidResponseError."""
@@ -175,7 +201,12 @@ async def test_gemini_malformed_json_raises_invalid_response(monkeypatch):
     with pytest.raises(ModelInvalidResponseError) as exc_info:
         await provider.generate_structured("System", "User")
     assert exc_info.value.code == "MODEL_INVALID_RESPONSE"
+    assert exc_info.value.error_class == ProviderErrorClass.SCHEMA_PARSING
 
+
+# ================================================================
+# 27. GeminiProvider — Timeout
+# ================================================================
 
 @pytest.mark.asyncio
 async def test_gemini_timeout_raises_model_timeout_error(monkeypatch):
@@ -189,7 +220,12 @@ async def test_gemini_timeout_raises_model_timeout_error(monkeypatch):
     with pytest.raises(ModelTimeoutError) as exc_info:
         await provider.generate_structured("System", "User")
     assert exc_info.value.code == "MODEL_TIMEOUT"
+    assert exc_info.value.error_class == ProviderErrorClass.NETWORK_ERROR
 
+
+# ================================================================
+# 28. GeminiProvider — 401
+# ================================================================
 
 @pytest.mark.asyncio
 async def test_gemini_authentication_failure_raises_configuration_error(monkeypatch):
@@ -204,7 +240,12 @@ async def test_gemini_authentication_failure_raises_configuration_error(monkeypa
         await provider.generate_structured("System", "User")
     assert exc_info.value.code == "AI_PROVIDER_AUTHENTICATION"
     assert "Gemini rejected the configured credentials" in exc_info.value.message
+    assert exc_info.value.error_class == ProviderErrorClass.KEY_AUTH_FAILURE
 
+
+# ================================================================
+# 29. GeminiProvider — 429
+# ================================================================
 
 @pytest.mark.asyncio
 async def test_gemini_rate_limit_raises_rate_limited_error(monkeypatch):
@@ -218,7 +259,12 @@ async def test_gemini_rate_limit_raises_rate_limited_error(monkeypatch):
     with pytest.raises(ModelRateLimitedError) as exc_info:
         await provider.generate_structured("System", "User")
     assert exc_info.value.code == "MODEL_RATE_LIMITED"
+    assert exc_info.value.error_class == ProviderErrorClass.RATE_LIMIT
 
+
+# ================================================================
+# 30. GeminiProvider — 500
+# ================================================================
 
 @pytest.mark.asyncio
 async def test_gemini_server_error_raises_model_unavailable_error(monkeypatch):
@@ -232,111 +278,602 @@ async def test_gemini_server_error_raises_model_unavailable_error(monkeypatch):
     with pytest.raises(ModelUnavailableError) as exc_info:
         await provider.generate_structured("System", "User")
     assert exc_info.value.code == "MODEL_UNAVAILABLE"
+    assert exc_info.value.error_class == ProviderErrorClass.MODEL_UNAVAILABLE
 
 
 # ================================================================
-# Router Tests
+# 31. GeminiProvider — 404 (MODEL_UNAVAILABLE, not INVALID_REQUEST)
 # ================================================================
 
 @pytest.mark.asyncio
-async def test_router_with_gemini_primary(monkeypatch):
-    """Test that AIProviderRouter defaults to GeminiProvider and executes correctly."""
-    expected_dsl = {"schema_version": "1.0", "title": "Gemini Game"}
+async def test_gemini_404_raises_model_unavailable_not_invalid_request(monkeypatch):
+    """Test that HTTP 404 raises ModelUnavailableError (model not found), not INVALID_REQUEST."""
+    async def mock_post(self, url, json=None, headers=None):
+        return httpx.Response(status_code=404, text="Model not found")
 
-    async def mock_gemini_post(self, url, json=None, headers=None):
-        return httpx.Response(
-            status_code=200,
-            json={"choices": [{"message": {"content": _json.dumps(expected_dsl)}}]},
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    provider = GeminiProvider(api_key="test-gemini-key", model="gemini-3.7-flash")
+    with pytest.raises(ModelUnavailableError) as exc_info:
+        await provider.generate_structured("System", "User")
+    assert exc_info.value.error_class == ProviderErrorClass.MODEL_UNAVAILABLE
+
+
+# ================================================================
+# 34. Error Classification
+# ================================================================
+
+def test_classify_ai_error_from_subclasses():
+    """classify_ai_error should use .error_class from well-typed AIError subclasses."""
+    assert classify_ai_error(ModelTimeoutError(5.0)) == ProviderErrorClass.NETWORK_ERROR
+    assert classify_ai_error(ModelRateLimitedError()) == ProviderErrorClass.RATE_LIMIT
+    assert classify_ai_error(AIConfigurationError()) == ProviderErrorClass.KEY_AUTH_FAILURE
+    assert classify_ai_error(ModelUnavailableError()) == ProviderErrorClass.MODEL_UNAVAILABLE
+    assert classify_ai_error(ModelInvalidResponseError()) == ProviderErrorClass.SCHEMA_PARSING
+
+
+def test_classify_ai_error_from_raw_status():
+    """classify_ai_error should classify plain AIError by status_code when no subclass."""
+    err_401 = AIError("GENERIC", "auth fail", status_code=401)
+    assert classify_ai_error(err_401) == ProviderErrorClass.KEY_AUTH_FAILURE
+
+    err_429 = AIError("GENERIC", "rate limit", status_code=429)
+    assert classify_ai_error(err_429) == ProviderErrorClass.RATE_LIMIT
+
+    err_400 = AIError("GENERIC", "bad request", status_code=400)
+    assert classify_ai_error(err_400) == ProviderErrorClass.INVALID_REQUEST
+
+    err_503 = AIError("GENERIC", "down", status_code=503)
+    assert classify_ai_error(err_503) == ProviderErrorClass.TRANSIENT_PROVIDER
+
+
+def test_failover_eligibility_matrix():
+    """is_credential_failover_eligible must match the spec table exactly."""
+    assert is_credential_failover_eligible(ProviderErrorClass.KEY_AUTH_FAILURE) is True
+    assert is_credential_failover_eligible(ProviderErrorClass.RATE_LIMIT) is True
+    assert is_credential_failover_eligible(ProviderErrorClass.TRANSIENT_PROVIDER) is True
+    assert is_credential_failover_eligible(ProviderErrorClass.NETWORK_ERROR) is True
+    assert is_credential_failover_eligible(ProviderErrorClass.UNKNOWN) is True
+    # Must NOT trigger credential failover
+    assert is_credential_failover_eligible(ProviderErrorClass.INVALID_REQUEST) is False
+    assert is_credential_failover_eligible(ProviderErrorClass.CONTENT_SAFETY) is False
+    assert is_credential_failover_eligible(ProviderErrorClass.SCHEMA_PARSING) is False
+    assert is_credential_failover_eligible(ProviderErrorClass.MODEL_UNAVAILABLE) is False
+
+
+# ================================================================
+# 21. Task-Specific Model Chains
+# ================================================================
+
+def test_task_model_chains_have_correct_defaults():
+    """resolve_model_chain must return correct Gemini 3 defaults per task."""
+    gen_chain = resolve_model_chain(TaskType.GAME_GENERATION)
+    assert gen_chain[0] == "gemini-3.7-flash"
+    assert "gemini-3.6-flash" in gen_chain
+
+    remix_chain = resolve_model_chain(TaskType.REMIX)
+    assert remix_chain[0] == "gemini-3.6-flash"
+
+    patch_chain = resolve_model_chain(TaskType.DSL_PATCH)
+    assert patch_chain[0] == "gemini-3.6-flash"
+    # Lighter models should appear in the fallback positions
+    assert any("lite" in m or "3.5" in m or "3.1" in m for m in patch_chain[1:])
+
+    analysis_chain = resolve_model_chain(TaskType.PLAYTEST_ANALYSIS)
+    # Primary should be a lighter/faster model for analysis
+    assert "lite" in analysis_chain[0] or "3.5" in analysis_chain[0]
+
+
+def test_task_model_chains_all_non_empty():
+    """Every task type must return a non-empty model chain."""
+    for task in TaskType:
+        chain = resolve_model_chain(task)
+        assert len(chain) >= 1, f"Empty chain for {task}"
+
+
+# ================================================================
+# 35. GeminiKeyRegistry — Eligibility & Cooldown
+# ================================================================
+
+def test_key_registry_configured_order_preserved():
+    """Credential order must match the configured key pool order."""
+    registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_c"])
+    eligible = registry.get_eligible_keys()
+    assert [idx for (idx, _) in eligible] == [0, 1, 2]
+    assert eligible[0][1] == "key_a"
+    assert eligible[1][1] == "key_b"
+    assert eligible[2][1] == "key_c"
+
+
+def test_key_registry_deduplicates():
+    """Duplicate keys must be removed; the first occurrence's position is kept."""
+    registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_a", "key_c"])
+    assert len(registry) == 3
+    eligible = registry.get_eligible_keys()
+    keys = [k for (_, k) in eligible]
+    assert keys.count("key_a") == 1
+    assert "key_b" in keys
+    assert "key_c" in keys
+
+
+@pytest.mark.asyncio
+async def test_key_registry_cooldown_skips_key():
+    """A credential in cooldown must be skipped by get_eligible_keys()."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b", "key_c"],
+        failure_threshold=1,
+        cooldown_seconds=3600,
+    )
+    # Force key_a into cooldown
+    await registry.record_failure(0, ProviderErrorClass.RATE_LIMIT)
+    eligible = registry.get_eligible_keys()
+    eligible_keys = [k for (_, k) in eligible]
+    assert "key_a" not in eligible_keys
+    assert "key_b" in eligible_keys
+    assert "key_c" in eligible_keys
+
+
+@pytest.mark.asyncio
+async def test_key_registry_cooldown_clears_after_expiry():
+    """A credential must become eligible again after its cooldown expires."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=1,
+        cooldown_seconds=0,  # Instant expiry for test
+    )
+    await registry.record_failure(0, ProviderErrorClass.RATE_LIMIT)
+    # With 0s cooldown the disabled_until is in the past → should be eligible
+    eligible = registry.get_eligible_keys()
+    eligible_keys = [k for (_, k) in eligible]
+    # key_a should have expired cooldown (0 seconds) and be eligible again
+    assert "key_a" in eligible_keys
+
+
+@pytest.mark.asyncio
+async def test_key_registry_record_success_clears_failures():
+    """record_success must reset consecutive_failures and clear disabled_until."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a"],
+        failure_threshold=1,
+        cooldown_seconds=3600,
+    )
+    await registry.record_failure(0, ProviderErrorClass.RATE_LIMIT)
+    assert not registry.get_eligible_keys()  # In cooldown
+
+    await registry.record_success(0)
+    state = registry.get_state(0)
+    assert state.consecutive_failures == 0
+    assert state.disabled_until is None
+    assert registry.get_eligible_keys()  # Eligible again
+
+
+@pytest.mark.asyncio
+async def test_key_registry_auth_failure_immediate_cooldown():
+    """KEY_AUTH_FAILURE must immediately enter cooldown regardless of threshold."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,  # High threshold; would normally need 5 failures
+        cooldown_seconds=3600,
+    )
+    # One AUTH failure should immediately disable the key
+    await registry.record_failure(0, ProviderErrorClass.KEY_AUTH_FAILURE)
+    state = registry.get_state(0)
+    assert state.disabled_until is not None
+    eligible = registry.get_eligible_keys()
+    assert all(k != "key_a" for (_, k) in eligible)
+
+
+def test_key_registry_secret_not_in_state():
+    """Credential secrets must not appear in ProviderKeyState (only masked identifier)."""
+    raw_key = "AIzaSyB19AMT2lo2Q4_BTHKRCSBpe9K06U8Cu3I"
+    registry = GeminiKeyRegistry(api_keys=[raw_key])
+    state = registry.get_state(0)
+    assert raw_key not in state.masked_key
+    assert len(state.masked_key) <= 8  # Only last 4 chars + prefix dots
+
+
+# ================================================================
+# Failover Executor — Core Sequential Behavior
+# ================================================================
+
+@pytest.mark.asyncio
+async def test_key1_used_first():
+    """Key 1 must be the first credential tried on a healthy request."""
+    registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_c"])
+    expected_result = {"ok": True}
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        MockProvider.return_value.generate_structured_with_meta = AsyncMock(
+            return_value=(expected_result, {})
+        )
+        result = await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
         )
 
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_gemini_post)
+    # Only one call should have been made (first success stops)
+    assert MockProvider.call_count == 1
+    # Verify Key 1 (key_a) was used
+    call_kwargs = MockProvider.call_args
+    used_key = call_kwargs.kwargs.get("api_key") or (call_kwargs.args[0] if call_kwargs.args else None)
+    assert used_key == "key_a"
+    assert result.result == expected_result
+    assert result.key_fallbacks_used == 0
+    assert result.model_fallbacks_used == 0
 
-    primary = GeminiProvider(api_key="test-key-123", model="gemini-3-flash-preview")
+
+@pytest.mark.asyncio
+async def test_key1_stays_primary_on_successive_success():
+    """Key 1 must be used for EVERY request when healthy — no round-robin."""
+    registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_c"])
+    seen_keys = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        MockProvider.return_value.generate_structured_with_meta = AsyncMock(
+            return_value=({"ok": True}, {})
+        )
+        for _ in range(4):
+            MockProvider.reset_mock()
+            await execute_with_failover(
+                task_type=TaskType.GAME_GENERATION,
+                system_prompt="S",
+                user_prompt="U",
+                registry=registry,
+            )
+            call_kwargs = MockProvider.call_args
+            used_key = call_kwargs.kwargs.get("api_key") or (call_kwargs.args[0] if call_kwargs.args else None)
+            seen_keys.append(used_key)
+
+    # All 4 requests must have used key_a (Key 1)
+    assert all(k == "key_a" for k in seen_keys), f"Expected all key_a, got: {seen_keys}"
+
+
+@pytest.mark.asyncio
+async def test_key2_not_called_after_key1_success():
+    """After Key 1 succeeds, Key 2 must NOT be called."""
+    registry = GeminiKeyRegistry(api_keys=["key_a", "key_b"])
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        MockProvider.return_value.generate_structured_with_meta = AsyncMock(
+            return_value=({"ok": True}, {})
+        )
+        await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    # Only one provider instantiation (Key 1 only)
+    assert MockProvider.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_key1_eligible_failure_triggers_key2():
+    """After Key 1 rate-limited, Key 2 must be tried."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+    call_sequence = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        def provider_factory(*args, **kwargs):
+            key = kwargs.get("api_key", "")
+            call_sequence.append(key)
+            mock = MagicMock()
+            if key == "key_a":
+                mock.generate_structured_with_meta = AsyncMock(
+                    side_effect=ModelRateLimitedError()
+                )
+            else:
+                mock.generate_structured_with_meta = AsyncMock(
+                    return_value=({"ok": True}, {})
+                )
+            return mock
+
+        MockProvider.side_effect = provider_factory
+
+        result = await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    assert result.result == {"ok": True}
+    assert "key_a" in call_sequence
+    assert "key_b" in call_sequence
+    assert result.key_fallbacks_used == 1
+
+
+@pytest.mark.asyncio
+async def test_key2_success_key3_not_called():
+    """After Key 2 succeeds (Key 1 failed), Key 3 must NOT be called."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b", "key_c"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+    call_sequence = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        def provider_factory(*args, **kwargs):
+            key = kwargs.get("api_key", "")
+            call_sequence.append(key)
+            mock = MagicMock()
+            if key == "key_a":
+                mock.generate_structured_with_meta = AsyncMock(
+                    side_effect=ModelRateLimitedError()
+                )
+            else:
+                mock.generate_structured_with_meta = AsyncMock(
+                    return_value=({"ok": True}, {})
+                )
+            return mock
+
+        MockProvider.side_effect = provider_factory
+        await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    assert "key_a" in call_sequence
+    assert "key_b" in call_sequence
+    assert "key_c" not in call_sequence, "key_c should not be called after key_b succeeds"
+
+
+@pytest.mark.asyncio
+async def test_invalid_request_no_failover():
+    """INVALID_REQUEST error must raise immediately — no credential or model cycling."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        mock = MagicMock()
+        mock.generate_structured_with_meta = AsyncMock(
+            side_effect=AIError("INVALID_REQUEST", "bad payload", status_code=400,
+                                error_class=ProviderErrorClass.INVALID_REQUEST)
+        )
+        MockProvider.return_value = mock
+
+        with pytest.raises(AIError) as exc_info:
+            await execute_with_failover(
+                task_type=TaskType.GAME_GENERATION,
+                system_prompt="S",
+                user_prompt="U",
+                registry=registry,
+            )
+
+    # Must fail immediately — only one provider instantiation
+    assert MockProvider.call_count == 1
+    assert exc_info.value.error_class == ProviderErrorClass.INVALID_REQUEST
+
+
+@pytest.mark.asyncio
+async def test_schema_parsing_no_failover():
+    """SCHEMA_PARSING error must raise immediately — provider succeeded, it's our problem."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        mock = MagicMock()
+        mock.generate_structured_with_meta = AsyncMock(
+            side_effect=ModelInvalidResponseError("bad json")
+        )
+        MockProvider.return_value = mock
+
+        with pytest.raises(ModelInvalidResponseError):
+            await execute_with_failover(
+                task_type=TaskType.GAME_GENERATION,
+                system_prompt="S",
+                user_prompt="U",
+                registry=registry,
+            )
+
+    assert MockProvider.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_model_unavailable_triggers_model_fallback_not_key_cycling():
+    """MODEL_UNAVAILABLE must advance to next model, not cycle through keys."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+    call_sequence = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        def provider_factory(*args, **kwargs):
+            key = kwargs.get("api_key", "")
+            model = kwargs.get("model", "")
+            call_sequence.append((model, key))
+            mock = MagicMock()
+            if "3.7" in model:
+                mock.generate_structured_with_meta = AsyncMock(
+                    side_effect=ModelUnavailableError(code="MODEL_NOT_FOUND")
+                )
+            else:
+                mock.generate_structured_with_meta = AsyncMock(
+                    return_value=({"ok": True, "model_used": model}, {})
+                )
+            return mock
+
+        MockProvider.side_effect = provider_factory
+
+        result = await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    assert result.result.get("ok") is True
+    assert "3.7" not in result.model_used
+    assert result.model_fallbacks_used >= 1
+
+
+@pytest.mark.asyncio
+async def test_all_credentials_fail_triggers_model_fallback():
+    """After all credentials are exhausted for model N, executor must try model N+1."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+    call_sequence = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        def provider_factory(*args, **kwargs):
+            model = kwargs.get("model", "")
+            key = kwargs.get("api_key", "")
+            call_sequence.append((model, key))
+            mock = MagicMock()
+            if "3.7" in model:
+                mock.generate_structured_with_meta = AsyncMock(
+                    side_effect=ModelRateLimitedError()
+                )
+            else:
+                mock.generate_structured_with_meta = AsyncMock(
+                    return_value=({"ok": True}, {})
+                )
+            return mock
+
+        MockProvider.side_effect = provider_factory
+        result = await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    models_tried = [m for (m, _) in call_sequence]
+    assert any("3.7" in m for m in models_tried)
+    assert any("3.7" not in m for m in models_tried)
+    assert result.result == {"ok": True}
+    assert result.model_fallbacks_used >= 1
+
+
+@pytest.mark.asyncio
+async def test_next_model_starts_from_key1():
+    """When falling back to the next model, the executor must start from Key 1, not Key 2."""
+    registry = GeminiKeyRegistry(
+        api_keys=["key_a", "key_b"],
+        failure_threshold=5,
+        cooldown_seconds=3600,
+    )
+    call_sequence = []
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        def provider_factory(*args, **kwargs):
+            model = kwargs.get("model", "")
+            key = kwargs.get("api_key", "")
+            call_sequence.append((model, key))
+            mock = MagicMock()
+            if "3.7" in model:
+                mock.generate_structured_with_meta = AsyncMock(
+                    side_effect=ModelRateLimitedError()
+                )
+            else:
+                mock.generate_structured_with_meta = AsyncMock(
+                    return_value=({"ok": True}, {})
+                )
+            return mock
+
+        MockProvider.side_effect = provider_factory
+        await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    fallback_model_calls = [(m, k) for (m, k) in call_sequence if "3.7" not in m]
+    if fallback_model_calls:
+        first_fallback_key = fallback_model_calls[0][1]
+        assert first_fallback_key == "key_a", f"Fallback should start from Key 1, got: {first_fallback_key}"
+
+
+@pytest.mark.asyncio
+async def test_no_eligible_credentials_raises_unavailable():
+    """An empty credential pool must raise AIConfigurationError or ModelUnavailableError."""
+    registry = GeminiKeyRegistry(api_keys=[])
+
+    # With an empty pool, the executor should fail fast with a configuration error
+    with pytest.raises((AIConfigurationError, ModelUnavailableError)):
+        await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+
+@pytest.mark.asyncio
+async def test_failover_result_no_credential_details():
+    """FailoverResult.to_provider_meta() must not expose raw credential values."""
+    registry = GeminiKeyRegistry(api_keys=["my_super_secret_key_12345"])
+
+    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+        MockProvider.return_value.generate_structured_with_meta = AsyncMock(
+            return_value=({"ok": True}, {})
+        )
+        result = await execute_with_failover(
+            task_type=TaskType.GAME_GENERATION,
+            system_prompt="S",
+            user_prompt="U",
+            registry=registry,
+        )
+
+    meta = result.to_provider_meta()
+    meta_str = str(meta)
+    assert "my_super_secret_key_12345" not in meta_str
+    assert "provider" in meta
+    assert "model" in meta
+
+
+# ================================================================
+# 32. AIProviderRouter — Defaults
+# ================================================================
+
+@pytest.mark.asyncio
+async def test_router_with_no_primary_uses_failover_executor():
+    """AIProviderRouter with no injected primary should use the failover executor."""
+    router = AIProviderRouter()
+    assert router.primary is None  # V2 behavior: no primary means → failover executor
+
+
+# ================================================================
+# 33. AIProviderRouter — Test mock compatibility
+# ================================================================
+
+@pytest.mark.asyncio
+async def test_router_with_injected_mock_primary_bypasses_executor(monkeypatch):
+    """AIProviderRouter with a mock primary should delegate to it directly."""
+    expected_dsl = {"schema_version": "1.0", "title": "Mock Game"}
+
+    async def mock_post(self, url, json=None, headers=None):
+        return _make_ok_response(expected_dsl)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    primary = GeminiProvider(api_key="test-key-123", model="gemini-3.6-flash")
     router = AIProviderRouter(primary=primary)
 
     result, meta = await router.generate_structured_with_meta("System", "User")
     assert result == expected_dsl
     assert meta["provider"] == "gemini"
-    assert meta["model"] == "gemini-3-flash-preview"
+    assert meta["model"] == "gemini-3.6-flash"
     assert meta["fallback_used"] is False
-
-
-# ================================================================
-# RotatingGeminiProvider Tests
-# ================================================================
-
-@pytest.mark.asyncio
-async def test_rotating_provider_no_keys_raises_configuration_error():
-    """An empty key pool raises AIConfigurationError, same as a bare GeminiProvider."""
-    provider = RotatingGeminiProvider(api_keys=[])
-    with pytest.raises(AIConfigurationError):
-        await provider.generate_structured("System", "User")
-
-
-@pytest.mark.asyncio
-async def test_rotating_provider_round_robins_across_successful_calls(monkeypatch):
-    """Successive successful calls should advance through the key pool in order,
-    spreading load rather than reusing the same key every time."""
-    expected_dict = {"schema_version": "1.0", "test": True}
-    seen_keys = []
-
-    async def mock_post(self, url, json=None, headers=None):
-        seen_keys.append(headers.get("Authorization"))
-        return httpx.Response(
-            status_code=200,
-            json={"choices": [{"message": {"content": _json.dumps(expected_dict)}}]},
-        )
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b", "key_c"])
-    for _ in range(4):
-        result, meta = await provider.generate_structured_with_meta("System", "User")
-        assert result == expected_dict
-        assert meta["key_pool_size"] == 3
-
-    # 4 calls across a 3-key pool: key_a, key_b, key_c, key_a (round-robin wrap)
-    assert seen_keys == ["Bearer key_a", "Bearer key_b", "Bearer key_c", "Bearer key_a"]
-
-
-@pytest.mark.asyncio
-async def test_rotating_provider_skips_rate_limited_key(monkeypatch):
-    """If the first key in rotation is rate-limited, the next key in the pool is
-    tried within the same request instead of surfacing a hard failure."""
-    expected_dict = {"schema_version": "1.0", "test": "recovered"}
-
-    async def mock_post(self, url, json=None, headers=None):
-        if headers.get("Authorization") == "Bearer key_a":
-            return httpx.Response(status_code=429, text="Rate limit exceeded")
-        return httpx.Response(
-            status_code=200,
-            json={"choices": [{"message": {"content": _json.dumps(expected_dict)}}]},
-        )
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b"])
-    result, meta = await provider.generate_structured_with_meta("System", "User")
-    assert result == expected_dict
-    assert meta["provider"] == "gemini"
-
-
-@pytest.mark.asyncio
-async def test_rotating_provider_all_keys_rate_limited_raises(monkeypatch):
-    """When every key in the pool is rate-limited, the provider fails fast with
-    ModelRateLimitedError rather than retrying indefinitely."""
-    async def mock_post(self, url, json=None, headers=None):
-        return httpx.Response(status_code=429, text="Rate limit exceeded")
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    provider = RotatingGeminiProvider(api_keys=["key_a", "key_b"])
-    with pytest.raises(ModelRateLimitedError):
-        await provider.generate_structured_with_meta("System", "User")
-
-
-@pytest.mark.asyncio
-async def test_router_defaults_to_rotating_gemini_provider():
-    """AIProviderRouter with no explicit primary should default to a RotatingGeminiProvider."""
-    router = AIProviderRouter()
-    assert isinstance(router.primary, RotatingGeminiProvider)

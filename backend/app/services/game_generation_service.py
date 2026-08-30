@@ -4,6 +4,7 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.ai.hosted_provider import AIProviderRouter
+from app.ai.model_router import TaskType
 from app.ai.prompts import (
     SYSTEM_PROMPT,
     build_generation_prompt,
@@ -246,6 +247,7 @@ class GameGenerationService:
                 raw_output, provider_meta = await self.provider.generate_structured_with_meta(
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=user_prompt,
+                    task_type=TaskType.GAME_GENERATION,
                 )
             else:
                 raw_output = await self.provider.generate_structured(
@@ -490,6 +492,7 @@ class GameGenerationService:
                             system_prompt=SYSTEM_PROMPT,
                             user_prompt=repair_prompt,
                             timeout=repair_timeout,
+                            task_type=TaskType.DSL_PATCH,
                         )
                     except TypeError:
                         repaired_output, _ = await self.provider.generate_structured_with_meta(
@@ -598,10 +601,17 @@ class GameGenerationService:
         # (POST /api/projects/{id}/analyze-playtest returns ANALYSIS_FAILED) rather than
         # silently returning fabricated ratings/recommendations disguised as a genuine
         # AI critique — a real outage must never look like a successful analysis.
-        analysis = await self.provider.generate_structured(
-            system_prompt="You are an expert game analyst. Output ONLY valid JSON critique.",
-            user_prompt=prompt,
-        )
+        if hasattr(self.provider, "generate_structured_with_meta"):
+            analysis, _ = await self.provider.generate_structured_with_meta(
+                system_prompt="You are an expert game analyst. Output ONLY valid JSON critique.",
+                user_prompt=prompt,
+                task_type=TaskType.PLAYTEST_ANALYSIS,
+            )
+        else:
+            analysis = await self.provider.generate_structured(
+                system_prompt="You are an expert game analyst. Output ONLY valid JSON critique.",
+                user_prompt=prompt,
+            )
         # Ensure recommendations have required fields
         recs = analysis.get("recommendations", [])
         for idx, r in enumerate(recs):
@@ -656,10 +666,17 @@ class GameGenerationService:
         prompt = build_improvement_prompt(dsl_copy, spec_dict, selected_recommendations)
 
         try:
-            patched_raw = await self.provider.generate_structured(
-                system_prompt=SYSTEM_PROMPT,
-                user_prompt=prompt,
-            )
+            if hasattr(self.provider, "generate_structured_with_meta"):
+                patched_raw, _ = await self.provider.generate_structured_with_meta(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    task_type=TaskType.DSL_PATCH,
+                )
+            else:
+                patched_raw = await self.provider.generate_structured(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                )
             _, patched_dsl_dict = self._extract_spec_and_dsl(patched_raw)
             val_res = validate_game_dsl(patched_dsl_dict)
 
@@ -834,10 +851,17 @@ class GameGenerationService:
 
         current_errors: List[str] = []
         try:
-            raw_output = await self.provider.generate_structured(
-                system_prompt=SYSTEM_PROMPT,
-                user_prompt=prompt,
-            )
+            if hasattr(self.provider, "generate_structured_with_meta"):
+                raw_output, _ = await self.provider.generate_structured_with_meta(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    task_type=TaskType.REMIX,
+                )
+            else:
+                raw_output = await self.provider.generate_structured(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                )
             dsl, cand_spec, errors = self._validate_remix_candidate(raw_output)
             if dsl is not None:
                 return _result(dsl, cand_spec, 1)
@@ -852,10 +876,17 @@ class GameGenerationService:
         for attempt in range(1, self.max_retries + 1):
             repair_prompt = build_repair_prompt(last_candidate, current_errors)
             try:
-                repaired_output = await self.provider.generate_structured(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=repair_prompt,
-                )
+                if hasattr(self.provider, "generate_structured_with_meta"):
+                    repaired_output, _ = await self.provider.generate_structured_with_meta(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=repair_prompt,
+                        task_type=TaskType.DSL_PATCH,
+                    )
+                else:
+                    repaired_output = await self.provider.generate_structured(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=repair_prompt,
+                    )
             except Exception as exc:
                 return GenerationResult(
                     success=False,

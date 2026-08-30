@@ -1,7 +1,33 @@
-import asyncio
+"""
+Gemini/Groq AI provider HTTP adapters.
+
+Layer responsibilities
+======================
+GeminiProvider
+  Single credential + single model + single HTTP request.
+  Knows NOTHING about credential pools, model chains, or failover policy.
+  Pure transport: prompt → HTTP → JSON.
+
+GroqProvider / HostedOpenAIProvider
+  Legacy / test-fixture providers.  Same single-request interface.
+
+AIProviderRouter
+  Backward-compatible facade used by GameGenerationService.
+  Delegates to the central failover executor (failover_executor.py).
+  Accepts an optional task_type parameter for task-specific routing.
+  When task_type is not provided, defaults to GAME_GENERATION.
+
+Removed in V2
+=============
+RotatingGeminiProvider — eliminated.  It performed proactive round-robin
+rotation on EVERY request, which is the opposite of the desired behavior.
+The new architecture keeps Key 1 as the stable primary credential and only
+advances to Key 2 on an eligible failure.
+"""
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 import httpx
 
 from app.ai.provider import (
@@ -12,6 +38,7 @@ from app.ai.provider import (
     ModelRateLimitedError,
     ModelTimeoutError,
     ModelUnavailableError,
+    ProviderErrorClass,
 )
 from app.config import settings
 
@@ -92,7 +119,6 @@ class BaseHostedProvider(AIProvider):
                 {"role": "user", "content": user_prompt},
             ],
             "response_format": {"type": "json_object"},
-            "temperature": 0.3,
         }
 
         url = f"{self.base_url}/chat/completions"
@@ -119,6 +145,12 @@ class BaseHostedProvider(AIProvider):
             )
         elif response.status_code == 429:
             raise ModelRateLimitedError(f"Rate limit exceeded on {self.provider_name} provider.")
+        elif response.status_code == 404:
+            raise ModelUnavailableError(
+                f"{self.provider_name.capitalize()} model '{self.model}' not found (HTTP 404). "
+                "The model may be unavailable, deprecated, or the model ID may be incorrect.",
+                code="MODEL_NOT_FOUND",
+            )
         elif response.status_code >= 500:
             raise ModelUnavailableError(
                 f"{self.provider_name.capitalize()} provider returned server error (HTTP {response.status_code})."
@@ -146,12 +178,7 @@ class BaseHostedProvider(AIProvider):
                 raise ModelInvalidResponseError("Model output did not parse into a top-level JSON object.")
 
             provider_display = "Google Gemini" if self.provider_name == "gemini" else self.provider_name.capitalize()
-            if "gemini" in self.model.lower():
-                model_display = "Gemini 3 Flash Preview" if "flash" in self.model.lower() else self.model
-            elif "gemma" in self.model.lower():
-                model_display = "Gemma 4 31B"
-            else:
-                model_display = self.model
+            model_display = self.model
 
             meta = {
                 "provider": self.provider_name,
@@ -169,8 +196,14 @@ class BaseHostedProvider(AIProvider):
 
 class GeminiProvider(BaseHostedProvider):
     """
-    Primary Generative AI Provider: Google Gemini.
-    Uses Google AI Studio / Gemini OpenAI-compatible REST endpoint.
+    Single-credential, single-model Google Gemini HTTP adapter.
+
+    This class handles ONE credential and ONE model per instance.
+    It knows nothing about credential pools, model chains, or failover.
+    The failover executor (failover_executor.py) instantiates this per attempt.
+
+    The public interface is identical to V1 GeminiProvider so existing test
+    mocks that patch GeminiProvider directly continue to work.
     """
 
     def __init__(
@@ -180,98 +213,22 @@ class GeminiProvider(BaseHostedProvider):
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
     ):
-        pool = settings.gemini_api_key_pool()
-        resolved_key = api_key if api_key is not None else (pool[0] if pool else settings.AI_API_KEY)
-        resolved_model = model if model is not None else (settings.GEMINI_MODEL or settings.AI_MODEL or "gemini-3-flash-preview")
-        resolved_url = base_url if base_url is not None else (settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai")
+        # When api_key is explicitly provided (by the failover executor), use it directly.
+        # When api_key is None (legacy / direct instantiation), fall back to the first
+        # configured pool key or the legacy GEMINI_API_KEY setting.
+        if api_key is None:
+            pool = settings.gemini_api_key_pool()
+            api_key = pool[0] if pool else settings.AI_API_KEY
+        resolved_model = model or settings.GEMINI_MODEL or "gemini-3.6-flash"
+        resolved_url = base_url or settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai"
 
         super().__init__(
-            api_key=resolved_key,
+            api_key=api_key,
             model=resolved_model,
             base_url=resolved_url,
             timeout=timeout or settings.AI_TIMEOUT_SECONDS,
             provider_name="gemini",
         )
-
-
-class RotatingGeminiProvider(AIProvider):
-    """
-    Gemini provider that rotates round-robin across a pool of configured API keys.
-
-    Two rate-limit defenses in one:
-    1. Load spreading: each call advances to the next key in the pool, so steady
-       traffic is distributed across keys instead of hammering a single one.
-    2. Reactive rotation: if the key picked for this call comes back rate-limited
-       (HTTP 429) or rejected (401/403 -- e.g. a revoked key), the next key in the
-       pool is tried immediately within the same request, bounded to one attempt
-       per configured key so an exhausted pool still fails fast.
-
-    Degrades to plain single-key GeminiProvider behavior when only one key (or
-    zero) is configured -- existing single-key deployments are unaffected.
-    """
-
-    provider_name = "gemini"
-
-    def __init__(
-        self,
-        api_keys: Optional[List[str]] = None,
-        model: Optional[str] = None,
-        base_url: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ):
-        self._keys: List[str] = [k for k in (api_keys if api_keys is not None else settings.gemini_api_key_pool()) if k]
-        self.model = model or (settings.GEMINI_MODEL or settings.AI_MODEL or "gemini-3-flash-preview")
-        self.base_url = (base_url or settings.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
-        self.timeout = timeout or settings.AI_TIMEOUT_SECONDS
-        self._index = 0
-        self._lock = asyncio.Lock()
-
-        # Backward-compatible single-key surface for callers that inspect `.api_key`
-        # directly (e.g. AIProviderRouter's "is a fallback provider configured?" check).
-        self.api_key = self._keys[0] if self._keys else None
-
-    async def _next_key(self) -> str:
-        async with self._lock:
-            key = self._keys[self._index % len(self._keys)]
-            self._index += 1
-        return key
-
-    async def generate_structured(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        json_schema: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
-        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
-        return result
-
-    async def generate_structured_with_meta(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        json_schema: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        if not self._keys:
-            raise AIConfigurationError("Gemini API key is not configured on the server.")
-
-        last_error: Optional[AIError] = None
-        for _ in range(len(self._keys)):
-            key = await self._next_key()
-            provider = GeminiProvider(api_key=key, model=self.model, base_url=self.base_url, timeout=timeout or self.timeout)
-            try:
-                res, meta = await provider.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
-                if len(self._keys) > 1:
-                    meta["key_pool_size"] = len(self._keys)
-                return res, meta
-            except (ModelRateLimitedError, AIConfigurationError) as err:
-                # This specific key is rate-limited or was rejected -- rotate to the
-                # next key in the pool rather than surfacing a hard failure immediately.
-                last_error = err
-                continue
-
-        raise last_error or ModelRateLimitedError("All configured Gemini API keys are rate-limited.")
 
 
 class GroqProvider(BaseHostedProvider):
@@ -323,19 +280,31 @@ class HostedOpenAIProvider(BaseHostedProvider):
 
 class AIProviderRouter(AIProvider):
     """
-    Provider Router:
-    - Primary: Google Gemini (Gemini 3 Flash Preview: `gemini-3-flash-preview`), rotating across every
-      configured `GEMINI_API_KEY`/`GEMINI_API_KEYS` if more than one key is set.
-    - Optional Fallback: Groq (if explicitly injected, otherwise none)
+    Backward-compatible provider router facade.
+
+    V2 behavior: delegates to execute_with_failover() from failover_executor.py.
+    - Sequential credential failover (no proactive rotation / round-robin)
+    - Task-based model routing
+    - Error-class-gated failover eligibility
+
+    Accepts an optional `task_type` (TaskType enum or None).
+    When task_type is None, defaults to TaskType.GAME_GENERATION.
+
+    The `primary` and `fallback` constructor arguments are retained for test
+    mock compatibility.  When a mock `primary` is injected, routing delegates
+    to it directly (bypassing the failover executor) so test mocks continue to work.
     """
 
     def __init__(
         self,
         primary: Optional[AIProvider] = None,
         fallback: Optional[AIProvider] = None,
+        task_type: Optional[Any] = None,
     ):
-        self.primary = primary or RotatingGeminiProvider()
-        self.fallback = fallback
+        # When a mock primary is injected (test context), use it directly.
+        self.primary = primary
+        self.fallback = fallback  # Retained for backward compat; not used in V2 direct path
+        self._task_type = task_type
 
     async def generate_structured(
         self,
@@ -344,9 +313,6 @@ class AIProviderRouter(AIProvider):
         json_schema: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """
-        Request structured completion with automatic fallback on infrastructure failures.
-        """
         result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
         return result
 
@@ -356,70 +322,42 @@ class AIProviderRouter(AIProvider):
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
+        task_type: Optional[Any] = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        Execute completion with infrastructure fallback routing and provider traceability metadata.
+        Execute with failover routing.
+
+        When a mock `primary` has been injected (test context), delegates to it
+        directly so existing test mocks that patch GeminiProvider or inject a
+        mock primary into AIProviderRouter continue to work without change.
         """
-        # 1. Attempt Primary Provider (Gemini)
-        try:
+        resolved_task = task_type or self._task_type
+
+        # Test-mock compatibility: if a mock primary was injected, use it directly
+        if self.primary is not None:
             if hasattr(self.primary, "generate_structured_with_meta"):
                 return await self.primary.generate_structured_with_meta(
                     system_prompt, user_prompt, json_schema, timeout=timeout
                 )
-            else:
-                res = await self.primary.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
-                return res, {
-                    "provider": getattr(self.primary, "provider_name", "primary"),
-                    "model": getattr(self.primary, "model", "default"),
-                    "fallback_used": False,
-                    "fallback_reason": None,
-                }
+            res = await self.primary.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
+            return res, {
+                "provider": getattr(self.primary, "provider_name", "primary"),
+                "model": getattr(self.primary, "model", "default"),
+                "fallback_used": False,
+                "fallback_reason": None,
+            }
 
-        except (ModelUnavailableError, ModelTimeoutError, ModelRateLimitedError) as infra_err:
-            # 2. Check if Fallback Provider (Groq) is configured
-            fallback_key = getattr(self.fallback, "api_key", None)
-            if fallback_key:
-                try:
-                    if hasattr(self.fallback, "generate_structured_with_meta"):
-                        res, meta = await self.fallback.generate_structured_with_meta(
-                            system_prompt, user_prompt, json_schema, timeout=timeout
-                        )
-                        meta["fallback_used"] = True
-                        meta["fallback_reason"] = infra_err.code
-                        return res, meta
-                    else:
-                        res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
-                        return res, {
-                            "provider": getattr(self.fallback, "provider_name", "groq"),
-                            "model": getattr(self.fallback, "model", "llama-3.1-8b-instant"),
-                            "fallback_used": True,
-                            "fallback_reason": infra_err.code,
-                        }
-                except Exception as fb_err:
-                    raise ModelUnavailableError(
-                        f"Primary provider failed ({infra_err.message}) and fallback provider also failed: {str(fb_err)}"
-                    )
-            else:
-                # Fallback unconfigured: re-raise the primary provider error cleanly
-                raise infra_err
+        # V2 path: use the central failover executor
+        from app.ai.failover_executor import execute_with_failover
+        from app.ai.model_router import TaskType
 
-        except AIConfigurationError as cfg_err:
-            # If Primary has no API key configured, check if fallback has key configured
-            fallback_key = getattr(self.fallback, "api_key", None)
-            if fallback_key:
-                if hasattr(self.fallback, "generate_structured_with_meta"):
-                    res, meta = await self.fallback.generate_structured_with_meta(
-                        system_prompt, user_prompt, json_schema, timeout=timeout
-                    )
-                    meta["fallback_used"] = True
-                    meta["fallback_reason"] = "PRIMARY_NOT_CONFIGURED"
-                    return res, meta
-                else:
-                    res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
-                    return res, {
-                        "provider": getattr(self.fallback, "provider_name", "groq"),
-                        "model": getattr(self.fallback, "model", "llama-3.1-8b-instant"),
-                        "fallback_used": True,
-                        "fallback_reason": "PRIMARY_NOT_CONFIGURED",
-                    }
-            raise cfg_err
+        effective_task = resolved_task if isinstance(resolved_task, TaskType) else TaskType.GAME_GENERATION
+
+        failover_result = await execute_with_failover(
+            task_type=effective_task,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            json_schema=json_schema,
+            timeout=timeout,
+        )
+        return failover_result.result, failover_result.to_provider_meta()

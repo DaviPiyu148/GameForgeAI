@@ -40,6 +40,7 @@ class MockProvider(AIProvider):
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         res, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
         return res
@@ -50,6 +51,7 @@ class MockProvider(AIProvider):
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         self.call_count += 1
         self.timeouts_received.append(timeout)

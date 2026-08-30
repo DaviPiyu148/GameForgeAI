@@ -31,9 +31,11 @@ DSL PATCH / REVISION
 REBUILD / VERSION PROTOTYPE (v1 → v2 → v3)
 ```
 
-## Provider Abstraction & Model Invariants
-- **Active Provider**: Google Gemini (Gemini 3 Flash Preview, identifier: `gemini-3-flash-preview`).
-- **Safety Boundary**: The model outputs structured JSON only (`GameDesignSpec` + `GameDSL`).
+## Provider Abstraction & Model Invariants (Architecture V2)
+- **Active Provider**: Google Gemini (Gemini 3 Family: `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).
+- **Sequential Credential Failover**: Deterministic request-level failover across independently configured credentials (Key 1 primary; Key 2/3 tried only on eligible errors).
+- **Task-Based Model Routing**: Canonical `TaskType` routing maps operations (`GAME_GENERATION`, `REMIX`, `DSL_PATCH`, `BLUEPRINT`, `PLAYTEST_ANALYSIS`, `DIRECTOR`) to tailored model fallback chains.
+- **Safety Boundary**: The model outputs structured JSON only (`GameDesignSpec` + `GameDSL`) via `response_format={"type": "json_object"}`.
 - **Zero Arbitrary Execution**: Never generate raw JavaScript, never use `eval()` or `new Function()`.
 - **Compiler Logs**: Real structured build progress emitted via SSE.
 

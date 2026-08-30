@@ -21,29 +21,65 @@ class Settings(BaseSettings):
     # Hugging Face Settings (Optional - higher rate limits & authenticated hub downloads)
     HF_TOKEN: Optional[str] = None
 
-    # AI Hosted Provider Settings
+    # ── AI Hosted Provider Settings ────────────────────────────────────────
     AI_PROVIDER: str = "gemini"
     AI_TIMEOUT_SECONDS: float = 150.0
     AI_REPAIR_TIMEOUT_SECONDS: float = 45.0
     AI_REPAIR_MAX_ATTEMPTS: int = 1
     AI_MAX_RETRIES: int = 2
 
-    # Primary Generative Provider: Google Gemini
+    # Overall deadline across ALL failover attempts (key + model fallback combined).
+    # Worst-case calculation: 3 models × 3 keys × 150s ≈ 1350s, but fast-fail errors
+    # (401, 429, 5xx) classify within milliseconds and don't consume the full timeout.
+    # True connection timeouts may consume AI_TIMEOUT_SECONDS each.
+    # This is a wall-clock guard, not a per-attempt timeout.
+    AI_OVERALL_DEADLINE_SECONDS: float = 420.0
+
+    # ── Primary Generative Provider: Google Gemini ─────────────────────────
+    # GEMINI_API_KEY / GEMINI_API_KEYS support comma-separated credentials
+    # representing INDEPENDENTLY configured Google API credentials/projects.
+    # Each credential should ideally belong to a separate Google API project for
+    # independent quota.  Multiple credentials from the same project share
+    # project-level quota and do NOT provide independent quota isolation.
     GEMINI_API_KEY: Optional[str] = None
-    # Additional Gemini API keys for rotation, comma-separated (e.g. "key_a,key_b,key_c").
-    # Combined with GEMINI_API_KEY to form the full rotation pool -- lets a single
-    # deployment spread requests across multiple keys/projects to stay under each
-    # key's individual rate limit rather than being bottlenecked by one key.
     GEMINI_API_KEYS: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-3-flash-preview"
+
+    # LEGACY: GEMINI_MODEL is retained for backward compatibility only.
+    # It is SUPERSEDED by the task-specific GEMINI_*_MODELS settings below.
+    # Task-specific model chains take precedence.  Do NOT rely on this for
+    # new model configuration — it exists only so that existing .env files
+    # without task-specific chains continue to function during migration.
+    # The old "gemini-3-flash-preview" value is suppressed from being used
+    # as a fallback chain entry by model_router.py.
+    GEMINI_MODEL: str = "gemini-3-flash-preview"  # LEGACY — superseded by task chains
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
 
-    # Groq Fallback Provider
+    # ── Task-Specific Model Chains (Gemini 3 stable family) ───────────────
+    # These are DEFAULT chains.  Override via environment variables.
+    # All models in a chain must support response_format=json_object (structured output).
+    # Format: comma-separated ordered model IDs, primary first.
+    # If not set, model_router.py uses hardcoded Gemini 3 defaults.
+    GEMINI_GENERATION_MODELS: Optional[str] = None  # e.g. "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash"
+    GEMINI_REMIX_MODELS: Optional[str] = None       # e.g. "gemini-3.6-flash,gemini-3.7-flash,gemini-3.5-flash"
+    GEMINI_DSL_PATCH_MODELS: Optional[str] = None   # e.g. "gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+    GEMINI_BLUEPRINT_MODELS: Optional[str] = None   # e.g. "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash"
+    GEMINI_ANALYSIS_MODELS: Optional[str] = None    # e.g. "gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.1-flash-lite"
+    GEMINI_DIRECTOR_MODELS: Optional[str] = None    # e.g. "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash"
+
+    # ── Credential Failover / Health Settings ─────────────────────────────
+    # KEY_FAILURE_THRESHOLD: consecutive failures before a credential enters cooldown.
+    # KEY_AUTH_FAILURE always enters cooldown immediately (regardless of threshold).
+    KEY_FAILURE_THRESHOLD: int = 3
+    # KEY_COOLDOWN_SECONDS: how long a credential stays in cooldown before becoming
+    # eligible again.  Health state is process-local; restart clears all cooldowns.
+    KEY_COOLDOWN_SECONDS: int = 300  # 5 minutes
+
+    # ── Groq Fallback Provider (Optional) ─────────────────────────────────
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
-    # Generic AI settings (mapped dynamically)
+    # Generic AI settings (mapped dynamically — legacy compatibility)
     AI_MODEL: str = "gemini-3-flash-preview"
     AI_API_KEY: Union[str, None] = None
     AI_BASE_URL: Union[str, None] = None
@@ -94,9 +130,15 @@ class Settings(BaseSettings):
 
     def gemini_api_key_pool(self) -> List[str]:
         """
-        Ordered, de-duplicated pool of all configured Gemini API keys: `GEMINI_API_KEY`
-        (if set) followed by each key in the comma-separated `GEMINI_API_KEYS` list.
-        Used by RotatingGeminiProvider to round-robin requests across keys.
+        Ordered, de-duplicated pool of all configured Gemini API credentials.
+
+        Reads GEMINI_API_KEY (which may itself be comma-separated) and
+        GEMINI_API_KEYS.  Deduplication preserves the first occurrence's position.
+
+        Each credential should ideally represent an independently configured
+        Google API project for quota isolation.  Multiple credentials from the
+        same project share project-level quota and do NOT provide independent
+        quota isolation, even if they are different key strings.
         """
         candidates: List[str] = []
         if self.GEMINI_API_KEY:
