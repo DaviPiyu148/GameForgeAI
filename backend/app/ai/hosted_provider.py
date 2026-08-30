@@ -57,11 +57,12 @@ class BaseHostedProvider(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Request structured JSON completion from the hosted provider endpoint.
         """
-        res, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+        res, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
         return res
 
     async def generate_structured_with_meta(
@@ -69,6 +70,7 @@ class BaseHostedProvider(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Request structured JSON completion and return (parsed_json, metadata).
@@ -94,12 +96,13 @@ class BaseHostedProvider(AIProvider):
         }
 
         url = f"{self.base_url}/chat/completions"
+        effective_timeout = timeout if timeout is not None else self.timeout
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=effective_timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException:
-            raise ModelTimeoutError(self.timeout)
+            raise ModelTimeoutError(effective_timeout)
         except httpx.NetworkError as net_err:
             raise ModelUnavailableError(
                 f"Network error connecting to {self.provider_name} provider: {str(net_err)}"
@@ -238,8 +241,9 @@ class RotatingGeminiProvider(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
-        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
         return result
 
     async def generate_structured_with_meta(
@@ -247,6 +251,7 @@ class RotatingGeminiProvider(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if not self._keys:
             raise AIConfigurationError("Gemini API key is not configured on the server.")
@@ -254,9 +259,9 @@ class RotatingGeminiProvider(AIProvider):
         last_error: Optional[AIError] = None
         for _ in range(len(self._keys)):
             key = await self._next_key()
-            provider = GeminiProvider(api_key=key, model=self.model, base_url=self.base_url, timeout=self.timeout)
+            provider = GeminiProvider(api_key=key, model=self.model, base_url=self.base_url, timeout=timeout or self.timeout)
             try:
-                res, meta = await provider.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+                res, meta = await provider.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
                 if len(self._keys) > 1:
                     meta["key_pool_size"] = len(self._keys)
                 return res, meta
@@ -337,11 +342,12 @@ class AIProviderRouter(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Request structured completion with automatic fallback on infrastructure failures.
         """
-        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema)
+        result, _ = await self.generate_structured_with_meta(system_prompt, user_prompt, json_schema, timeout=timeout)
         return result
 
     async def generate_structured_with_meta(
@@ -349,6 +355,7 @@ class AIProviderRouter(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Execute completion with infrastructure fallback routing and provider traceability metadata.
@@ -357,10 +364,10 @@ class AIProviderRouter(AIProvider):
         try:
             if hasattr(self.primary, "generate_structured_with_meta"):
                 return await self.primary.generate_structured_with_meta(
-                    system_prompt, user_prompt, json_schema
+                    system_prompt, user_prompt, json_schema, timeout=timeout
                 )
             else:
-                res = await self.primary.generate_structured(system_prompt, user_prompt, json_schema)
+                res = await self.primary.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
                 return res, {
                     "provider": getattr(self.primary, "provider_name", "primary"),
                     "model": getattr(self.primary, "model", "default"),
@@ -375,13 +382,13 @@ class AIProviderRouter(AIProvider):
                 try:
                     if hasattr(self.fallback, "generate_structured_with_meta"):
                         res, meta = await self.fallback.generate_structured_with_meta(
-                            system_prompt, user_prompt, json_schema
+                            system_prompt, user_prompt, json_schema, timeout=timeout
                         )
                         meta["fallback_used"] = True
                         meta["fallback_reason"] = infra_err.code
                         return res, meta
                     else:
-                        res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema)
+                        res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
                         return res, {
                             "provider": getattr(self.fallback, "provider_name", "groq"),
                             "model": getattr(self.fallback, "model", "llama-3.1-8b-instant"),
@@ -402,13 +409,13 @@ class AIProviderRouter(AIProvider):
             if fallback_key:
                 if hasattr(self.fallback, "generate_structured_with_meta"):
                     res, meta = await self.fallback.generate_structured_with_meta(
-                        system_prompt, user_prompt, json_schema
+                        system_prompt, user_prompt, json_schema, timeout=timeout
                     )
                     meta["fallback_used"] = True
                     meta["fallback_reason"] = "PRIMARY_NOT_CONFIGURED"
                     return res, meta
                 else:
-                    res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema)
+                    res = await self.fallback.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
                     return res, {
                         "provider": getattr(self.fallback, "provider_name", "groq"),
                         "model": getattr(self.fallback, "model", "llama-3.1-8b-instant"),

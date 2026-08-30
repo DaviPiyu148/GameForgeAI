@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # AI Hosted Provider Settings
     AI_PROVIDER: str = "gemini"
     AI_TIMEOUT_SECONDS: float = 150.0
+    AI_REPAIR_TIMEOUT_SECONDS: float = 45.0
+    AI_REPAIR_MAX_ATTEMPTS: int = 1
     AI_MAX_RETRIES: int = 2
 
     # Primary Generative Provider: Google Gemini

@@ -2,18 +2,15 @@
 
 ## Task
 
-Product Polish Sprint A — Project Management, Generated Game Covers, Builder Presets
+Game Generation Hardening V1 — Resilience to Schema Drift, Malformed AI Output, Provider Timeouts, and Recoverable DSL Errors
 
 ## Status
 
-IN_PROGRESS
+COMPLETE
 
 ## Objective
 
-Make GameForge AI feel substantially more product-like using existing architecture:
-1. Project Management: Rename (inline), Duplicate (snapshot copy), Delete (relationship-safe)
-2. Generated Game Covers: deterministic procedural covers per project card
-3. Builder Presets: Quick Prototype / Campaign / Open World one-click presets
+Eliminate unnecessary 150-second LLM repair calls for recoverable schema mismatches and schema drift (such as `levels[0].width`). Make the GameForge generation pipeline robust, secure, deterministic, and bounded without weakening the strict Pydantic closed-world safety boundary.
 
 ## Started
 
@@ -21,111 +18,78 @@ Make GameForge AI feel substantially more product-like using existing architectu
 
 ---
 
-## Dependency Graph Analysis (Pre-Implementation)
+## 1. Reconnaissance & Analysis
 
-### Project → Child Entity FK Relationships
-
-| Child Table | FK | Cascade |
-|---|---|---|
-| `project_versions` | `projects.id` (ondelete=CASCADE) | YES — automatic |
-| `playtest_sessions` | `projects.id` (ondelete=CASCADE) | YES — automatic |
-| `build_jobs.project_id` | **NO FK constraint** — plain String(36) | N/A — string reference only |
-| `build_logs.build_id` | **NO FK constraint** — plain String(36) | N/A — string reference only |
-| `xp_events.source_reference` | **NO FK constraint** — nullable String(255) | N/A — audit log reference only |
-
-**Conclusion**: Deleting a Project row cleanly cascades to `project_versions` and `playtest_sessions`
-via existing DB constraints. `build_jobs`, `build_logs`, and `xp_events` are independent audit
-entities — they are NOT children of Project (by design). No orphan rows will be created.
-No additional cleanup logic is needed.
-
-### GameProject shape (confirmed fields)
-
-Available for cover generation: `id`, `title`, `genre`, `engine`, `world_mode`, `scale`, `status`
-All confirmed as persisted DB columns.
+- [x] Inspected `game_generation_service.py` generation & repair flow
+- [x] Inspected `dsl_models.py` schemas & `extra="forbid"` enforcement
+- [x] Inspected `validator.py` normalization & error extraction
+- [x] Inspected `hosted_provider.py` HTTP client & timeout handling
+- [x] Inspected `config.py` timeout settings (`AI_TIMEOUT_SECONDS`)
+- [x] Inspected `prompts.py` generation & repair prompts
+- [x] Identified root cause of `levels[0].width` failure: LLM places `width` directly on `LevelDef` instead of `world`, strict `extra="forbid"` rejects it, and pipeline triggers 150s LLM repair loop instead of deterministic local normalization.
 
 ---
 
-## 1. Pre-Implementation
+## 2. Implementation Subtasks
 
-- [x] Read AGENTS.md
-- [x] Inspected all model files (project, project_version, playtest, build, build_log, progression, preference)
-- [x] Inspected all relevant migrations (confirmed build_jobs has no FK on project_id)
-- [x] Inspected project_service.py, project_repo.py, api/projects.py
-- [x] Inspected AppContext.tsx, DashboardPage.tsx, BuilderPage.tsx, ProfilePage.tsx
-- [x] Inspected types/index.ts, services/projects.ts, services/api.ts
-- [x] Inspected existing test_projects.py patterns
-- [x] Confirmed git status: clean working tree on fresh-main, 335 backend tests passing
+### Subtask A: Dedicated Normalization Module (`backend/app/generation/dsl_normalizer.py`)
+- [x] Implement `ValidationIssue` dataclass (path, issue_type, message, severity, repairability)
+- [x] Implement `KNOWN_SAFE_FIELDS` registry for `LevelDef`, `WorldDef`, `PlayerDef`, `EntityDef`, `RuleDef`, `UIDef`, `ObjectiveDef`, and Open World models
+- [x] Implement `UNSAFE_PATTERNS` detector for script injection, arbitrary code, and unsafe fields
+- [x] Implement safe scalar type normalization (numeric strings -> ints/floats, boolean strings -> bools, hex colors)
+- [x] Implement safe migration of root-level level properties (e.g. `levels[i].width` -> `levels[i].world.width` or clean drop)
+- [x] Implement `DSLNormalizer.normalize(data)` returning `(normalized_dict, issues)`
 
----
+### Subtask B: Integration with Validator (`backend/app/generation/validator.py`)
+- [x] Refactor `validate_game_dsl()` to use `DSLNormalizer` as pre-validation stage
+- [x] Retain strict `GameDSL.model_validate(normalized)` with `extra="forbid"`
+- [x] Populate structured `ValidationIssue`s in `ValidationResult`
 
-## 2. Implementation
+### Subtask C: Config & Provider Timeouts (`config.py`, `hosted_provider.py`)
+- [x] Add `AI_REPAIR_TIMEOUT_SECONDS` (default: 45.0s) and `AI_REPAIR_MAX_ATTEMPTS` (1) to `config.py`
+- [x] Support custom timeout parameter in `AIProvider.generate_structured_with_meta()` and `generate_structured()`
 
-### Feature 1 — Project Management
+### Subtask D: Generation Service & Repair Decision Engine (`game_generation_service.py`)
+- [x] Update `generate_game_dsl()` to classify validation errors into `DETERMINISTIC`, `SEMANTIC`, `UNSAFE`, `PROVIDER_FAILURE`
+- [x] Eliminate LLM repair calls when issues are `DETERMINISTIC`
+- [x] Bound semantic repair to maximum 1 attempt with `AI_REPAIR_TIMEOUT_SECONDS`
+- [x] Preserve both original validation error and repair failure error on repair failure
+- [x] Implement clean fallback prototype generation for exhausted/failed provider states when appropriate
 
-- [ ] Backend: `project_repo.py` — add `delete()` method
-- [ ] Backend: `project_service.py` — add `delete_project()`, `duplicate_project()`
-- [ ] Backend: `api/projects.py` — add `DELETE /projects/{id}` (204) and `POST /projects/{id}/duplicate` (201)
-- [ ] Frontend: `services/projects.ts` — add `deleteProject()`, `duplicateProject()`
-- [ ] Frontend: `types/index.ts` — add `deleteProject`, `duplicateProject` to AppContextType
-- [ ] Frontend: `AppContext.tsx` — implement `deleteProject()`, `duplicateProject()` actions
-- [ ] Frontend: `DashboardPage.tsx` — compact action menu with Rename/Duplicate/Delete
-
-### Feature 2 — Generated Game Covers
-
-- [ ] Frontend: `src/utils/projectCover.ts` — deterministic cover generator
-- [ ] Frontend: `src/components/Shared/ProjectCoverArt.tsx` — cover rendering component
-- [ ] Frontend: `DashboardPage.tsx` — use ProjectCoverArt in project cards
-- [ ] Frontend: `ProfilePage.tsx` — use ProjectCoverArt where project cards appear
-
-### Feature 3 — Builder Presets
-
-- [ ] Frontend: `src/data/builderPresets.ts` — three preset definitions derived from canonical defaults
-- [ ] Frontend: `BuilderPage.tsx` — preset chip row + active state tracking
+### Subtask E: Generation Prompt Hardening (`backend/app/ai/prompts.py`)
+- [x] Add explicit negative constraints against `levels[i].width/height` and hallucinated fields
 
 ---
 
-## 3. Tests
+## 3. Verification & Tests
 
-- [ ] Backend: new tests for duplicate_project (owner, non-owner, data semantics)
-- [ ] Backend: new tests for delete_project (owner, non-owner, cascade verification)
-- [ ] Backend: rename test already covered by existing PATCH tests
-
----
-
-## 4. Verification
-
-- [ ] pytest tests/ -q (≥335 tests, all pass)
-- [ ] npx tsc --noEmit (0 errors)
-- [ ] npx oxlint (0 errors)
-- [ ] npm run build (succeeds)
-- [ ] alembic current / alembic heads (single head bc9ae398f146)
-- [ ] BROWSER TESTING: NOT YET PERFORMED
+- [x] Add comprehensive test matrix in `backend/tests/test_generation_resilience.py` (10/10 passing)
+- [x] Add explicit regression test: `levels[0].width` normalized deterministically with `repair_provider_call_count == 0`
+- [x] Add security test: unsafe fields (`runtime_script`, `javascript`, etc.) rejected and NEVER silently dropped
+- [x] Add provider timeout & repair timeout tests
+- [x] Run full pytest test suite (`pytest tests/ -q` -> 360 passed, 0 failed)
+- [x] Run frontend checks (`npm run build` -> 0 errors, production build succeeded)
+- [x] Run Alembic migration check (single head `bc9ae398f146`)
 
 ---
 
-## 5. Documentation
+## 4. Documentation & Git Checkpoint
 
-- [ ] docs/08-API-CONTRACT.md — add DELETE + duplicate endpoints
-- [ ] docs/15-CURRENT-STATUS.md — update status
-- [ ] PRODUCT_POLISH_SPRINT_A.md — create sprint record
-
----
-
-## 6. Git Checkpoint
-
-- [ ] git diff reviewed
-- [ ] commit created
-- [ ] working tree clean
+- [x] Create `GENERATION_RESILIENCE.md`
+- [x] Update `TASK.md`, `docs/09-AI-GAME-GENERATION.md`, `docs/15-CURRENT-STATUS.md`
+- [x] Commit changes with message `fix: harden game generation reliability against schema drift and timeouts`
+- [x] Confirm clean working tree
 
 ---
-
-## Blockers
-
-None.
 
 ## Change Log
 
-- 2026-08-24: Full-stack operational health audit — 9 confirmed defects found and fixed.
-- 2026-08-26: UI Copy Audit V1 — commit b192bc1.
-- 2026-08-26: Living Documentation Refresh — commit b635d2d.
-- 2026-08-30: Product Polish Sprint A — IN_PROGRESS.
+- `backend/app/generation/dsl_normalizer.py`: Created dedicated deterministic normalization module and security scanner.
+- `backend/app/generation/validator.py`: Integrated `DSLNormalizer` and structured issue tracking.
+- `backend/app/config.py`: Added `AI_REPAIR_TIMEOUT_SECONDS` (45.0) and `AI_REPAIR_MAX_ATTEMPTS` (1).
+- `backend/app/ai/provider.py` & `hosted_provider.py`: Added timeout parameter to `generate_structured` and `generate_structured_with_meta`.
+- `backend/app/services/game_generation_service.py`: Refactored repair loop to bound retries to 1 attempt, bypass LLM on deterministic fixes, and enforce dedicated repair timeout.
+- `backend/app/ai/prompts.py`: Hardened negative prompt constraints against placing width/height on levels.
+- `backend/tests/test_generation_resilience.py`: 10 comprehensive resilience tests covering level-width regression, security boundaries, timeout fallbacks, legacy aliases, and markdown stripping.
+- `GENERATION_RESILIENCE.md`: Documented architecture, threat model, and verification results.
+

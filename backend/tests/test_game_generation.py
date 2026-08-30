@@ -16,6 +16,8 @@ class MockAIProvider(AIProvider):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         self.call_count += 1
         if not self.responses:

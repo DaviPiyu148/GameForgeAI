@@ -5,6 +5,11 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import ValidationError
 
 from app.generation.dsl_models import GameDSL
+from app.generation.dsl_normalizer import (
+    DSLNormalizer,
+    ValidationIssue,
+    KNOWN_SAFE_FIELDS_BY_MODEL,
+)
 from app.schemas.design_spec import HEX_COLOR_REGEX
 
 VALID_ENTITY_TYPES = {"enemy", "collectible", "obstacle", "platform", "hazard"}
@@ -183,6 +188,7 @@ class ValidationResult:
     dsl: Optional[GameDSL] = None
     errors: List[str] = field(default_factory=list)
     raw_data: Optional[Dict[str, Any]] = None
+    issues: List[ValidationIssue] = field(default_factory=list)
 
     def get_error_summary(self) -> str:
         """Formatted bullet points of errors for repair prompts."""
@@ -190,36 +196,44 @@ class ValidationResult:
             return "No errors."
         return "\n".join(f"- {err}" for err in self.errors)
 
+    def has_unsafe_issues(self) -> bool:
+        """Check if any issues are flagged as unsafe / security violations."""
+        return any(i.repairability == "UNSAFE" for i in self.issues)
+
+    def is_deterministically_repairable(self) -> bool:
+        """Check if all remaining issues are deterministic."""
+        if not self.issues:
+            return False
+        return all(i.repairability == "DETERMINISTIC" for i in self.issues)
+
 
 def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
     """
-    Validate candidate JSON or dictionary against GameDSL schema.
+    Validate candidate JSON or dictionary against GameDSL schema with deterministic pre-normalization.
     
-    Returns machine-readable ValidationResult suitable for bounded repair.
+    Returns machine-readable ValidationResult with structured issue classification.
     """
-    raw_dict: Dict[str, Any]
-    if isinstance(data, str):
-        try:
-            raw_dict = json.loads(data)
-        except json.JSONDecodeError as e:
-            return ValidationResult(
-                is_valid=False,
-                errors=[f"Invalid JSON format: {str(e)}"],
-                raw_data=None,
-            )
-    elif isinstance(data, dict):
-        raw_dict = dict(data)
-    else:
+    # 1. Deterministic Normalization & Sanitization
+    normalized, issues = DSLNormalizer.normalize(data)
+    if normalized is None:
         return ValidationResult(
             is_valid=False,
-            errors=[f"Expected dict or JSON string, received {type(data).__name__}"],
+            dsl=None,
+            errors=[i.message for i in issues],
             raw_data=None,
+            issues=issues,
         )
 
-    # Safe deterministic structural pre-normalization
-    normalized = dict(raw_dict)
-    if "schema_version" not in normalized:
-        normalized["schema_version"] = "2.0"
+    # 2. Reject unsafe code or security violations immediately
+    unsafe_issues = [i for i in issues if i.repairability == "UNSAFE"]
+    if unsafe_issues:
+        return ValidationResult(
+            is_valid=False,
+            dsl=None,
+            errors=[f"Security rejection: {i.message}" for i in unsafe_issues],
+            raw_data=None,
+            issues=issues,
+        )
 
     # Normalize metadata
     if "metadata" not in normalized or not isinstance(normalized["metadata"], dict):
@@ -751,24 +765,57 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
             dsl=validated_dsl,
             errors=[],
             raw_data=normalized,
+            issues=issues,
         )
     except ValidationError as exc:
         formatted_errors: List[str] = []
+        pydantic_issues: List[ValidationIssue] = []
+
         for err in exc.errors():
-            loc = " -> ".join(str(l) for l in err.get("loc", []))
+            loc_tuple = err.get("loc", ())
+            loc = " -> ".join(str(l) for l in loc_tuple)
             msg = err.get("msg", "Validation error")
+            err_type = err.get("type", "")
             formatted_errors.append(f"Field '{loc}': {msg}")
+
+            repairability = "SEMANTIC"
+            if err_type == "extra_forbidden":
+                field_name = str(loc_tuple[-1]) if loc_tuple else ""
+                # Check if this extra field is in known safe registry
+                is_safe = any(field_name in fields for fields in KNOWN_SAFE_FIELDS_BY_MODEL.values())
+                repairability = "DETERMINISTIC" if is_safe else "SEMANTIC"
+            elif "missing" in err_type:
+                repairability = "SEMANTIC"
+            elif "enum" in err_type:
+                repairability = "SEMANTIC"
+
+            pydantic_issues.append(ValidationIssue(
+                path=list(loc_tuple),
+                issue_type=err_type.upper(),
+                message=f"Field '{loc}': {msg}",
+                severity="MEDIUM",
+                repairability=repairability,
+            ))
 
         return ValidationResult(
             is_valid=False,
             dsl=None,
             errors=formatted_errors,
-            raw_data=raw_dict,
+            raw_data=normalized,
+            issues=issues + pydantic_issues,
         )
     except ValueError as val_err:
+        issue = ValidationIssue(
+            path=["root"],
+            issue_type="VALUE_ERROR",
+            message=str(val_err),
+            severity="HIGH",
+            repairability="SEMANTIC",
+        )
         return ValidationResult(
             is_valid=False,
             dsl=None,
             errors=[str(val_err)],
-            raw_data=raw_dict,
+            raw_data=normalized,
+            issues=issues + [issue],
         )

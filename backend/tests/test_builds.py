@@ -25,7 +25,7 @@ from tests.test_dsl import get_sample_valid_dsl_dict
 
 class MockBuildAIProvider(AIProvider):
     """Mock AI Provider for fast, reliable unit testing without live API keys."""
-    async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None):
+    async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None, **kwargs):
         return get_sample_valid_dsl_dict()
 
 
@@ -312,7 +312,7 @@ async def test_duplicate_worker_execution_prevented():
 async def test_build_cancellation(client: TestClient):
     """Test cancelling an active build job via POST /api/builds/{id}/cancel."""
     class SlowMockAIProvider(AIProvider):
-        async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None):
+        async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None, **kwargs):
             await asyncio.sleep(2.0)
             return get_sample_valid_dsl_dict()
 

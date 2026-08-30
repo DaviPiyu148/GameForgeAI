@@ -4,19 +4,19 @@
 ```text
 USER IDEA
     ↓
-AI GAME DESIGN
+AI GAME DESIGN & SPECIFICATION (GameDesignSpec + GameDSL)
     ↓
-STRUCTURED GAME DESIGN SPECIFICATION (GameDesignSpec)
+STAGE 1: PARSING & SECURITY SCANNING (Extract JSON, Block Code Injection / Unsafe Keys)
     ↓
-GAME DSL (Expanded Primitives v2.0)
+STAGE 2: DETERMINISTIC NORMALIZATION (dsl_normalizer.py: Schema Drift, Levels Migration, Aliases, Scalars)
     ↓
-DSL SCHEMA VALIDATION (Pydantic v2)
+STAGE 3: STRICT DSL SCHEMA VALIDATION (Pydantic v2 with extra="forbid")
     ↓
-GAMEPLAY QUALITY VALIDATION (Deterministic Quality & Clearance Checks)
+STAGE 4: GAMEPLAY QUALITY & SCALE BUDGET (Deterministic Quality & Clearance Checks)
     ↓
-BOUNDED AI REPAIR (Max 2 Retries with Structured Feedback)
+STAGE 5: BOUNDED AI REPAIR (Max 1 Attempt for Semantic Errors, Dedicated 45s Timeout)
     ↓
-DETERMINISTIC PHASER PROTOTYPE (Procedural Generation & Game Feel)
+STAGE 6: DETERMINISTIC PHASER PROTOTYPE (Procedural Generation & Game Feel)
     ↓
 PLAYTEST TELEMETRY (Non-Intrusive In-Game Event Tracker)
     ↓

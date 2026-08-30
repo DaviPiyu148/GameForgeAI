@@ -54,6 +54,7 @@ class AIProvider(ABC):
         system_prompt: str,
         user_prompt: str,
         json_schema: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Request structured JSON from the hosted LLM provider.

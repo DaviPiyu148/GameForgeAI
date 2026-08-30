@@ -103,10 +103,10 @@ class GameplayQualityValidator:
                 )
 
         # 6. Progression & Session Bounds
-        if not dsl.rules:
+        if not all_rules:
             errors.append("Game has zero interaction rules. At least 1-2 gameplay rules are required.")
-        if len(dsl.rules) > 15:
-            errors.append(f"Rule count ({len(dsl.rules)}) exceeds maximum safe capacity (15).")
+        if len(all_rules) > 30:
+            errors.append(f"Total rule count ({len(all_rules)}) exceeds maximum safe capacity (30).")
         if dsl.world.wave_count < 1 or dsl.world.wave_count > 10:
             errors.append(f"Wave count ({dsl.world.wave_count}) outside valid range (1-10).")
 

@@ -54,7 +54,7 @@ from app.ai.provider import AIProvider
 
 
 class MockForensicAIProvider(AIProvider):
-    async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None):
+    async def generate_structured(self, system_prompt: str, user_prompt: str, json_schema=None, **kwargs):
         return {
             "title": "Patched Game",
             "genre": "Action",

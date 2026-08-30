@@ -29,13 +29,15 @@ Repository hygiene cleanup complete (commit `390961e`). All work through Phase 6
 | Website Content & UI Copy Audit V1 (`UI_COPY_AUDIT.md`) | COMPLETE |
 | Dev-proxy 502 investigation (FS-034, `FULL_STACK_OPERATIONAL_AUDIT.md`) | COMPLETE — classified KNOWN DEVELOPMENT-ONLY LIMITATION, not code-fixable |
 | Full repository hygiene / dead-code cleanup (`REPOSITORY_HYGIENE_AUDIT.md`) | COMPLETE |
+| Product Polish Sprint A (Project Management, Generated Covers, Builder Presets) | COMPLETE |
+| Game Generation Hardening V1 (Deterministic Normalization, Repair Timeout, Resilience) (`GENERATION_RESILIENCE.md`) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of commit `390961e` + this documentation pass)
+## Current Verification (as of Generation Hardening V1)
 
-- **Backend tests**: 335 passing (`cd backend && pytest -v`) — re-run this for the authoritative current count; do not hardcode it elsewhere.
+- **Backend tests**: 360 passing (`cd backend && pytest -q`) — 100% pass rate across all suites.
 - **TypeScript**: 0 errors (`npx tsc --noEmit`).
 - **Lint**: 0 errors/warnings (`npx oxlint`).
 - **Production build**: succeeds (`npm run build`).

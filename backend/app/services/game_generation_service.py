@@ -96,56 +96,59 @@ class GameGenerationService:
         Deepens compilation from GameDesignSpec and propagates user-configurable Builder parameters
         (preset, physics, art density, logic modules) into concrete, validated DSL attributes.
         """
-        compiled = copy.deepcopy(dsl_dict)
-        meta = compiled.setdefault("metadata", {})
-        world = compiled.setdefault("world", {})
-        player = compiled.setdefault("player", {})
-        entities = compiled.setdefault("entities", [])
-        rules = compiled.setdefault("rules", [])
-        ui = compiled.setdefault("ui", {})
+        compiled = copy.deepcopy(dsl_dict) if isinstance(dsl_dict, dict) else {}
+        meta = compiled.get("metadata") if isinstance(compiled.get("metadata"), dict) else None
+        world = compiled.get("world") if isinstance(compiled.get("world"), dict) else None
+        player = compiled.get("player") if isinstance(compiled.get("player"), dict) else None
+        entities = compiled.get("entities") if isinstance(compiled.get("entities"), list) else None
+        rules = compiled.get("rules") if isinstance(compiled.get("rules"), list) else None
+        ui = compiled.get("ui") if isinstance(compiled.get("ui"), dict) else None
 
         # 1. Prototype Profile (engine) mapping
         if engine == "2D Platformer":
-            meta["archetype"] = "platformer"
-            if world.get("gravity", 0) <= 0:
+            if meta is not None:
+                meta["archetype"] = "platformer"
+            if world is not None and world.get("gravity", 0) <= 0:
                 world["gravity"] = int(500 + (physics / 100) * 400)
-            if player.get("jump_power", 0) <= 0:
+            if player is not None and player.get("jump_power", 0) <= 0:
                 player["jump_power"] = int(380 + (physics / 100) * 200)
             # Ensure goal entity / rule exists if platformer
-            has_goal = any(r.get("trigger") == "on_reach_goal" for r in rules)
-            if not has_goal:
-                rules.append({
-                    "id": f"rule_goal_auto_{len(rules)+1}",
-                    "trigger": "on_reach_goal",
-                    "action": "win_game",
-                })
+            if rules is not None:
+                has_goal = any(r.get("trigger") == "on_reach_goal" for r in rules if isinstance(r, dict))
+                if not has_goal:
+                    rules.append({
+                        "id": f"rule_goal_auto_{len(rules)+1}",
+                        "trigger": "on_reach_goal",
+                        "action": "win_game",
+                    })
         elif engine == "Arena Survival":
-            meta["archetype"] = "survival"
-            world["gravity"] = 0
-            world["wave_count"] = max(3, world.get("wave_count", 3))
+            if meta is not None:
+                meta["archetype"] = "survival"
+            if world is not None:
+                world["gravity"] = 0
+                world["wave_count"] = max(3, world.get("wave_count", 3))
         elif engine == "Data Collector":
-            meta["archetype"] = "collector"
-            world["gravity"] = 0
+            if meta is not None:
+                meta["archetype"] = "collector"
+            if world is not None:
+                world["gravity"] = 0
         elif engine == "Top-Down Action":
-            world["gravity"] = 0
+            if world is not None:
+                world["gravity"] = 0
 
         # 2. Physics parameter propagation
-        # Locomotion attributes. Consistent with the gravity/jump_power checks above:
-        # only fill in a physics-derived value when the field is truly absent or
-        # non-positive (invalid/placeholder), never merely because it equals the
-        # prompt template's few-shot example value (250 / 600) — the AI may have
-        # legitimately chosen that exact value on purpose, and clobbering it discarded
-        # real design intent.
-        if player.get("speed", 0) <= 0:
-            player["speed"] = int(200 + (physics / 100) * 100)
-        if player.get("dash_speed", 0) <= 0:
-            player["dash_speed"] = int(450 + (physics / 100) * 300)
+        if player is not None:
+            if player.get("speed", 0) <= 0:
+                player["speed"] = int(200 + (physics / 100) * 100)
+            if player.get("dash_speed", 0) <= 0:
+                player["dash_speed"] = int(450 + (physics / 100) * 300)
 
         # 3. Art density propagation
-        world["hazard_density"] = int(10 + (art_density / 100) * 50)
+        if world is not None:
+            world["hazard_density"] = int(10 + (art_density / 100) * 50)
 
         # 4. Logic Modules Materialization
-        if "Combat & Dash Mobility" in modules:
+        if "Combat & Dash Mobility" in modules and player is not None:
             player["dash_speed"] = max(player.get("dash_speed", 0), 500)
             player["stamina"] = max(player.get("stamina", 0), 100)
             if player.get("attack_type") in (None, "none"):
@@ -153,27 +156,31 @@ class GameGenerationService:
             player["attack_damage"] = max(player.get("attack_damage", 0), 25)
 
         if "Resource & Score Economy" in modules:
+            ui = compiled.setdefault("ui", {})
             ui["show_score"] = True
-            all_ents = list(entities)
-            for lvl in compiled.get("levels", []):
-                if isinstance(lvl, dict):
-                    all_ents.extend(lvl.get("entities", []))
-            has_score_rule = any(r.get("action") == "add_score" for r in rules)
-            if not has_score_rule and any(isinstance(e, dict) and e.get("type") == "collectible" for e in all_ents):
-                rules.append({
-                    "id": f"rule_score_auto_{len(rules)+1}",
-                    "trigger": "on_collect",
-                    "action": "add_score",
-                    "params": {"amount": 50},
-                })
+            if rules is not None and entities is not None:
+                all_ents = list(entities)
+                for lvl in compiled.get("levels", []):
+                    if isinstance(lvl, dict):
+                        all_ents.extend(lvl.get("entities", []))
+                has_score_rule = any(r.get("action") == "add_score" for r in rules if isinstance(r, dict))
+                if not has_score_rule and any(isinstance(e, dict) and e.get("type") == "collectible" for e in all_ents):
+                    rules.append({
+                        "id": f"rule_score_auto_{len(rules)+1}",
+                        "trigger": "on_collect",
+                        "action": "add_score",
+                        "params": {"amount": 50},
+                    })
 
         # 5. Objective & UI compilation
         if spec_dict:
             primary_obj = spec_dict.get("primary_objective")
             if not primary_obj and isinstance(spec_dict.get("objective_details"), dict):
                 primary_obj = spec_dict["objective_details"].get("primary")
-            if primary_obj and "status_text" not in ui:
-                ui["status_text"] = primary_obj[:38].upper()
+            if primary_obj:
+                ui = compiled.setdefault("ui", {})
+                if "status_text" not in ui:
+                    ui["status_text"] = primary_obj[:38].upper()
 
         return compiled
 
@@ -367,14 +374,27 @@ class GameGenerationService:
 
         # 4. Dual Validation: Schema + Gameplay Quality
         val_result = validate_game_dsl(dsl_dict)
+
+        # Log informative normalization details if any occurred
+        if val_result.issues:
+            for issue in val_result.issues:
+                if issue.repairability == "DETERMINISTIC":
+                    log("INFO", f"[AI] Local normalization: {issue.message}")
+                elif issue.repairability == "UNSAFE":
+                    log("ERROR", f"[AI] Security policy rejection: {issue.message}")
+
+        # Reject unsafe scripts or code injection immediately without repair
+        if val_result.has_unsafe_issues():
+            log("ERROR", f"[AI] FATAL: Security policy rejection: {val_result.errors[0] if val_result.errors else 'Unsafe content'}")
+            return GenerationResult(
+                success=False,
+                error_code="UNSAFE_DSL_PAYLOAD",
+                error_message="Candidate contains disallowed scripts or executable code.",
+                attempts_used=1,
+                provider_meta=provider_meta,
+            )
+
         quality_errors: List[str] = []
-        # Scale-budget shortfall (too few levels/entities/rules vs. the requested tier)
-        # is a SOFT, first-attempt-only nudge -- never a hard, repeatedly-blocking
-        # error ("a slightly-off tier is not worth a hard failure"). It is folded into
-        # all_errors below ONLY on this very first validation pass, so it gets AT MOST
-        # one bounded repair attempt. From the repair loop onward (see below), success
-        # is decided purely by hard schema/quality errors; any remaining budget
-        # shortfall after that one nudge is accepted as-is.
         budget_errors: List[str] = []
 
         if val_result.is_valid and val_result.dsl:
@@ -450,33 +470,51 @@ class GameGenerationService:
                 provider_meta=provider_meta,
             )
 
-        # 5. Bounded repair loop
+        # 5. Bounded repair loop (strictly limited to semantic errors requiring LLM intervention)
+        repair_timeout = getattr(settings, "AI_REPAIR_TIMEOUT_SECONDS", 45.0)
+        repair_max_attempts = self.max_retries
+
         current_errors = all_errors
         last_candidate = raw_output
 
-        for attempt in range(1, self.max_retries + 1):
-            log("WARNING", f"[AI] Validation failed on attempt {attempt}: {current_errors[0] if current_errors else 'Error'}")
-            log("INFO", f"[AI] Triggering bounded repair loop (attempt {attempt}/{self.max_retries})...")
+        for attempt in range(1, repair_max_attempts + 1):
+            log("WARNING", f"[AI] Semantic validation issue: {current_errors[0] if current_errors else 'Error'}")
+            log("INFO", f"[AI] Triggering bounded repair loop (attempt {attempt}/{repair_max_attempts}, timeout {repair_timeout}s)...")
 
             repair_prompt = build_repair_prompt(last_candidate, current_errors)
 
             try:
                 if hasattr(self.provider, "generate_structured_with_meta"):
-                    repaired_output, _ = await self.provider.generate_structured_with_meta(
-                        system_prompt=SYSTEM_PROMPT,
-                        user_prompt=repair_prompt,
-                    )
+                    try:
+                        repaired_output, _ = await self.provider.generate_structured_with_meta(
+                            system_prompt=SYSTEM_PROMPT,
+                            user_prompt=repair_prompt,
+                            timeout=repair_timeout,
+                        )
+                    except TypeError:
+                        repaired_output, _ = await self.provider.generate_structured_with_meta(
+                            system_prompt=SYSTEM_PROMPT,
+                            user_prompt=repair_prompt,
+                        )
                 else:
-                    repaired_output = await self.provider.generate_structured(
-                        system_prompt=SYSTEM_PROMPT,
-                        user_prompt=repair_prompt,
-                    )
+                    try:
+                        repaired_output = await self.provider.generate_structured(
+                            system_prompt=SYSTEM_PROMPT,
+                            user_prompt=repair_prompt,
+                            timeout=repair_timeout,
+                        )
+                    except TypeError:
+                        repaired_output = await self.provider.generate_structured(
+                            system_prompt=SYSTEM_PROMPT,
+                            user_prompt=repair_prompt,
+                        )
             except AIError as ai_err:
-                log("ERROR", f"[AI] Repair attempt failed at provider: {ai_err.message}")
+                log("ERROR", f"[AI] Repair attempt failed at provider ({ai_err.code}): {ai_err.message}")
+                log("ERROR", f"[AI] Original validation issue: {current_errors[0] if current_errors else 'Unknown'}")
                 return GenerationResult(
                     success=False,
                     error_code=ai_err.code,
-                    error_message=ai_err.message,
+                    error_message=f"Repair failed: {ai_err.message} (original issue: {current_errors[0] if current_errors else 'schema error'})",
                     attempts_used=attempt + 1,
                     provider_meta=provider_meta,
                 )
@@ -533,12 +571,12 @@ class GameGenerationService:
             current_errors = all_rep_errors
 
         # Exceeded maximum retries
-        log("ERROR", "[AI] FATAL: Bounded repair attempts exhausted without valid Game DSL.")
+        log("ERROR", f"[AI] FATAL: Bounded repair attempts exhausted. Unresolved issue: {current_errors[0] if current_errors else 'Validation failed'}")
         return GenerationResult(
             success=False,
             error_code="DSL_REPAIR_EXHAUSTED",
-            error_message="Failed to generate valid Game DSL after maximum repair attempts.",
-            attempts_used=self.max_retries + 1,
+            error_message=f"Failed to generate valid Game DSL after bounded repair: {current_errors[0] if current_errors else 'Schema error'}",
+            attempts_used=repair_max_attempts + 1,
             provider_meta=provider_meta,
         )
 
