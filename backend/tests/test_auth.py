@@ -235,3 +235,23 @@ def test_password_hash_never_in_any_response(client):
         assert "password" not in res.json().get("user", {}), (
             "password field leaked into user response"
         )
+
+
+def test_form_urlencoded_payload_returns_422_without_crashing(client):
+    """
+    BUG-AUTH-01 regression test: Submitting application/x-www-form-urlencoded
+    content causes Pydantic v2 to embed raw bytes in error['input'].
+    Verify that _sanitize_validation_error_details decodes bytes so JSONResponse
+    returns a clean 422 instead of crashing with a 500 TypeError.
+    """
+    res = client.post(
+        "/api/auth/login",
+        content=b"email=test%40example.com&password=secretpassword",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert res.status_code == 422
+    data = res.json()
+    assert "error" in data
+    assert data["error"]["code"] == "AUTH_VALIDATION_FAILED"
+    assert "details" in data["error"]
+

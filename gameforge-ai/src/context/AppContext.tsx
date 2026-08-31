@@ -85,6 +85,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const unsubscribeSseRef = useRef<(() => void) | null>(null);
   const authHydrationStartedRef = useRef(false);
+  const searchSequenceRef = useRef(0);
 
   // 1. Backend Project Hydration
   const refreshProjects = useCallback(async () => {
@@ -495,6 +496,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    const currentSearchId = ++searchSequenceRef.current;
     const activeMode = mode || state.discoveryMode || 'BEST_MATCH';
     const activeSession = sessionContext || state.discoverySession || {};
 
@@ -510,6 +512,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Request up to 24 candidates from backend discovery index
       const response = await discoveryService.searchGames(trimmed, 24, undefined, activeMode, activeSession);
+      
+      // Stale response guard: ignore if a newer search was submitted while inflight
+      if (searchSequenceRef.current !== currentSearchId) {
+        return;
+      }
+
       setState((s) => ({
         ...s,
         isSearching: false,
@@ -524,8 +532,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         navigate('/');
       }
     } catch (err) {
+      if (searchSequenceRef.current !== currentSearchId) {
+        return;
+      }
       console.warn('Discovery search error, navigating to no-matches fallback', err);
       setState((s) => ({ ...s, isSearching: false }));
+      pushToast({
+        variant: 'error',
+        title: 'SEARCH FAILED',
+        description: err instanceof Error ? err.message : 'Unable to complete discovery search.',
+      });
       navigate('/discover/no-matches');
     }
   };
@@ -685,6 +701,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await compileProject(navigate);
   };
 
+  // 9. Documentation & Info Modal Controls
+  const openInfoModal = (tab: 'docs' | 'api' | 'community' | 'support' | 'privacy' = 'docs') => {
+    setState((s) => ({
+      ...s,
+      infoModalTab: tab,
+    }));
+  };
+
+  const closeInfoModal = () => {
+    setState((s) => ({
+      ...s,
+      infoModalTab: null,
+    }));
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -718,6 +749,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         changePassword,
         deleteProject,
         duplicateProject,
+        openInfoModal,
+        closeInfoModal,
+        pushToast,
       }}
     >
       {children}

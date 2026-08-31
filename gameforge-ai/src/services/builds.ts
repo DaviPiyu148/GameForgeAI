@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { joinApiUrl } from './urlUtils';
+import { getApiBaseUrl, joinApiUrl } from './urlUtils';
 import type {
   BuildLogEntry,
   BuildLogListResponse,
@@ -7,7 +7,6 @@ import type {
   BuildResponse,
   BackendBuildStatus,
 } from '../types';
-
 export interface BuildStatusEventData {
   build_id: string;
   status: BackendBuildStatus;
@@ -22,8 +21,6 @@ export interface BuildEventHandlers {
   onError?: (err: Error) => void;
   onComplete?: () => void;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const buildService = {
   /**
@@ -80,7 +77,7 @@ export const buildService = {
         const tokenParam = `?sse_token=${encodeURIComponent(sseAuth.sse_token)}`;
         // FS-028 fix: use joinApiUrl so a trailing slash on API_BASE_URL never
         // produces a double-slash in the EventSource URL.
-        const sseUrl = joinApiUrl(API_BASE_URL, `builds/${buildId}/events${tokenParam}`);
+        const sseUrl = joinApiUrl(getApiBaseUrl(), `builds/${buildId}/events${tokenParam}`);
         eventSource = new EventSource(sseUrl);
 
         eventSource.addEventListener('log', (event: MessageEvent) => {

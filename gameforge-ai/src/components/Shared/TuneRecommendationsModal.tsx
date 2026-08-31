@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { DiscoverySessionContext } from '../../types';
 
 interface TuneRecommendationsModalProps {
@@ -19,17 +20,39 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
   onApply,
   onReset,
 }) => {
-  const [localRefinements, setLocalRefinements] = React.useState<string[]>(
+  const [localRefinements, setLocalRefinements] = useState<string[]>(
     sessionContext.refinements || []
   );
-  const [localAvoidTags, setLocalAvoidTags] = React.useState<string[]>(
+  const [localAvoidTags, setLocalAvoidTags] = useState<string[]>(
     sessionContext.temporary_avoid_tags || []
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     setLocalRefinements(sessionContext.refinements || []);
     setLocalAvoidTags(sessionContext.temporary_avoid_tags || []);
   }, [sessionContext]);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -62,11 +85,22 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg bg-surface-container-low border border-outline-variant/60 rounded-sm shadow-2xl p-6 space-y-6">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tune recommendations dialog"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] flex flex-col rounded-sm modal-enter relative z-10 p-6 space-y-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant/40 pb-3">
+        <div className="flex items-center justify-between border-b border-primary/30 pb-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">tune</span>
             <h2 className="font-display text-lg text-white uppercase tracking-wider">
@@ -75,9 +109,10 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-white text-sm font-mono cursor-pointer"
+            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            aria-label="Close tune dialog"
           >
-            ✕
+            <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
 
@@ -98,10 +133,10 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
                   key={opt}
                   type="button"
                   onClick={() => toggleRefinement(opt)}
-                  className={`px-2.5 py-1 text-xs font-mono rounded border transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-mono rounded border transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-primary/20 border-primary text-primary font-bold'
-                      : 'bg-surface-container-highest/40 border-outline-variant/40 text-on-surface hover:border-outline-variant'
+                      ? 'bg-primary/20 border-primary text-primary font-bold shadow-[0_0_8px_rgba(76,224,210,0.3)]'
+                      : 'bg-surface-container-low border-outline-variant/40 text-on-surface hover:border-primary/50 hover:text-primary'
                   }`}
                 >
                   + {opt}
@@ -125,10 +160,10 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
                   key={tag}
                   type="button"
                   onClick={() => toggleAvoidTag(tag)}
-                  className={`px-2.5 py-1 text-xs font-mono rounded border transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-mono rounded border transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-secondary/20 border-secondary text-secondary font-bold'
-                      : 'bg-surface-container-highest/40 border-outline-variant/40 text-on-surface hover:border-outline-variant'
+                      ? 'bg-secondary/20 border-secondary text-secondary font-bold shadow-[0_0_8px_rgba(255,61,129,0.3)]'
+                      : 'bg-surface-container-low border-outline-variant/40 text-on-surface hover:border-secondary/50 hover:text-secondary'
                   }`}
                 >
                   - {tag}
@@ -139,11 +174,11 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-between items-center pt-4 border-t border-outline-variant/40">
+        <div className="flex justify-between items-center pt-4 border-t border-primary/20">
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-1.5 text-xs font-mono text-on-surface-variant hover:text-white cursor-pointer"
+            className="px-3 py-1.5 text-xs font-mono text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
           >
             Reset Filters
           </button>
@@ -151,20 +186,21 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 border border-outline-variant text-on-surface font-mono text-xs uppercase rounded cursor-pointer"
+              className="px-4 py-2 border border-outline-variant text-on-surface font-mono text-xs uppercase rounded hover:border-primary/50 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="px-5 py-1.5 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded btn-interactive cursor-pointer"
+              className="px-5 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded btn-interactive energy-sweep glow-cyan cursor-pointer"
             >
               Apply Tune
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

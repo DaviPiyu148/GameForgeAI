@@ -32,6 +32,8 @@ export const authStorage = {
   },
 };
 
+let inFlightGetMe: Promise<AuthUser> | null = null;
+
 export const authService = {
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     const res = await apiClient.post<AuthResponse>('/auth/register', data);
@@ -50,7 +52,13 @@ export const authService = {
   },
 
   getMe: async (): Promise<AuthUser> => {
-    return apiClient.get<AuthUser>('/auth/me');
+    if (inFlightGetMe) {
+      return inFlightGetMe;
+    }
+    inFlightGetMe = apiClient.get<AuthUser>('/auth/me').finally(() => {
+      inFlightGetMe = null;
+    });
+    return inFlightGetMe;
   },
 
   updateUsername: async (username: string): Promise<AuthUser> => {

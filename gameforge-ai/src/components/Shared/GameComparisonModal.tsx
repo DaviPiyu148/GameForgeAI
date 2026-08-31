@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { discoveryService } from '../../services/discovery';
 import type { CompareGamesResponse } from '../../types';
 
@@ -39,13 +40,46 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
     fetchComparison();
   }, [isOpen, selectedGameIds]);
 
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-surface-container-low border border-outline-variant/60 rounded-sm shadow-2xl p-6 flex flex-col space-y-4 overflow-hidden">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Game comparison modal"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="relative w-full max-w-4xl max-h-[90vh] bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-sm p-6 flex flex-col space-y-4 overflow-hidden modal-enter z-10"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant/40 pb-3">
+        <div className="flex items-center justify-between border-b border-primary/30 pb-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-xl">compare_arrows</span>
             <h2 className="font-display text-lg text-white uppercase tracking-wider">
@@ -54,9 +88,10 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-white text-sm font-mono cursor-pointer"
+            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            aria-label="Close comparison dialog"
           >
-            ✕
+            <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
 
@@ -78,13 +113,14 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
               {data.games.map((g) => (
                 <div
                   key={g.id}
-                  className="bg-surface-container-highest/30 border border-outline-variant/40 rounded p-3 space-y-3 relative"
+                  className="bg-surface-container-low border border-primary/20 rounded p-3 space-y-3 relative"
                 >
                   <button
                     type="button"
                     onClick={() => onRemoveGame(g.id)}
                     className="absolute top-2 right-2 text-on-surface-variant hover:text-secondary text-xs cursor-pointer"
                     title="Remove from comparison"
+                    aria-label={`Remove ${g.title} from comparison`}
                   >
                     ✕
                   </button>
@@ -106,13 +142,13 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
                   </div>
 
                   {/* Genres */}
-                  <div className="space-y-1 pt-1 border-t border-outline-variant/20">
+                  <div className="space-y-1 pt-1 border-t border-primary/20">
                     <span className="text-[10px] font-mono text-primary font-bold uppercase">Genres</span>
                     <div className="flex flex-wrap gap-1">
                       {g.genres.slice(0, 3).map((gen) => (
                         <span
                           key={gen}
-                          className="px-1.5 py-0.2 bg-primary/10 text-primary text-[10px] font-mono rounded"
+                          className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-mono rounded"
                         >
                           {gen}
                         </span>
@@ -121,7 +157,7 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
                   </div>
 
                   {/* Modes */}
-                  <div className="space-y-1 pt-1 border-t border-outline-variant/20">
+                  <div className="space-y-1 pt-1 border-t border-primary/20">
                     <span className="text-[10px] font-mono text-secondary font-bold uppercase">Modes</span>
                     <div className="text-[11px] font-mono text-on-surface">
                       {g.player_modes.join(', ') || 'Single-player'}
@@ -129,7 +165,7 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
                   </div>
 
                   {/* Platforms */}
-                  <div className="space-y-1 pt-1 border-t border-outline-variant/20">
+                  <div className="space-y-1 pt-1 border-t border-primary/20">
                     <span className="text-[10px] font-mono text-tertiary font-bold uppercase">Platforms</span>
                     <div className="text-[11px] font-mono text-on-surface truncate">
                       {g.platforms.join(', ') || 'PC'}
@@ -140,7 +176,7 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
             </div>
 
             {/* Overlap Summary */}
-            <div className="bg-surface-container-highest/20 border border-outline-variant/30 rounded p-4 space-y-3">
+            <div className="bg-surface-container-low border border-primary/20 rounded p-4 space-y-3">
               <h4 className="font-mono text-xs text-primary font-bold uppercase tracking-wider">
                 Common Ground & Differentiators
               </h4>
@@ -156,7 +192,7 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
                   <span className="text-on-surface-variant block mb-1">DISTINCT TAGS:</span>
                   <div className="flex flex-wrap gap-1">
                     {data.differentiating_tags.map((t) => (
-                      <span key={t} className="px-1.5 py-0.2 bg-surface-container border border-outline-variant/40 rounded text-[10px] text-on-surface">
+                      <span key={t} className="px-1.5 py-0.5 bg-surface-container border border-primary/20 rounded text-[10px] text-on-surface">
                         {t}
                       </span>
                     ))}
@@ -167,16 +203,17 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
           </div>
         )}
 
-        <div className="flex justify-end pt-2 border-t border-outline-variant/30">
+        <div className="flex justify-end pt-2 border-t border-primary/20">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded btn-interactive cursor-pointer"
+            className="px-5 py-2 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded btn-interactive energy-sweep glow-cyan cursor-pointer"
           >
             Close Comparison
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

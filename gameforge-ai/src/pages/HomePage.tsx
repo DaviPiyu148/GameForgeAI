@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { discoveryService } from '../services/discovery';
@@ -7,7 +7,6 @@ import { TuneRecommendationsModal } from '../components/Shared/TuneRecommendatio
 import { GameComparisonModal } from '../components/Shared/GameComparisonModal';
 import { GameDNAOnboardingModal } from '../components/Shared/GameDNAOnboardingModal';
 import type { DiscoverySearchResult } from '../types';
-
 
 const INITIAL_VISIBLE_RESULTS = 12;
 
@@ -26,7 +25,7 @@ const HomePage = () => {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [isTuneModalOpen, setIsTuneModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
-
+  const recognitionRef = useRef<any>(null);
 
   const navigate = useNavigate();
   const {
@@ -37,6 +36,7 @@ const HomePage = () => {
     searchDiscovery,
     clearDiscoveryResults,
     saveDiscovery,
+    pushToast,
   } = useAppContext();
 
   // Sync initial prompt from context if needed
@@ -50,6 +50,19 @@ const HomePage = () => {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_RESULTS);
   }, [state.discoveryResults?.length]);
+
+  // Clean up speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
 
   const handleChipClick = (text: string) => {
     setPromptText(text);
@@ -74,11 +87,70 @@ const HomePage = () => {
   };
 
   const toggleMic = () => {
-    setIsListening(!isListening);
-    if (!isListening && !promptText.trim()) {
-      const text = 'Co-op sci-fi roguelite with deck-building mechanics...';
-      setPromptText(text);
-      setPrompt(text);
+    const SpeechRecognition =
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
+      (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      pushToast({
+        variant: 'info',
+        title: 'VOICE SEARCH',
+        description: "Voice search isn't supported in this browser.",
+      });
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn('Error stopping speech recognition:', err);
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setPromptText(transcript);
+          setPrompt(transcript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          pushToast({
+            variant: 'error',
+            title: 'MICROPHONE ACCESS',
+            description: 'Microphone permission was denied. Please allow microphone access in browser settings.',
+          });
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Speech recognition start failed:', err);
+      setIsListening(false);
     }
   };
 
@@ -558,6 +630,7 @@ const HomePage = () => {
                         type="button"
                         onClick={() => saveDiscovery(result.game.external_id)}
                         disabled={isSaved}
+                        aria-label={isSaved ? 'Saved to discoveries' : `Save ${result.game.display_title || result.game.title} to discoveries`}
                         className={`flex-1 px-2 py-2 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded border transition-colors flex items-center justify-center gap-1 cursor-pointer ${
                           isSaved
                             ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-default'
@@ -574,6 +647,7 @@ const HomePage = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedGameForDetails(result)}
+                        aria-label={`View rich details and screenshots for ${result.game.display_title || result.game.title}`}
                         className="flex-1 px-2 py-2 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
                         title="View rich game details, screenshots, and storefront links"
                       >
@@ -586,6 +660,7 @@ const HomePage = () => {
                         type="button"
                         onClick={() => handleBuildSimilar(result)}
                         disabled={isActionLoading === `build-${result.game.external_id || result.game.id}`}
+                        aria-label={`Synthesize game prototype inspired by ${result.game.display_title || result.game.title}`}
                         className="flex-1 px-2 py-2 bg-primary text-on-primary font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded btn-interactive glow-cyan flex items-center justify-center gap-1 cursor-pointer"
                         title="Synthesize game prototype inspired by this title"
                       >
@@ -601,6 +676,7 @@ const HomePage = () => {
                           type="checkbox"
                           id={`compare-${gameKey}`}
                           checked={comparedGameIds.includes(result.game.external_id || result.game.id)}
+                          aria-label={`Compare ${result.game.display_title || result.game.title}`}
                           onChange={() => {
                             const gid = result.game.external_id || result.game.id;
                             setComparedGameIds((prev) =>
@@ -625,6 +701,7 @@ const HomePage = () => {
                         <button
                           type="button"
                           onClick={() => handleFeedback(gameKey, 'like')}
+                          aria-label={`Like match for ${result.game.display_title || result.game.title}`}
                           className={`hover:text-emerald-400 cursor-pointer flex items-center gap-0.5 ${
                             userFeedback === 'like' ? 'text-emerald-400 font-bold' : ''
                           }`}
@@ -637,6 +714,7 @@ const HomePage = () => {
                         <button
                           type="button"
                           onClick={() => handleFeedback(gameKey, 'dislike')}
+                          aria-label={`Dislike match for ${result.game.display_title || result.game.title}`}
                           className={`hover:text-secondary cursor-pointer flex items-center gap-0.5 ${
                             userFeedback === 'dislike' ? 'text-secondary font-bold' : ''
                           }`}
@@ -650,6 +728,7 @@ const HomePage = () => {
                         <button
                           type="button"
                           onClick={() => handleFeedback(gameKey, 'less_like_this')}
+                          aria-label={`Show fewer matches like ${result.game.display_title || result.game.title}`}
                           className="hover:text-amber-400 cursor-pointer flex items-center gap-0.5"
                           title="Less like this"
                         >

@@ -17,7 +17,24 @@ export const AuthModal = () => {
       setMode(state.authModalMode);
     }
     setError(null);
-  }, [state.authModalMode, state.isAuthModalOpen]);
+    if (state.isAuthModalOpen && (state.authModalMode || 'login') === 'login') {
+      if (import.meta.env.DEV && !email) {
+        setEmail('testuser_browser1@test.com');
+        setPassword('TestPass123!');
+      }
+    }
+  }, [state.authModalMode, state.isAuthModalOpen, email]);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    if (state.isAuthModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [state.isAuthModalOpen]);
 
   // Handle escape key
   useEffect(() => {
@@ -54,8 +71,20 @@ export const AuthModal = () => {
         await register({ email: email.trim(), username: username.trim(), password });
       }
     } catch (err: unknown) {
-      const apiErr = err as { message?: string; code?: string };
-      setError(apiErr.message || 'Authentication failed. Please try again.');
+      const apiErr = err as { message?: string; code?: string; status?: number };
+      if (apiErr.status === 401 || apiErr.code === 'INVALID_CREDENTIALS') {
+        setError('Invalid email or password. Please verify your credentials.');
+      } else if (apiErr.status === 422 || apiErr.code === 'VALIDATION_ERROR' || apiErr.code === 'AUTH_VALIDATION_FAILED') {
+        setError(apiErr.message || 'Please check your input format and try again.');
+      } else if (apiErr.status === 409 || apiErr.code === 'USERNAME_TAKEN') {
+        setError(apiErr.message || 'This username or email is already in use.');
+      } else if (apiErr.status === 0 || apiErr.code === 'NETWORK_ERROR') {
+        setError('Connection problem. Please check your network or server connection.');
+      } else if (apiErr.status && apiErr.status >= 500) {
+        setError('GameForge backend service is temporarily unavailable. Please try again shortly.');
+      } else {
+        setError(apiErr.message || 'Authentication failed. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -64,6 +93,9 @@ export const AuthModal = () => {
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Authentication modal"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeAuthModal();
       }}
@@ -83,7 +115,7 @@ export const AuthModal = () => {
           <button
             onClick={closeAuthModal}
             className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-            aria-label="Close"
+            aria-label="Close authentication dialog"
           >
             <span className="material-symbols-outlined text-base">close</span>
           </button>

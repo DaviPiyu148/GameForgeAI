@@ -4,7 +4,9 @@
  * or `VITE_API_URL` when explicitly configured.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+import { getApiBaseUrl, joinApiUrl } from './urlUtils';
+
+export const API_BASE_URL = getApiBaseUrl();
 export const AUTH_TOKEN_KEY = 'gameforge_auth_token';
 
 export class ApiError extends Error {
@@ -28,7 +30,7 @@ interface RequestOptions extends RequestInit {
 export async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { params, ...customConfig } = options;
 
-  let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  let url = joinApiUrl(getApiBaseUrl(), endpoint);
 
   if (params) {
     const searchParams = new URLSearchParams();
@@ -115,9 +117,9 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw error;
     }
-    // Network errors (connection refused, offline, etc.)
+    // Network errors (connection refused, proxy ECONNRESET, offline, etc.)
     throw new ApiError(
-      'Unable to connect to GameForge backend service.',
+      'Connection problem. Please check your network or server connection.',
       'NETWORK_ERROR',
       0
     );

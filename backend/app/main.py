@@ -74,14 +74,28 @@ app.add_middleware(
 )
 
 
+def _make_json_safe(obj):
+    if isinstance(obj, bytes):
+        try:
+            return obj.decode("utf-8")
+        except UnicodeDecodeError:
+            return repr(obj)
+    if isinstance(obj, dict):
+        return {k: _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_make_json_safe(item) for item in obj]
+    if isinstance(obj, Exception):
+        return str(obj)
+    return obj
+
+
 def _sanitize_validation_error_details(errors: list) -> list:
     """
     Pydantic v2 embeds the raw exception object under `ctx.error` for any custom
-    `@field_validator` that raises a bare ValueError/AssertionError (e.g. the DSL's
-    script-injection checks or Remix's mutually-exclusive-intents check). That raw
-    exception object is not JSON-serializable, so `JSONResponse` would crash while
-    trying to render `details` -- turning a clean 422 into an unhandled 500. Strip
-    it down to its string form; the human-readable message is already in `msg`.
+    `@field_validator` that raises a bare ValueError/AssertionError, and embeds raw
+    `bytes` under `input` when form-urlencoded or non-JSON bodies fail validation.
+    Recursively sanitize all non-JSON-serializable objects (bytes, exceptions, etc.)
+    so `JSONResponse` never crashes with a 500 while rendering a 422 error envelope.
     """
     sanitized = []
     for err in errors:
@@ -91,7 +105,7 @@ def _sanitize_validation_error_details(errors: list) -> list:
             ctx = dict(ctx)
             ctx["error"] = str(ctx["error"])
             err["ctx"] = ctx
-        sanitized.append(err)
+        sanitized.append(_make_json_safe(err))
     return sanitized
 
 

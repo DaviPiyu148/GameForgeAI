@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 const ErrorStatusPage = () => {
-  const { state, retryBuild } = useAppContext();
+  const { state, retryBuild, pushToast } = useAppContext();
   const navigate = useNavigate();
   const [showLogModal, setShowLogModal] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
@@ -16,6 +16,24 @@ const ErrorStatusPage = () => {
       setShowLogModal(false);
       setIsClosingModal(false);
     }, 250);
+  };
+
+  const handleCopyLogs = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const logs =
+        state.compilerLogs.length > 0
+          ? state.compilerLogs.join('\n')
+          : `[FATAL_EXCEPTION] ${state.lastError?.code || 'BUILD_ERROR'}\n[MESSAGE] ${state.lastError?.message || 'Prototype synthesis interrupted.'}`;
+      await navigator.clipboard.writeText(logs);
+      pushToast({
+        variant: 'success',
+        title: 'COMPILER LOGS',
+        description: 'Compiler output copied.',
+      });
+    } catch (err) {
+      console.warn('Failed to copy compiler logs', err);
+    }
   };
 
   // If we somehow get here without an error state, kick back to builder
@@ -74,7 +92,17 @@ const ErrorStatusPage = () => {
             <div className="w-3 h-3 rounded-full bg-tertiary/80"></div>
             <div className="w-3 h-3 rounded-full bg-primary/80"></div>
           </div>
-          <div className="flex items-center gap-2 font-mono text-xs text-on-surface-variant tracking-wider">
+          <div className="flex items-center gap-3 font-mono text-xs text-on-surface-variant tracking-wider">
+            <button
+              type="button"
+              onClick={handleCopyLogs}
+              title="Copy error output"
+              aria-label="Copy error output"
+              className="px-2 py-0.5 border border-error/40 hover:border-error hover:bg-error/10 text-error rounded font-mono text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span className="material-symbols-outlined text-[13px]">content_copy</span>
+              <span>COPY OUTPUT</span>
+            </button>
             <span className="material-symbols-outlined text-sm text-error">bug_report</span>
             <span>ERROR_LOG_TTY1</span>
           </div>
@@ -190,13 +218,25 @@ const ErrorStatusPage = () => {
                   <span className="material-symbols-outlined text-sm">terminal</span>
                   <span className="font-mono text-sm tracking-widest font-bold uppercase">COMPILER_LOG.TXT</span>
                 </div>
-                <button
-                  ref={closeBtnRef}
-                  onClick={handleCloseModal}
-                  className="text-on-surface-variant hover:text-error p-1 icon-interactive focus:outline-none focus:ring-1 focus:ring-error cursor-pointer"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCopyLogs}
+                    title="Copy compiler output"
+                    aria-label="Copy compiler output"
+                    className="px-2 py-0.5 border border-error/40 hover:border-error hover:bg-error/10 text-error rounded font-mono text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                    <span>COPY OUTPUT</span>
+                  </button>
+                  <button
+                    ref={closeBtnRef}
+                    onClick={handleCloseModal}
+                    className="text-on-surface-variant hover:text-error p-1 icon-interactive focus:outline-none focus:ring-1 focus:ring-error cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
               </div>
               <div className="p-4 bg-terminal-bg font-mono text-xs h-96 overflow-y-auto space-y-1">
                 {state.compilerLogs.map((log, i) => (

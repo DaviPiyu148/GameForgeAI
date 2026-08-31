@@ -42,6 +42,14 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
   }, [onClose]);
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     closeBtnRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {

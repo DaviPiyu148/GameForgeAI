@@ -46,18 +46,17 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Game Generation Hardening V1 (Deterministic Normalization, Repair Timeout, Resilience) (`GENERATION_RESILIENCE.md`) | COMPLETE |
 | AI Provider Architecture V2 (Sequential Failover, Gemini 3 Routing, Model Fallback) (`AI_PROVIDER_ARCHITECTURE.md`) | COMPLETE |
 | Small Product Fixes & Reliability Polish V2 (Blueprint Recovery, Persistent Build Logs, Fullscreen API, Account Settings, Builder Design Preview) | COMPLETE |
+| Browser Audit Remediation V1 (API Transport Normalization, Auth Deduplication, Validation Error JSON Serialization, Discovery Stale Response Guard, Web Speech Voice Input, Modal Portal & Scroll Lock Migration, InfoModal Tabbed Documentation, Copy Output Actions) (`BROWSER_PRODUCT_REMEDIATION_V1.md`) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Small Product Fixes & Reliability Polish V2)
+## Current Verification (as of Browser Audit Remediation V1)
 
-- **Backend tests**: 100% pass rate across all suites (`cd backend && pytest -q`).
-- **Blueprint test suite**: 11/11 tests passing (`pytest tests/test_blueprint.py`).
-- **Profile API test suite**: 4/4 tests passing (`pytest tests/test_profile_api.py`).
-- **Build/Project test suite**: 36/36 tests passing (`pytest tests/test_builds.py tests/test_projects.py tests/test_project_management.py`).
-- **Auth test suite**: 15/15 tests passing (`pytest tests/test_auth.py`).
-- **AI Provider test suite**: 36/36 tests passing (`pytest tests/test_ai_provider.py`).
+- **Backend tests**: 424/424 passing (100% pass rate across all suites via `uv run pytest tests/ -q`).
+- **Auth test suite**: 16/16 tests passing (including regression test for form-urlencoded validation error serialization).
+- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 60 files).
 - **Generation resilience suite**: 10/10 tests passing (`pytest tests/test_generation_resilience.py`).
 - **TypeScript**: 0 errors (`npx tsc --noEmit`).
 - **Production build**: succeeds (`npm run build` — 79 modules transformed, 3.72s).

@@ -6,7 +6,7 @@ import { PrototypeModal } from '../components/Shared/PrototypeModal';
 export const SuccessStatusPage = () => {
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
-  const { state, updateGameProject } = useAppContext();
+  const { state, updateGameProject, pushToast } = useAppContext();
   const navigate = useNavigate();
 
   const logsToDisplay = state.compilerLogs.length > 0
@@ -23,6 +23,20 @@ export const SuccessStatusPage = () => {
         '[PHASER] Runtime verification: PASS',
         '[SYS] Build complete: 0x00_SYS_READY',
       ];
+
+  const handleCopyLogs = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(logsToDisplay.join('\n'));
+      pushToast({
+        variant: 'success',
+        title: 'COMPILER LOGS',
+        description: 'Compiler output copied.',
+      });
+    } catch (err) {
+      console.warn('Failed to copy compiler logs', err);
+    }
+  };
 
   const hasRecoveredIssues = logsToDisplay.some(
     (l) => l.includes('Recovered') || l.includes('repair') || l.includes('normalization')
@@ -291,7 +305,17 @@ export const SuccessStatusPage = () => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-on-surface-variant text-[11px]">
+            <div className="flex items-center gap-3 text-on-surface-variant text-[11px]">
+              <button
+                type="button"
+                onClick={handleCopyLogs}
+                title="Copy compiler output"
+                aria-label="Copy compiler output"
+                className="px-2 py-0.5 border border-primary/40 hover:border-primary hover:bg-primary/10 text-primary rounded font-mono text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                <span>COPY OUTPUT</span>
+              </button>
               <span>{showTechnicalLogs ? 'COLLAPSE' : `EXPAND (${logsToDisplay.length} STAGES)`}</span>
               <span
                 className="material-symbols-outlined text-sm transition-transform duration-200"

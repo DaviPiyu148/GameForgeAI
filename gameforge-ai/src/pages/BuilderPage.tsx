@@ -6,7 +6,15 @@ import { BUILDER_PRESETS, applyPreset, detectActivePreset } from '../data/builde
 import { BuilderDesignPreview } from '../components/Builder/BuilderDesignPreview';
 
 const BuilderPage = () => {
-  const { state, setPrompt, updateBuildParams, compileProject, cancelCurrentBuild, clearCompilerLogs } = useAppContext();
+  const {
+    state,
+    setPrompt,
+    updateBuildParams,
+    compileProject,
+    cancelCurrentBuild,
+    clearCompilerLogs,
+    pushToast,
+  } = useAppContext();
   const navigate = useNavigate();
   const logsEndRef = useRef<HTMLDivElement>(null);
   
@@ -46,6 +54,23 @@ const BuilderPage = () => {
       setTimeout(() => setCopyFeedback(false), 2000);
     } catch (err) {
       console.warn('Failed to copy text', err);
+    }
+  };
+
+  const handleCopyCompilerOutput = async () => {
+    try {
+      const logs =
+        state.compilerLogs.length > 0
+          ? state.compilerLogs.join('\n')
+          : '[SYS] Environment ready. GameForge Engine v4.2.1 initialized.';
+      await navigator.clipboard.writeText(logs);
+      pushToast({
+        variant: 'success',
+        title: 'COMPILER LOGS',
+        description: 'Compiler output copied.',
+      });
+    } catch (err) {
+      console.warn('Failed to copy compiler logs', err);
     }
   };
 
@@ -188,9 +213,9 @@ const BuilderPage = () => {
               <div className="flex justify-between items-baseline mb-2">
                 <h3 className="font-mono text-[10px] text-secondary-soft flex items-center gap-1.5 uppercase tracking-wide">
                   <span className="material-symbols-outlined text-[14px]">preview</span>
-                  Live Preview (Wireframe)
+                  DESIGN PREVIEW
                 </h3>
-                <span className="font-mono text-[9px] text-on-surface-variant/60">Configuration Preview</span>
+                <span className="font-mono text-[9px] text-on-surface-variant/60">Configuration Schematic</span>
               </div>
               <BuilderDesignPreview params={state.currentBuildParams} prompt={state.currentPrompt} />
             </div>
@@ -359,14 +384,25 @@ const BuilderPage = () => {
                 <span className="material-symbols-outlined text-[14px]">dvr</span>
                 Compiler Output
               </h2>
-              <button
-                onClick={clearCompilerLogs}
-                title="Clear compiler output"
-                aria-label="Clear compiler logs"
-                className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors cursor-pointer rounded"
-              >
-                <span className="material-symbols-outlined text-[14px]">clear_all</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyCompilerOutput}
+                  title="Copy compiler output"
+                  aria-label="Copy compiler output"
+                  className="text-primary/70 hover:text-primary px-2 py-0.5 hover:bg-primary/10 transition-colors cursor-pointer rounded flex items-center gap-1 font-mono text-[9px] uppercase font-bold"
+                >
+                  <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                  <span>COPY OUTPUT</span>
+                </button>
+                <button
+                  onClick={clearCompilerLogs}
+                  title="Clear compiler output"
+                  aria-label="Clear compiler logs"
+                  className="text-primary/70 hover:text-primary p-1 hover:bg-primary/10 transition-colors cursor-pointer rounded"
+                >
+                  <span className="material-symbols-outlined text-[14px]">clear_all</span>
+                </button>
+              </div>
             </div>
             <div className="flex-1 p-4 font-mono text-xs text-primary/80 overflow-y-auto space-y-1">
               {state.compilerLogs.length === 0 ? (
