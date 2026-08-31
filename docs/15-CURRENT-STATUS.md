@@ -4,7 +4,7 @@
 2026-08-31
 
 ## Current Phase
-Generation/Runtime Integration V1 (System Usage Tiers, Canonical Usage Matrix, Rule Liveness, Dead-Rule Detection, Active System Verification) complete. Generation contract, requirement coverage, depth evaluator, and success status UI verified. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
+Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Detection, Encounter Pacing, Failure Clarity) complete. Flow model, beat evaluation, deadlock checks, and failure clarity active. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
 ---
 
@@ -21,7 +21,9 @@ Generation/Runtime Integration V1 (System Usage Tiers, Canonical Usage Matrix, R
 | Generated Game Quality V3 (Real Output Improvement: Design Patterns, Composition Matrix, Palettes) (`GENERATION_OUTPUT_QUALITY_V3.md`) | COMPLETE |
 | Game Runtime Experience V1 (Visual Identity, Game Feel, VFX, Props, HUD) (`GAME_RUNTIME_EXPERIENCE_V1.md`) | COMPLETE |
 | Generation/Runtime Integration V1 (System Usage, Dead-Rule Detection, Active Loops) (`GENERATION_RUNTIME_INTEGRATION.md`) | COMPLETE |
+| Gameplay Experience V1 (Beats, Pacing, Deadlock Detection, Failure Clarity) (`GAMEPLAY_EXPERIENCE_V1.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
+
 
 
 

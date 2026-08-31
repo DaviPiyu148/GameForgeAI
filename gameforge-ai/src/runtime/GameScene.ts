@@ -948,7 +948,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.health <= 0) {
       this.ruleEngine.trigger('on_player_death', this.getGameContext(), { score: this.score });
-      this.triggerEndGame('LOST');
+      this.triggerEndGame('LOST', '✖ HEALTH DEPLETED ✖');
     }
   }
 
@@ -980,9 +980,10 @@ export class GameScene extends Phaser.Scene {
 
     if (this.health <= 0) {
       this.ruleEngine.trigger('on_player_death', this.getGameContext(), { score: this.score });
-      this.triggerEndGame('LOST');
+      this.triggerEndGame('LOST', '✖ OVERWHELMED BY ENEMY FIRE ✖');
     }
   }
+
 
   private handleHazardTouch(_p: any, hazObj: any): void {
     const now = this.time.now;

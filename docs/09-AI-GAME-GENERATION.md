@@ -60,6 +60,13 @@ STAGE 10: [SYS] BUILD COMPLETE (Persistence & 0x00_SYS_READY)
 - **Rule Liveness & Dead-Rule Validator**: Detects rules referencing un-emittable triggers or unsupported action handlers, applying penalties during quality evaluation.
 - **Active Gameplay Composition**: Reconnects co-existing metadata into active loops (vehicles for distant traversal, factions providing missions, threat escalating responses).
 
+## Gameplay Experience V1 (Rhythm, Deadlocks & Pacing)
+- **Gameplay Beat Model**: Action $\rightarrow$ Challenge $\rightarrow$ Feedback $\rightarrow$ Reward/Progress across 5 flow phases (Intro, Action, Variation, Escalation, Finale) (`gameplay_rhythm.py`).
+- **Deterministic Deadlock Detection**: Detects zero-target objectives, out-of-bounds exits, unreachable scoring conditions, and wave trigger viability.
+- **Failure Clarity & Recovery**: Discloses exact failure causes (`✖ HEALTH DEPLETED ✖`, `✖ OVERWHELMED BY ENEMY FIRE ✖`) and clears transient state cleanly.
+- **Quality Health & Pacing Scoring**: Rewards balanced encounter progression and penalizes gameplay deadlocks.
+
+
 
 ## GameDesignSpec
 Acts as an intermediate structured design layer between natural-language user concepts and executable Phaser Game DSL schemas:

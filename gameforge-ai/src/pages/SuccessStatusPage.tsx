@@ -61,6 +61,17 @@ export const SuccessStatusPage = () => {
     return Array.from(new Set(systems));
   }, [state.compilerLogs]);
 
+  // Extract core gameplay loop from logs
+  const gameplayLoop = useMemo(() => {
+    const logs = state.compilerLogs.length > 0 ? state.compilerLogs : [];
+    for (const line of logs) {
+      const match = line.match(/> Core loop:\s*(.+)/i);
+      if (match) return match[1].trim();
+    }
+    return null;
+  }, [state.compilerLogs]);
+
+
 
 
 
@@ -161,6 +172,12 @@ export const SuccessStatusPage = () => {
             <p className="font-body text-xs text-on-surface-variant max-w-lg">
               Deterministic structural and gameplay health indicator evaluating core loop, progression, variety, and runtime capability coverage.
             </p>
+            {gameplayLoop && (
+              <div className="text-[11px] font-mono text-primary/90 flex items-center gap-1.5 pt-0.5">
+                <span className="text-on-surface-variant uppercase font-bold text-[10px]">FLOW:</span>
+                <span>{gameplayLoop}</span>
+              </div>
+            )}
             {verifiedSystems.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {verifiedSystems.map((sys) => (
@@ -171,6 +188,7 @@ export const SuccessStatusPage = () => {
               </div>
             )}
           </div>
+
 
 
           <div className="flex items-center gap-4 shrink-0">

@@ -279,6 +279,25 @@ class GameDepthEvaluator:
             for r_id, r_reason in dead_rules:
                 warnings.append(f"Dead rule detected: rule '{r_id}' ({r_reason}).")
 
+        # Audit gameplay rhythm & deadlocks (Gameplay Experience V1)
+        from app.generation.gameplay_rhythm import GameplayRhythmManager
+        deadlock_res = GameplayRhythmManager.detect_deadlocks(dsl)
+        deadlock_penalty = 0.0
+        if not deadlock_res.is_valid:
+            deadlock_penalty = min(30.0, len(deadlock_res.deadlocks) * 15.0)
+            failure_codes.append(QualityFailureCode.GAMEPLAY_DEADLOCK_DETECTED)
+            for d in deadlock_res.deadlocks:
+                warnings.append(f"Gameplay deadlock: {d}")
+        if deadlock_res.warnings:
+            for dw in deadlock_res.warnings:
+                warnings.append(f"Pacing notice: {dw}")
+
+        beat_score, beats = GameplayRhythmManager.evaluate_gameplay_beats(dsl, scale)
+        if beat_score < 50.0:
+            failure_codes.append(QualityFailureCode.WEAK_GAMEPLAY_LOOP)
+            warnings.append("Weak gameplay rhythm: Missing core action, challenge, or reward beats.")
+
+
 
         # ─────────────────────────────────────────────────────────────────────
         # 6. Finale Quality Score (0 - 100)
@@ -308,9 +327,10 @@ class GameDepthEvaluator:
             (mechanic_coverage_score * WEIGHT_MECHANIC_COVERAGE) +
             (cross_system_score * WEIGHT_CROSS_SYSTEM) +
             (finale_score * WEIGHT_FINALE)
-        ) / 100.0) - dead_rule_penalty
+        ) / 100.0) - dead_rule_penalty - deadlock_penalty
 
         overall_score = int(math.floor(max(0.0, min(100.0, raw_score))))
+
 
 
         # Determine acceptability based on scale threshold
