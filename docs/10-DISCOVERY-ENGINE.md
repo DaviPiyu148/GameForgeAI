@@ -1,7 +1,10 @@
-# 10 — Discovery Engine 2.3 & Discovery Intelligence V1
+# 10 — Discovery Engine & Discovery Experience V2
 
-## Implementation Status (IMPLEMENTED — Discovery Intelligence V1)
+## Implementation Status (IMPLEMENTED — Discovery Experience V2)
 The Discovery Engine features hybrid semantic + lexical retrieval, deterministic rich intent parsing (moods, session lengths, combat/difficulty preferences, hard/soft negations), centralized ranking configuration (`ranking_config.py`), O(1) FAISS vector retrieval, multi-signal ranking with bounded Game DNA personalization, soft franchise diversity reranking, interactive discovery modes (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`), interactive feedback API (`POST /api/discovery/feedback`), grounded explanations, honest trade-offs, and clean English display normalization.
+
+Discovery Experience V2 elevates this with cold-start Game DNA onboarding (`POST /api/profile/preferences/onboard`), safe preferences reset (`POST /api/profile/preferences/reset`), multi-game side-by-side comparison (`POST /api/discovery/compare`), session-scoped tuning panel without database pollution, and interactive quick mood discovery.
+
 
 
 ## User-Facing English Display Normalization (Discovery 2.2)

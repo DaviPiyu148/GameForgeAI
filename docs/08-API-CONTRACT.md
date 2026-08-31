@@ -53,9 +53,13 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 - `GET /api/discovery/similar/{steam_app_id}` -> Retrieve similar games based on nearest neighbor vectors in FAISS.
 - `POST /api/discovery/more-like-this` -> Multi-seed recommendation blend.
 - `GET /api/discovery/build-inspiration/{steam_app_id}` -> Extract 2D prototype archetype, modules, and starter prompt.
+- `POST /api/discovery/compare` -> Compare 2-3 games side-by-side using catalog metadata. Returns `CompareGamesResponse` with `games`, `common_genres`, `common_tags`, `common_modes`, and `differentiating_tags`.
 
 - `GET /api/profile/progress` -> Server-authoritative XP/level/milestone status. Returns `200 OK` with `{ user_id, total_xp, current_level, creator_title, current_level_base_xp, next_level_xp, xp_into_level, xp_needed_for_next, progress_percentage, milestones: [{ milestone_key, title, description, icon, xp_bonus, is_unlocked, unlocked_at }], unlocked_milestone_count, total_milestone_count, recent_events: [{ id, event_type, xp_amount, source_reference, created_at }] }`.
-- `GET /api/profile/preferences` -> Behavioral genre-affinity distribution ("Game DNA") derived from search/save/build/play activity. Returns `200 OK` with `{ user_id, top_genres: [{ genre, score, percentage, interaction_count, affinity_tier }], total_interactions, strongest_match, recent_interest, confidence_level, summary_headline, has_sufficient_data }`.
+- `GET /api/profile/preferences` -> Behavioral genre-affinity distribution ("Game DNA") derived from search/save/build/play activity. Returns `200 OK` with `{ user_id, top_genres: [{ genre, score, percentage, interaction_count, affinity_tier }], total_interactions, strongest_match, recent_interest, avoidances, suggested_explorations, confidence_level, summary_headline, has_sufficient_data }`.
+- `POST /api/profile/preferences/onboard` -> Establish bounded initial Game DNA starter preferences (`genres`, `enjoyments`, `avoidances`). Returns updated `UserPreferencesResponse`.
+- `POST /api/profile/preferences/reset` -> Safely wipe Game DNA preference signals without deleting saves, projects, or progression XP. Returns `{ status, message, user_id }`.
+
 
 ---
 

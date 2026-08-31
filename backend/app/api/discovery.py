@@ -10,12 +10,15 @@ from app.dependencies import get_optional_user
 from app.models.user import User
 from app.schemas.discovery import (
     BuildInspirationResponse,
+    CompareGamesRequest,
+    CompareGamesResponse,
     DiscoveryFeedbackRequest,
     DiscoveryFeedbackResponse,
     DiscoverySearchRequest,
     DiscoverySearchResponse,
     MoreLikeThisRequest,
 )
+
 from app.services.discovery_service import DiscoveryService, discovery_service
 from app.services.preference_service import preference_service
 from app.services.progression_service import progression_service
@@ -149,6 +152,30 @@ async def more_like_this(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve more-like-this recommendations.",
         )
+
+
+@router.post(
+    "/compare",
+    response_model=CompareGamesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Compare 2-3 games side-by-side",
+    description="Fetches normalized metadata, genres, platforms, tags, and reviews for direct comparison.",
+)
+async def compare_games(
+    request: CompareGamesRequest,
+    service: DiscoveryService = Depends(get_discovery_service),
+) -> CompareGamesResponse:
+    """Compare 2-3 games side-by-side."""
+    try:
+        data = service.compare_games(request.game_ids)
+        return CompareGamesResponse(**data)
+    except Exception as e:
+        logger.error(f"Error in compare_games: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to compare selected games.",
+        )
+
 
 
 @router.get(

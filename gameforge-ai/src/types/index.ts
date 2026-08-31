@@ -108,10 +108,21 @@ export interface UserPreferencesData {
   total_interactions: number;
   strongest_match?: string | null;
   recent_interest?: string | null;
+  avoidances?: string[];
+  suggested_explorations?: string[];
   confidence_level?: 'LOW' | 'MODERATE' | 'HIGH';
   summary_headline?: string | null;
   has_sufficient_data: boolean;
 }
+
+export interface CompareGamesResponse {
+  games: GameDiscoveryItem[];
+  common_genres: string[];
+  common_tags: string[];
+  common_modes: string[];
+  differentiating_tags: string[];
+}
+
 
 export interface RegisterRequest {
   email: string;

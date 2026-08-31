@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
+import { discoveryService } from '../services/discovery';
 import type { GameProject } from '../types';
+
 
 export default function ProfilePage() {
   const {
@@ -597,8 +599,51 @@ export default function ProfilePage() {
                   ))}
                 </div>
 
+                {/* Avoidances and Suggestions */}
+                <div className="space-y-2 pt-2 border-t border-outline-variant/30">
+                  {preferencesData.avoidances && preferencesData.avoidances.length > 0 && (
+                    <div className="text-[11px] font-mono flex items-center gap-1.5 flex-wrap">
+                      <span className="text-on-surface-variant uppercase font-bold text-[10px]">Avoids:</span>
+                      {preferencesData.avoidances.map((a) => (
+                        <span key={a} className="px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px]">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {preferencesData.suggested_explorations && preferencesData.suggested_explorations.length > 0 && (
+                    <div className="text-[11px] font-mono flex items-center gap-1.5 flex-wrap">
+                      <span className="text-on-surface-variant uppercase font-bold text-[10px]">Explore:</span>
+                      {preferencesData.suggested_explorations.map((e) => (
+                        <span key={e} className="px-1.5 py-0.2 rounded bg-surface-container-highest border border-outline-variant/40 text-on-surface text-[10px]">
+                          {e}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Reset Game DNA Control */}
+                <div className="pt-2 flex justify-between items-center">
+                  <span className="text-[10px] font-mono text-on-surface-variant">
+                    Based on {preferencesData.total_interactions} interactions
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Reset your learned game preferences? Your saved games, projects, and progression will remain.')) {
+                        await discoveryService.resetPreferences();
+                        await refreshPreferences();
+                      }
+                    }}
+                    className="text-[10px] font-mono text-secondary hover:text-white uppercase font-bold cursor-pointer"
+                  >
+                    Reset Game DNA
+                  </button>
+                </div>
+
                 {/* Explanatory "How this works" footer */}
-                <div className="pt-3 border-t border-outline-variant/30 flex items-start gap-2 text-[11px] font-mono text-on-surface-variant leading-relaxed">
+                <div className="pt-2 border-t border-outline-variant/30 flex items-start gap-2 text-[11px] font-mono text-on-surface-variant leading-relaxed">
                   <span className="material-symbols-outlined text-sm text-primary shrink-0 mt-0.5">info</span>
                   <p>
                     GameForge learns from the games you search, save, build, and play to tailor future prototype recommendations.
@@ -606,6 +651,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+
           </div>
 
           {/* Saved Discoveries Section */}

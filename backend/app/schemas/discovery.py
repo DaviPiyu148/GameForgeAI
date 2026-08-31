@@ -133,6 +133,32 @@ class MoreLikeThisRequest(BaseModel):
         return self.game_ids or self.seed_game_ids or []
 
 
+class CompareGamesRequest(BaseModel):
+    """Request payload for comparing 2-3 games side-by-side."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    game_ids: List[str] = Field(
+        ...,
+        min_length=2,
+        max_length=3,
+        description="2 to 3 game IDs to compare side-by-side",
+    )
+
+
+class CompareGamesResponse(BaseModel):
+    """Response payload with normalized game items for comparison."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    games: List["GameDiscoveryItem"] = Field(default_factory=list)
+    common_genres: List[str] = Field(default_factory=list)
+    common_tags: List[str] = Field(default_factory=list)
+    common_modes: List[str] = Field(default_factory=list)
+    differentiating_tags: List[str] = Field(default_factory=list)
+
+
+
 class GameEnrichment(BaseModel):
     """Optional IGDB enrichment metadata for a game."""
 

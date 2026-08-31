@@ -242,16 +242,116 @@ class PreferenceService:
             strongest = f"{top_genre} Explorer"
             headline = f"{top_genre} Focus"
 
+        # Determine explicit avoidances (genres with zero or explicitly suppressed scores)
+        all_canonical = set(CANONICAL_GENRES)
+        user_genres = {p.genre for p in prefs if p.score > 1.0}
+        suppressed_genres = [p.genre for p in prefs if p.score == 0.0 and p.interaction_count > 1]
+        avoidances = suppressed_genres or [g for g in ["Horror", "Sports", "Racing"] if g not in user_genres][:2]
+
+        # Suggested exploratory genres (canonical genres with high community overlap but low personal score)
+        suggested = [g for g in CANONICAL_GENRES if g not in user_genres and g not in avoidances][:3]
+
         return UserPreferencesResponse(
             user_id=user_id,
             top_genres=items[:6],  # Top 6 ranked genres
             total_interactions=total_interactions,
             strongest_match=strongest,
             recent_interest=recent_genre,
+            avoidances=avoidances,
+            suggested_explorations=suggested,
             confidence_level=confidence,
             summary_headline=headline,
             has_sufficient_data=True,
         )
+
+    @classmethod
+    def reset_preferences(cls, db: Session, user_id: str) -> None:
+        """
+        Safely reset Game DNA preference records for a user.
+        Does NOT delete saved discoveries, projects, build history, or progression XP.
+        """
+        db.query(UserGenrePreference).filter(UserGenrePreference.user_id == user_id).delete()
+        db.commit()
+        logger.info("Reset Game DNA preference signals for user %s", user_id)
+
+    @classmethod
+    def onboard_preferences(
+        cls,
+        db: Session,
+        user_id: str,
+        genres: List[str],
+        enjoyments: List[str],
+        avoidances: List[str],
+    ) -> UserPreferencesResponse:
+        """
+        Initializes bounded preference signals for cold-start users from onboarding choices.
+        Does not over-weight initial setup so subsequent gameplay easily shapes Game DNA.
+        """
+        now = datetime.now(timezone.utc)
+
+        # 1. Clear any prior onboarding records to ensure clean state
+        db.query(UserGenrePreference).filter(UserGenrePreference.user_id == user_id).delete()
+
+        # 2. Record positive genres with balanced starter weight (3.0 each)
+        for g in genres:
+            canonical_set = cls.map_to_canonical_genres([g])
+            for c_genre in canonical_set:
+                pref = UserGenrePreference(
+                    user_id=user_id,
+                    genre=c_genre,
+                    score=3.0,
+                    interaction_count=1,
+                    last_interaction_at=now,
+                )
+                db.add(pref)
+
+        # 3. Record enjoyment mechanics as secondary boosts (1.5 each)
+        for e in enjoyments:
+            canonical_set = cls.map_to_canonical_genres([e])
+            for c_genre in canonical_set:
+                existing = (
+                    db.query(UserGenrePreference)
+                    .filter(UserGenrePreference.user_id == user_id, UserGenrePreference.genre == c_genre)
+                    .first()
+                )
+                if existing:
+                    existing.score += 1.5
+                else:
+                    pref = UserGenrePreference(
+                        user_id=user_id,
+                        genre=c_genre,
+                        score=1.5,
+                        interaction_count=1,
+                        last_interaction_at=now,
+                    )
+                    db.add(pref)
+
+        # 4. Record avoidances with 0.0 score and interaction_count=2 to mark as explicitly avoided
+        for a in avoidances:
+            canonical_set = cls.map_to_canonical_genres([a])
+            for c_genre in canonical_set:
+                existing = (
+                    db.query(UserGenrePreference)
+                    .filter(UserGenrePreference.user_id == user_id, UserGenrePreference.genre == c_genre)
+                    .first()
+                )
+                if existing:
+                    existing.score = 0.0
+                    existing.interaction_count += 2
+                else:
+                    pref = UserGenrePreference(
+                        user_id=user_id,
+                        genre=c_genre,
+                        score=0.0,
+                        interaction_count=2,
+                        last_interaction_at=now,
+                    )
+                    db.add(pref)
+
+        db.commit()
+        logger.info("Onboarded starter preferences for user %s", user_id)
+        return cls.get_preferences(db, user_id)
+
 
     @classmethod
     def get_generation_context(cls, db: Session, user_id: Optional[str]) -> Optional[Dict[str, Any]]:

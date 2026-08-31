@@ -496,5 +496,66 @@ class DiscoveryService:
         except Exception:
             return None
 
+    def compare_games(self, game_ids: List[str]) -> Dict[str, Any]:
+        """Compare 2-3 games side-by-side using normalized catalog metadata."""
+        from app.schemas.discovery import GameDiscoveryItem
+
+        games_meta: List[GameDiscoveryItem] = []
+        for gid in game_ids[:3]:
+            g = self.get_game_by_steam_id(gid)
+            if g:
+                # Format to GameDiscoveryItem
+                item = GameDiscoveryItem(
+
+                    id=str(g.get("id")),
+                    external_id=str(g.get("id")),
+                    source=g.get("source", "steam"),
+                    title=g.get("title", ""),
+                    display_title=g.get("title", ""),
+                    description=g.get("description", ""),
+                    genres=g.get("genres", []),
+                    tags=g.get("tags", []),
+                    player_modes=g.get("player_modes", []),
+                    platforms=g.get("platforms", []),
+                    release_year=g.get("release_year", 0),
+                    is_free=g.get("is_free", False),
+                    total_reviews=g.get("total_reviews", 0),
+                    positive_percent=g.get("positive_percent", 0.0),
+                    review_score_desc=g.get("review_score_desc", ""),
+                )
+                games_meta.append(item)
+
+
+        if not games_meta:
+            return {
+                "games": [],
+                "common_genres": [],
+                "common_tags": [],
+                "common_modes": [],
+                "differentiating_tags": [],
+            }
+
+        # Calculate common sets
+        genre_sets = [set(g.genres) for g in games_meta]
+        tag_sets = [set(g.tags) for g in games_meta]
+        mode_sets = [set(g.player_modes) for g in games_meta]
+
+        common_genres = list(set.intersection(*genre_sets)) if genre_sets else []
+        common_tags = list(set.intersection(*tag_sets))[:5] if tag_sets else []
+        common_modes = list(set.intersection(*mode_sets)) if mode_sets else []
+
+        # Find differentiating tags
+        all_tags = [t for g in games_meta for t in g.tags]
+        differentiating_tags = list({t for t in all_tags if t not in common_tags})[:8]
+
+        return {
+            "games": games_meta,
+            "common_genres": common_genres,
+            "common_tags": common_tags,
+            "common_modes": common_modes,
+            "differentiating_tags": differentiating_tags,
+        }
+
+
 
 discovery_service = DiscoveryService()

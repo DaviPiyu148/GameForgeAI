@@ -56,12 +56,29 @@ class UserPreferencesResponse(BaseModel):
     total_interactions: int = Field(default=0, ge=0)
     strongest_match: Optional[str] = None
     recent_interest: Optional[str] = None
+    avoidances: List[str] = Field(default_factory=list)
+    suggested_explorations: List[str] = Field(default_factory=list)
     confidence_level: str = Field(default="LOW")  # "LOW", "MODERATE", "HIGH"
     summary_headline: Optional[str] = None
     has_sufficient_data: bool = False
+
+
+class OnboardingPreferencesRequest(BaseModel):
+    """Payload for onboarding a new user's game preferences."""
+    genres: List[str] = Field(default_factory=list, max_length=15)
+    enjoyments: List[str] = Field(default_factory=list, max_length=15)
+    avoidances: List[str] = Field(default_factory=list, max_length=15)
+
+
+class ResetPreferencesResponse(BaseModel):
+    """Response returned upon resetting Game DNA preferences."""
+    status: str = "success"
+    message: str
+    user_id: str
 
 
 class AvatarUploadResponse(BaseModel):
     """Response returned upon successful profile avatar upload or deletion."""
     avatar_url: Optional[str] = None
     message: str
+

@@ -72,5 +72,37 @@ export const discoveryService = {
   ): Promise<BuildInspirationResponse> {
     return await apiClient.get<BuildInspirationResponse>(`/discovery/build-inspiration/${encodeURIComponent(steamAppId)}`);
   },
+
+  /**
+   * Compare 2-3 games side-by-side using catalog metadata.
+   */
+  async compareGames(gameIds: string[]): Promise<any> {
+    return await apiClient.post('/discovery/compare', {
+      game_ids: gameIds,
+    });
+  },
+
+  /**
+   * Establish initial Game DNA onboarding choices.
+   */
+  async onboardPreferences(
+    genres: string[],
+    enjoyments: string[],
+    avoidances: string[]
+  ): Promise<any> {
+    return await apiClient.post('/profile/preferences/onboard', {
+      genres,
+      enjoyments,
+      avoidances,
+    });
+  },
+
+  /**
+   * Safely reset Game DNA preference records without deleting projects, saves, or progression.
+   */
+  async resetPreferences(): Promise<any> {
+    return await apiClient.post('/profile/preferences/reset', {});
+  },
 };
+
 

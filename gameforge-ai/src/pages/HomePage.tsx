@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { discoveryService } from '../services/discovery';
 import { GameDetailsModal } from '../components/Shared/GameDetailsModal';
+import { TuneRecommendationsModal } from '../components/Shared/TuneRecommendationsModal';
+import { GameComparisonModal } from '../components/Shared/GameComparisonModal';
+import { GameDNAOnboardingModal } from '../components/Shared/GameDNAOnboardingModal';
 import type { DiscoverySearchResult } from '../types';
+
 
 const INITIAL_VISIBLE_RESULTS = 12;
 
@@ -18,6 +22,11 @@ const HomePage = () => {
   const [failedCardImages, setFailedCardImages] = useState<Record<string, boolean>>({});
   const [activeMode, setActiveMode] = useState<DiscoveryMode>('BEST_MATCH');
   const [feedbackGiven, setFeedbackGiven] = useState<Record<string, string>>({});
+  const [comparedGameIds, setComparedGameIds] = useState<string[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [isTuneModalOpen, setIsTuneModalOpen] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+
 
   const navigate = useNavigate();
   const {
@@ -256,8 +265,47 @@ const HomePage = () => {
           >
             <span>&gt; Space exploration no pvp</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setIsOnboardingModalOpen(true)}
+            className="bg-primary/20 border border-primary text-primary-bright font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/30 hover:shadow-[0_0_12px_rgba(76,224,210,0.4)] transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold"
+          >
+            <span className="material-symbols-outlined text-xs">dna</span>
+            <span>Build Game DNA</span>
+          </button>
         </section>
       )}
+
+      {/* Quick Mood & Discovery Explorer Bar */}
+      {!hasResults && !state.isSearching && (
+        <section className="w-full max-w-3xl mx-auto mb-12 text-center space-y-3 stagger-enter stagger-3">
+          <div className="flex items-center justify-center gap-2 text-xs font-mono text-on-surface-variant uppercase tracking-wider font-bold">
+            <span className="material-symbols-outlined text-primary text-sm">bolt</span>
+            <span>QUICK MOOD DISCOVERY</span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { label: 'Relax & Chill', prompt: 'relaxing cozy simulation no combat' },
+              { label: 'High Intensity', prompt: 'fast paced action adrenaline bullet hell' },
+              { label: 'Deep Exploration', prompt: 'atmospheric exploration discovery open world' },
+              { label: 'Rich Story', prompt: 'narrative rich atmospheric deep lore rpg' },
+              { label: 'Tactical Mind', prompt: 'tactical turn-based strategy puzzle thinking' },
+              { label: 'Surprise Me 🎲', prompt: 'innovative hidden gem experimental indie' },
+            ].map((m) => (
+              <button
+                key={m.label}
+                type="button"
+                onClick={() => handleChipClick(m.prompt)}
+                className="px-3 py-1 bg-surface-container-highest/40 hover:bg-surface-container-highest border border-outline-variant/50 hover:border-primary/50 text-on-surface hover:text-white font-mono text-xs rounded transition-colors cursor-pointer"
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
 
       {/* 4. Live Searching State */}
       {state.isSearching && (
@@ -304,6 +352,26 @@ const HomePage = () => {
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 type="button"
+                onClick={() => setIsTuneModalOpen(true)}
+                className="px-3.5 py-2 border border-primary/60 bg-primary/10 hover:bg-primary/20 text-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(76,224,210,0.2)]"
+              >
+                <span className="material-symbols-outlined text-sm">tune</span>
+                <span>Tune</span>
+              </button>
+
+              {comparedGameIds.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCompareModalOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-primary to-primary-bright text-on-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(76,224,210,0.4)] animate-bounce"
+                >
+                  <span className="material-symbols-outlined text-sm">compare_arrows</span>
+                  <span>Compare ({comparedGameIds.length})</span>
+                </button>
+              )}
+
+              <button
+                type="button"
                 onClick={() => navigate('/build')}
                 className="px-4 py-2 bg-secondary text-on-secondary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-magenta flex items-center gap-2 cursor-pointer"
               >
@@ -320,6 +388,7 @@ const HomePage = () => {
               </button>
             </div>
           </div>
+
 
           {/* Quick Interactive Refinement Chips */}
           <div className="flex items-center gap-2 flex-wrap pb-2">
@@ -525,9 +594,33 @@ const HomePage = () => {
                       </button>
                     </div>
 
-                    {/* Feedback row: Like, Dislike, Less Like This */}
+                    {/* Feedback row: Compare, Like, Dislike, Less Like This */}
                     <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1">
-                      <span className="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Tune:</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          id={`compare-${gameKey}`}
+                          checked={comparedGameIds.includes(result.game.external_id || result.game.id)}
+                          onChange={() => {
+                            const gid = result.game.external_id || result.game.id;
+                            setComparedGameIds((prev) =>
+                              prev.includes(gid)
+                                ? prev.filter((id) => id !== gid)
+                                : prev.length < 3
+                                ? [...prev, gid]
+                                : prev
+                            );
+                          }}
+                          className="w-3 h-3 accent-primary cursor-pointer"
+                        />
+                        <label
+                          htmlFor={`compare-${gameKey}`}
+                          className="text-[9px] uppercase tracking-wider text-on-surface-variant/90 cursor-pointer select-none"
+                        >
+                          Compare
+                        </label>
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -552,6 +645,7 @@ const HomePage = () => {
                           <span className="material-symbols-outlined text-xs">thumb_down</span>
                           <span>Dislike</span>
                         </button>
+
 
                         <button
                           type="button"
@@ -659,7 +753,49 @@ const HomePage = () => {
           }
         />
       )}
+
+      {/* 8. Tune Recommendations Modal */}
+
+      <TuneRecommendationsModal
+        isOpen={isTuneModalOpen}
+        onClose={() => setIsTuneModalOpen(false)}
+        sessionContext={state.discoverySession || {}}
+        onApply={(newContext) => {
+          setState((s) => ({ ...s, discoverySession: newContext }));
+          if (promptText.trim()) {
+            searchDiscovery(promptText, navigate, activeMode, newContext);
+          }
+        }}
+        onReset={() => {
+          setState((s) => ({ ...s, discoverySession: {} }));
+          if (promptText.trim()) {
+            searchDiscovery(promptText, navigate, activeMode, {});
+          }
+        }}
+      />
+
+      {/* 9. Side-by-Side Game Comparison Modal */}
+      <GameComparisonModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        selectedGameIds={comparedGameIds}
+        onRemoveGame={(id) => {
+          setComparedGameIds((prev) => prev.filter((gid) => gid !== id));
+        }}
+      />
+
+      {/* 10. Cold-Start Game DNA Onboarding Modal */}
+      <GameDNAOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        onCompleted={() => {
+          if (promptText.trim()) {
+            searchDiscovery(promptText, navigate, activeMode);
+          }
+        }}
+      />
     </div>
+
   );
 };
 

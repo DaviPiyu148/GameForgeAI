@@ -22,7 +22,9 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Game Runtime Experience V1 (Visual Identity, Game Feel, VFX, Props, HUD) (`GAME_RUNTIME_EXPERIENCE_V1.md`) | COMPLETE |
 | Generation/Runtime Integration V1 (System Usage, Dead-Rule Detection, Active Loops) (`GENERATION_RUNTIME_INTEGRATION.md`) | COMPLETE |
 | Gameplay Experience V1 (Beats, Pacing, Deadlock Detection, Failure Clarity) (`GAMEPLAY_EXPERIENCE_V1.md`) | COMPLETE |
+| Discovery Experience V2 (Game DNA Onboarding, Reset, Comparison, Tuning, Mood Explorer) (`DISCOVERY_EXPERIENCE_V2.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
+
 
 
 
