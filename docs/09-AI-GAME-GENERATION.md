@@ -47,8 +47,16 @@ STAGE 10: [SYS] BUILD COMPLETE (Persistence & 0x00_SYS_READY)
 - **Encounter Variety & Distinct Finales**: Mandates behavior mixing (`patrol`, `chase`, `ranged_attack`, `guard`) and boss encounters on final levels.
 - **Thematic Visual Palettes**: Deterministically binds world backgrounds, player colors, and accents to prompt themes rather than defaulting to generic neon dark styles.
 
+## Game Runtime Experience V1 (Visual Identity, Game Feel & Environment)
+- **Centralized Visual Profile**: Single authoritative profile mapping theme, level, and archetype into distinct visual parameters (`visualProfile.ts`).
+- **Procedural Texture Generation**: Vector silhouettes cached in Phaser TextureManager across roles (Knight, Operative, Starship, Crawler, Runner; Basic, Fast, Ranged, Heavy, Elite, Boss) (`proceduralTextures.ts`).
+- **Thematic Environments & Backgrounds**: 8 procedural background modes (`CITY`, `RUINS`, `SPACE`, `DESERT`, etc.), non-colliding props scaled by `artDensity`, landmarks, and 2-layer subtle parallax (`environmentSystem.ts`).
+- **Combat Feel & Kinetic Feedback**: Muzzle flashes, hit flashes, micro-sparks, dash ghost trails, collectible halo bursts, and tiered camera rumble (`vfxSystem.ts`).
+- **Thematic HUD**: Contextual border styles, palette matching, and priority information hierarchy (`GameScene.ts`).
+
 ## GameDesignSpec
 Acts as an intermediate structured design layer between natural-language user concepts and executable Phaser Game DSL schemas:
+
 
 - `title`, `elevator_pitch`, `genre`, `subgenre`, `theme`, `visual_style`, `camera`, `core_gameplay_loop`, `player_role`, `primary_objective`, `secondary_objectives`, `player_abilities`, `enemy_archetypes`, `hazards`, `collectibles`, `progression`, `difficulty_curve`, `win_conditions`, `loss_conditions`, `level_structure`, `estimated_session_length`, `selected_modules`, `rationale`.
 

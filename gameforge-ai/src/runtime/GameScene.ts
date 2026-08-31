@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
 import type { ActorDef, EntityDef, GameDSL, GameState, LevelDef, PlaytestSummary, POIDef, RegionDef, ThreatResponseUnitDef } from './types';
 import { generateProceduralTextures } from './textures';
+import { resolveVisualProfile, type RuntimeVisualProfile } from './visualProfile';
+import { generateDynamicTextures } from './proceduralTextures';
+
+import { EnvironmentSystem } from './environmentSystem';
+import { VFXSystem } from './vfxSystem';
 import { RuleEngine } from './rules';
 import { generateProceduralLayout } from './procedural';
 import { TelemetryTracker } from './telemetry';
@@ -12,6 +17,7 @@ import { ActivityManager } from './ActivityManager';
 import { FactionManager } from './FactionManager';
 import { ThreatManager } from './ThreatManager';
 import { WorldEventManager } from './WorldEventManager';
+
 
 export interface GameSceneData {
   dsl: GameDSL;
@@ -104,9 +110,16 @@ export class GameScene extends Phaser.Scene {
   private bossHealthBarFill?: Phaser.GameObjects.Rectangle;
   private bossLabelText?: Phaser.GameObjects.Text;
 
+  // Visual Experience Systems (Runtime Experience V1)
+  private visualProfile!: RuntimeVisualProfile;
+  private environmentSystem!: EnvironmentSystem;
+  private vfxSystem!: VFXSystem;
+
   constructor() {
     super({ key: 'GameScene' });
   }
+
+
 
   public init(data: GameSceneData): void {
     this.dsl = data.dsl;
@@ -142,16 +155,22 @@ export class GameScene extends Phaser.Scene {
     const worldH = this.dsl.world.height;
     const isPlatformer = this.dsl.metadata.archetype === 'platformer';
 
-    // 1. Textures & Bounds
+    // 1. Textures & Visual Systems Initialization
+    const activeLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
+    this.visualProfile = resolveVisualProfile(this.dsl, activeLevel);
     generateProceduralTextures(this);
+    generateDynamicTextures(this, this.visualProfile);
+
+    this.vfxSystem = new VFXSystem(this, this.visualProfile);
+    this.environmentSystem = new EnvironmentSystem(this, this.visualProfile, this.seed);
+
     this.physics.world.setBounds(0, 0, worldW, worldH);
     this.cameras.main.setBounds(0, 0, worldW, worldH);
 
-    // Background (this rectangle is re-tinted per level by applyLevelConfig; do not
-    // create a second background object elsewhere, or level transitions will drift).
-    const bgCol = Phaser.Display.Color.HexStringToColor(this.dsl.world.background_color || '#0a0b10').color;
+    // Background (re-tinted per level by applyLevelConfig)
+    const bgCol = this.visualProfile.palette.backgroundTint;
     this.backgroundRect = this.add.rectangle(worldW / 2, worldH / 2, worldW, worldH, bgCol);
-    this.createGridOverlay(worldW, worldH);
+    this.environmentSystem.buildEnvironment(worldW, worldH);
 
     // 2. Physics Groups
     this.platformsGroup = this.physics.add.staticGroup();
@@ -164,16 +183,15 @@ export class GameScene extends Phaser.Scene {
     this.actorsGroup = this.physics.add.group();
 
     // 3. Player Spawn (Respects the active level's spawn if multi-stage)
-    const activeLevel: LevelDef | null = this.dsl.levels?.[this.currentLevelIndex] ?? null;
     const initialSpawnX = activeLevel?.spawn_x ?? this.dsl.player.spawn_x ?? 400;
     const initialSpawnY = activeLevel?.spawn_y ?? this.dsl.player.spawn_y ?? 300;
 
-    this.player = this.physics.add.sprite(initialSpawnX, initialSpawnY, 'tex_player');
-    this.player.setDisplaySize(this.dsl.player.width, this.dsl.player.height);
+    const playerTexKey = `tex_player_${this.visualProfile.player.silhouette}_${this.visualProfile.themeKey}`;
+    this.player = this.physics.add.sprite(initialSpawnX, initialSpawnY, this.textures.exists(playerTexKey) ? playerTexKey : 'tex_player');
+    this.player.setDisplaySize(this.dsl.player.width || 32, this.dsl.player.height || 32);
     this.player.setCollideWorldBounds(true);
-    if (this.dsl.player.color) {
-      this.player.setTint(Phaser.Display.Color.HexStringToColor(this.dsl.player.color).color);
-    }
+    this.vfxSystem.addIdleAnimation(this.player, 0.8);
+
     this.playSpawnInTween(this.player);
 
     if (isPlatformer) {
@@ -532,7 +550,20 @@ export class GameScene extends Phaser.Scene {
           });
         }
       } else if (ent.type === 'enemy') {
-        const enemy = this.enemiesGroup.create(ent.x, ent.y, 'tex_enemy') as Phaser.Physics.Arcade.Sprite;
+        const isBoss = !!ent.is_boss;
+        let role = 'basic';
+        if (isBoss) role = 'boss';
+        else if (ent.behavior === 'ranged_attack') role = 'ranged';
+        else if (ent.behavior === 'chase' && (ent.speed || 100) > 150) role = 'fast';
+        else if ((ent.health || 30) >= 70) role = 'heavy';
+
+        const enemyTexKey = `tex_enemy_${role}_${this.visualProfile?.themeKey ?? 'neutral'}`;
+        const enemy = this.enemiesGroup.create(
+          ent.x,
+          ent.y,
+          this.textures.exists(enemyTexKey) ? enemyTexKey : 'tex_enemy'
+        ) as Phaser.Physics.Arcade.Sprite;
+
         enemy.setDisplaySize(ent.width, ent.height);
         enemy.setData('id', ent.id);
         enemy.setData('speed', ent.speed || 100);
@@ -542,12 +573,11 @@ export class GameScene extends Phaser.Scene {
         enemy.setData('behavior', ent.behavior || 'patrol');
         enemy.setData('loot_drop', ent.loot_drop || null);
         enemy.setData('originX', ent.x);
-        enemy.setData('is_boss', ent.is_boss || false);
+        enemy.setData('is_boss', isBoss);
         enemy.setCollideWorldBounds(true);
-        if (ent.color) {
-          enemy.setTint(Phaser.Display.Color.HexStringToColor(ent.color).color);
-        }
+
         this.playSpawnInTween(enemy);
+        this.vfxSystem?.addIdleAnimation(enemy, isBoss ? 1.5 : 0.6);
 
         // Register entity with centralized behavior system
         this.behaviorSystem.registerEntity(enemy, ent);
@@ -559,6 +589,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+
   /**
    * Single source of truth for "apply a level": background/theme, player spawn,
    * entity population, and HUD objective/level text. Used identically by create()
@@ -566,15 +597,18 @@ export class GameScene extends Phaser.Scene {
    * so the two code paths cannot drift out of sync.
    */
   private applyLevelConfig(level: LevelDef | null): void {
-    // Background / theme (re-tints the single persistent background rectangle;
-    // full theme-driven palette swapping is out of scope for this phase).
-    const bgColorHex = level?.world?.background_color || this.dsl.world.background_color || '#0a0b10';
+    // Re-derive visual profile per level theme to support multi-theme campaigns
+    this.visualProfile = resolveVisualProfile(this.dsl, level);
+    generateDynamicTextures(this, this.visualProfile);
+
+    const bgColorHex = level?.world?.background_color || this.visualProfile.palette.background;
     if (this.backgroundRect) {
       this.backgroundRect.setFillStyle(Phaser.Display.Color.HexStringToColor(bgColorHex).color);
     }
-    if (level?.theme) {
-      console.debug(`[GameScene] Level ${level.level_number} theme: ${level.theme}`);
-    }
+    this.environmentSystem?.destroy();
+    this.environmentSystem = new EnvironmentSystem(this, this.visualProfile, this.seed + (level?.level_number || 1));
+    this.environmentSystem.buildEnvironment(this.dsl.world.width, this.dsl.world.height);
+
 
     // Player spawn
     const spawnX = level?.spawn_x ?? this.dsl.player.spawn_x ?? this.dsl.world.width / 2;
@@ -667,9 +701,13 @@ export class GameScene extends Phaser.Scene {
       this.ruleEngine.trigger('on_time_limit', this.getGameContext(), { time: currentSec });
     }
 
+    // Update parallax layer on camera movement
+    this.environmentSystem?.updateParallax(this.cameras.main.scrollX, this.cameras.main.scrollY);
+
     const isPlatformer = this.dsl.metadata.archetype === 'platformer';
     let vx = 0;
     let vy = 0;
+
 
     const leftDown = !!(this.cursors?.left?.isDown || this.wasdKeys?.A?.isDown);
     const rightDown = !!(this.cursors?.right?.isDown || this.wasdKeys?.D?.isDown);
@@ -780,10 +818,12 @@ export class GameScene extends Phaser.Scene {
         this.stamina -= 30;
         currentSpd = this.dsl.player.dash_speed || 600;
         this.cameras.main.shake(80, 0.004);
+        this.vfxSystem?.triggerDashGhost(this.player);
         this.spawnDashParticles(this.player.x, this.player.y);
         this.telemetry.record('OBJECTIVE_COMPLETED', { action: 'dash' });
         this.ruleEngine.trigger('on_dash', this.getGameContext(), { speed: currentSpd });
       }
+
 
       if (isPlatformer) {
         if (upDown && (this.player.body as Phaser.Physics.Arcade.Body).touching.down) {
@@ -830,13 +870,20 @@ export class GameScene extends Phaser.Scene {
     const targetY = ptr.worldY || this.player.y;
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, targetX, targetY);
 
-    const bullet = this.bulletsGroup.get(this.player.x, this.player.y) as Phaser.Physics.Arcade.Sprite;
+    this.vfxSystem?.triggerMuzzleFlash(this.player.x, this.player.y, angle);
+
+    const bulletTex = `tex_bullet_${this.visualProfile?.themeKey ?? 'neutral'}`;
+    const bullet = this.bulletsGroup.get(
+      this.player.x,
+      this.player.y,
+      this.textures.exists(bulletTex) ? bulletTex : 'tex_bullet'
+    ) as Phaser.Physics.Arcade.Sprite;
+
     if (bullet) {
       bullet.setActive(true);
       bullet.setVisible(true);
-      bullet.setDisplaySize(10, 10);
-      const weaponColHex = this.dsl.player.weapon_color || '#ffea00';
-      bullet.setTint(Phaser.Display.Color.HexStringToColor(weaponColHex).color);
+      bullet.setDisplaySize(10, 16);
+      bullet.setRotation(angle + Math.PI / 2);
       bullet.setVelocity(Math.cos(angle) * 500, Math.sin(angle) * 500);
 
       this.time.delayedCall(1500, () => {
@@ -844,6 +891,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
   }
+
 
   private handleCollect(_p: any, colObj: any): void {
     const col = colObj as Phaser.Physics.Arcade.Sprite;
@@ -855,12 +903,14 @@ export class GameScene extends Phaser.Scene {
     this.telemetry.record('SCORE_CHANGED', { score: this.score });
 
     // Rule triggers
+    this.vfxSystem?.triggerPickupFeedback(col.x, col.y);
     this.ruleEngine.trigger('on_collect', this.getGameContext(), { amount: pts, id: entId });
     if (entId === 'goal_flag' || entId.includes('goal')) {
       this.ruleEngine.trigger('on_reach_goal', this.getGameContext(), { goal_id: entId });
     }
 
     col.destroy();
+
 
     // Check stage progression / win condition
     if (this.enemiesGroup.countActive() === 0 && this.collectiblesGroup.countActive() === 0) {
@@ -974,6 +1024,8 @@ export class GameScene extends Phaser.Scene {
     enemy.setData('health', hp);
     this.spawnFloatingText(enemy.x, enemy.y, `-${attackDmg}`, '#ffea00');
 
+    this.vfxSystem?.triggerHitFeedback(enemy, !!enemy.getData('is_boss'));
+
     // Boss phase-2 threshold: single deterministic, health-based behavior bump,
     // guarded to trigger at most once per boss (see EntityBehaviorSystem.triggerBossPhase2).
     if (hp > 0 && enemy.getData('is_boss')) {
@@ -995,6 +1047,7 @@ export class GameScene extends Phaser.Scene {
       this.telemetry.record('ENEMY_DEFEATED', { damageDealt: attackDmg });
       this.score += 100;
       this.telemetry.record('SCORE_CHANGED', { score: this.score });
+
 
       // Trigger enemy defeat rule
       this.ruleEngine.trigger('on_enemy_defeat', this.getGameContext(), { enemy_id: enemy.getData('id') });
@@ -1183,27 +1236,33 @@ export class GameScene extends Phaser.Scene {
     this.hpLabel.setVisible(showHealth);
 
     // Stamina Bar
-    this.staminaBarFill = this.add.rectangle(70, 24, 120, 6, 0x00f0ff).setOrigin(0, 0.5);
+    const stamCol = Phaser.Display.Color.HexStringToColor(this.visualProfile?.palette.accent ?? '#00f0ff').color;
+    this.staminaBarFill = this.add.rectangle(70, 24, 120, 6, stamCol).setOrigin(0, 0.5);
     this.staminaBarFill.setVisible(showStamina);
 
     // Score & Stage/Wave Text
-    this.scoreText = this.add.text(0, 36, `SCORE: 0`, { fontSize: '13px', color: '#ffea00', fontFamily: 'monospace', fontStyle: 'bold' });
+    const scoreCol = this.visualProfile?.palette.accent ?? '#ffea00';
+    const primaryCol = this.visualProfile?.palette.primary ?? '#00f0ff';
+    const font = this.visualProfile?.hud.fontFamily ?? 'monospace';
+
+    this.scoreText = this.add.text(0, 36, `SCORE: 0`, { fontSize: '13px', color: scoreCol, fontFamily: font, fontStyle: 'bold' });
     this.scoreText.setVisible(showScore);
 
     let nextY = 54;
     if (this.totalLevels > 1) {
-      this.stageText = this.add.text(0, nextY, `LEVEL: 1/${this.totalLevels}`, { fontSize: '12px', color: '#ff00ff', fontFamily: 'monospace', fontStyle: 'bold' });
+      this.stageText = this.add.text(0, nextY, `LEVEL: 1/${this.totalLevels}`, { fontSize: '12px', color: primaryCol, fontFamily: font, fontStyle: 'bold' });
       nextY += 16;
     }
 
-    this.waveText = this.add.text(0, nextY, `WAVE: 1/${this.maxWaves}`, { fontSize: '12px', color: '#00f0ff', fontFamily: 'monospace' });
+    this.waveText = this.add.text(0, nextY, `WAVE: 1/${this.maxWaves}`, { fontSize: '12px', color: primaryCol, fontFamily: font });
     this.waveText.setVisible(showWave);
     nextY += 16;
 
     // Objective / Status Text
     const primaryGoal = this.dsl.design_spec?.primary_objective || ui?.status_text || 'PLAY PROTOTYPE';
-    this.objectiveText = this.add.text(0, nextY, `GOAL: ${primaryGoal}`, { fontSize: '11px', color: '#a0aec0', fontFamily: 'monospace' });
+    this.objectiveText = this.add.text(0, nextY, `GOAL: ${primaryGoal}`, { fontSize: '11px', color: this.visualProfile?.palette.text ?? '#a0aec0', fontFamily: font });
     this.objectiveText.setVisible(showObjectives);
+
 
     // Status Banner
     this.bannerText = this.add.text(
@@ -1313,18 +1372,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private createGridOverlay(w: number, h: number): void {
-    const graphics = this.add.graphics();
-    graphics.lineStyle(1, 0xffffff, 0.04);
-    for (let x = 0; x < w; x += 40) {
-      graphics.lineBetween(x, 0, x, h);
-    }
-    for (let y = 0; y < h; y += 40) {
-      graphics.lineBetween(0, y, w, y);
-    }
-  }
-
   private applySpeedBoost(durationMs: number, multiplier: number): void {
+
     this.playerSpeed *= multiplier;
     this.time.delayedCall(durationMs, () => {
       this.playerSpeed /= multiplier;
@@ -1402,4 +1451,14 @@ export class GameScene extends Phaser.Scene {
       },
     };
   }
+
+  /**
+   * Complete lifecycle cleanup ensuring zero lingering Phaser objects or tweens.
+   */
+  public cleanupGameScene(): void {
+    this.vfxSystem?.destroy();
+    this.environmentSystem?.destroy();
+  }
 }
+
+
