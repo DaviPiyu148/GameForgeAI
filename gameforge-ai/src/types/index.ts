@@ -427,7 +427,6 @@ export interface AppState {
   projectsError?: string | null;
   progress?: UserProgressData | null;
   preferences?: UserPreferencesData | null;
-  infoModalTab?: 'docs' | 'api' | 'community' | 'support' | 'privacy' | null;
 }
 
 export interface AppContextType {
@@ -469,9 +468,6 @@ export interface AppContextType {
   // Sprint A — Project Management
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<void>;
-  // Documentation & Information Modal Actions
-  openInfoModal: (tab?: 'docs' | 'api' | 'community' | 'support' | 'privacy') => void;
-  closeInfoModal: () => void;
   // Toast notifications
   pushToast: (toast: { variant: 'info' | 'success' | 'xp' | 'levelup' | 'milestone' | 'error'; title: string; description?: string }) => void;
 }

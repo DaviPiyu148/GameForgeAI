@@ -47,21 +47,22 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | AI Provider Architecture V2 (Sequential Failover, Gemini 3 Routing, Model Fallback) (`AI_PROVIDER_ARCHITECTURE.md`) | COMPLETE |
 | Small Product Fixes & Reliability Polish V2 (Blueprint Recovery, Persistent Build Logs, Fullscreen API, Account Settings, Builder Design Preview) | COMPLETE |
 | Browser Audit Remediation V1 (API Transport Normalization, Auth Deduplication, Validation Error JSON Serialization, Discovery Stale Response Guard, Web Speech Voice Input, Modal Portal & Scroll Lock Migration, InfoModal Tabbed Documentation, Copy Output Actions) (`BROWSER_PRODUCT_REMEDIATION_V1.md`) | COMPLETE |
+| Deployment & Product Hygiene Fix V1 (Deployment-Safe Swagger URL `getSwaggerDocsUrl()`, Standalone Documentation Pages `#/documentation`, `#/api-access`, `#/community`, `#/support`, `#/privacy`, Footer Navigation, Test Credential Isolation from Production Code) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Browser Audit Remediation V1)
+## Current Verification (as of Deployment & Product Hygiene Fix V1)
 
 - **Backend tests**: 424/424 passing (100% pass rate across all suites via `uv run pytest tests/ -q`).
-- **Auth test suite**: 16/16 tests passing (including regression test for form-urlencoded validation error serialization).
+- **Auth test suite**: 16/16 tests passing.
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 60 files).
-- **Generation resilience suite**: 10/10 tests passing (`pytest tests/test_generation_resilience.py`).
-- **TypeScript**: 0 errors (`npx tsc --noEmit`).
-- **Production build**: succeeds (`npm run build` — 79 modules transformed, 3.72s).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 64 files).
+- **URL normalization unit tests**: 11/11 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
+- **Production build**: succeeds (`npm run build` — 91 modules transformed in 798ms).
 - **Alembic**: single head, `bc9ae398f146` (`alembic current` / `alembic heads`).
-- **Browser verification**: performed multiple times this cycle (UI Motion System, UI Copy Audit, repository hygiene cleanup, Small Product Fixes V2 partial — account settings, design preview) via a real headless-Chromium session against the live dev stack.
+- **Browser verification**: Explicitly NOT PERFORMED for this hygiene milestone per instructions (`BROWSER TESTING: NOT PERFORMED`).
+
 - **Known limitation — FS-034**: intermittent `502`/`ECONNRESET` from Vite's dev proxy on `/api/*` requests, root-caused to this specific development machine's physical memory exhaustion (confirmed via direct-vs-proxied and concurrent-vs-sequential comparison testing, and live free-RAM/paging measurement). The backend itself never fails these requests — only the dev-only proxy hop under memory pressure. **Not reproducible in a production deployment** (no dev proxy exists in that path) and not fixable at the application layer. See `FULL_STACK_OPERATIONAL_AUDIT.md` findings FS-020 and FS-034.
 
 ---

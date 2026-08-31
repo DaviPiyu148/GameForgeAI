@@ -81,6 +81,25 @@ assert(
   `/api/builds/abc-123/events${tokenParam}`
 );
 
+// --- Swagger Docs URL derivation tests ---
+assert(
+  'relative default produces clean /docs',
+  joinApiUrl('/docs', ''),
+  '/docs/'
+);
+
+assert(
+  'root origin joining for Swagger UI',
+  joinApiUrl('http://127.0.0.1:8000', '/docs'),
+  'http://127.0.0.1:8000/docs'
+);
+
+assert(
+  'deployed origin joining for Swagger UI',
+  joinApiUrl('https://api.gameforge.ai', '/docs'),
+  'https://api.gameforge.ai/docs'
+);
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) {
   if (typeof (globalThis as any).process !== 'undefined') {

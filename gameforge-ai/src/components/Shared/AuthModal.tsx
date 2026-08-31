@@ -17,13 +17,7 @@ export const AuthModal = () => {
       setMode(state.authModalMode);
     }
     setError(null);
-    if (state.isAuthModalOpen && (state.authModalMode || 'login') === 'login') {
-      if (import.meta.env.DEV && !email) {
-        setEmail('testuser_browser1@test.com');
-        setPassword('TestPass123!');
-      }
-    }
-  }, [state.authModalMode, state.isAuthModalOpen, email]);
+  }, [state.authModalMode, state.isAuthModalOpen]);
 
   // Lock body scroll while modal is open
   useEffect(() => {

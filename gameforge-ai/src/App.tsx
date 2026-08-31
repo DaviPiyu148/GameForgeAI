@@ -6,9 +6,13 @@ import SuccessStatusPage from './pages/SuccessStatusPage';
 import ErrorStatusPage from './pages/ErrorStatusPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
+import DocumentationPage from './pages/DocumentationPage';
+import ApiAccessPage from './pages/ApiAccessPage';
+import CommunityPage from './pages/CommunityPage';
+import SupportPage from './pages/SupportPage';
+import PrivacyPage from './pages/PrivacyPage';
 import { PageContainer } from './components/Shared/PageContainer';
 import { AuthModal } from './components/Shared/AuthModal';
-import { InfoModal } from './components/Shared/InfoModal';
 import { ToastContainer } from './components/Shared/ToastContainer';
 
 function App() {
@@ -24,7 +28,6 @@ function App() {
           <Route path="*" element={<Navigate to="/build" replace />} />
         </Routes>
         <AuthModal />
-        <InfoModal />
         <ToastContainer />
       </div>
     );
@@ -40,10 +43,14 @@ function App() {
           <Route path="/status/error" element={<ErrorStatusPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/documentation" element={<DocumentationPage />} />
+          <Route path="/api-access" element={<ApiAccessPage />} />
+          <Route path="/community" element={<CommunityPage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <AuthModal />
-        <InfoModal />
         <ToastContainer />
       </div>
     </PageContainer>
@@ -51,3 +58,4 @@ function App() {
 }
 
 export default App;
+

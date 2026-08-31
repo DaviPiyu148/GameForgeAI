@@ -701,21 +701,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await compileProject(navigate);
   };
 
-  // 9. Documentation & Info Modal Controls
-  const openInfoModal = (tab: 'docs' | 'api' | 'community' | 'support' | 'privacy' = 'docs') => {
-    setState((s) => ({
-      ...s,
-      infoModalTab: tab,
-    }));
-  };
-
-  const closeInfoModal = () => {
-    setState((s) => ({
-      ...s,
-      infoModalTab: null,
-    }));
-  };
-
   return (
     <AppContext.Provider
       value={{
@@ -749,8 +734,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         changePassword,
         deleteProject,
         duplicateProject,
-        openInfoModal,
-        closeInfoModal,
         pushToast,
       }}
     >

@@ -45,3 +45,27 @@ export function joinApiUrl(base: string, path: string): string {
   return `${normalizedBase}/${normalizedPath}`;
 }
 
+/**
+ * Resolves the canonical Swagger / OpenAPI interactive documentation URL.
+ * FastAPI serves Swagger at `/docs` relative to the root backend origin.
+ *
+ * Examples:
+ * - Direct host origin "http://127.0.0.1:8000" -> "http://127.0.0.1:8000/docs"
+ * - API path "http://127.0.0.1:8000/api" -> "http://127.0.0.1:8000/docs"
+ * - Deployed API "https://api.example.com/api" -> "https://api.example.com/docs"
+ * - Relative default "" or "/api" -> "/docs"
+ */
+export function getSwaggerDocsUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (!envUrl || envUrl.startsWith('/')) {
+    return '/docs';
+  }
+  // If absolute URL, strip trailing "/api" or slashes to get the root backend origin
+  let root = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  if (root.endsWith('/api')) {
+    root = root.slice(0, -4);
+  }
+  return joinApiUrl(root, '/docs');
+}
+
+

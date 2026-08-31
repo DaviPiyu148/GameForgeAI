@@ -104,3 +104,12 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 
 Standard codes supported: `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `EMAIL_ALREADY_EXISTS`, `USERNAME_TAKEN`, `RATE_LIMITED`, `PROJECT_NOT_FOUND`, `BUILD_NOT_FOUND`, `SAVED_DISCOVERY_NOT_FOUND`, `ALREADY_SAVED`, `VALIDATION_FAILED`, `BLUEPRINT_UNAVAILABLE`, `REMIX_FAILED`, `IMPROVEMENT_FAILED`, `INVALID_AVATAR`, `AVATAR_UPLOAD_FAILED`, `AVATAR_DELETE_FAILED`, `AVATAR_NOT_FOUND`.
 Do not expose tracebacks. Do not let clients arbitrarily mutate build status or bypass ownership.
+
+---
+
+## Interactive Documentation & Transport Configuration (IMPLEMENTED — Hygiene V1)
+- `/docs` -> FastAPI interactive OpenAPI / Swagger UI served at the root origin of the backend.
+- `getSwaggerDocsUrl()` in `gameforge-ai/src/services/urlUtils.ts` derives the canonical Swagger URL without hardcoding localhost or ports, dynamically handling relative defaults (`/docs`), direct origins (`http://127.0.0.1:8000/docs`), and production origins (`https://api.example.com/docs`).
+- `getApiBaseUrl()` and `joinApiUrl()` provide the single source of truth for REST endpoints and SSE event streaming.
+- Standalone documentation routes: `#/documentation`, `#/api-access`, `#/community`, `#/support`, `#/privacy`.
+
