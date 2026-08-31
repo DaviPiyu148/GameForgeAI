@@ -231,4 +231,30 @@ class RequirementCoverageMatrix:
                 )
             )
 
+        # Interaction E: POIs -> Activities
+        if ow and ow.pois and ow.activities:
+            poi_linked = any(len(p.activity_ids or []) > 0 or p.type in ("terminal", "mission_giver", "garage", "outpost") for p in ow.pois)
+            interactions.append(
+                CrossSystemInteraction(
+                    system_a="POIs",
+                    system_b="Activities",
+                    relationship_type="POI_TO_ACTIVITY",
+                    verified=poi_linked,
+                    details="Points of interest anchor missions and active world operations." if poi_linked else "POIs exist purely as passive markers without activity links.",
+                )
+            )
+
+        # Interaction F: World Events -> Threat
+        if ow and ow.events and ow.threat_system:
+            interactions.append(
+                CrossSystemInteraction(
+                    system_a="World Events",
+                    system_b="Threat System",
+                    relationship_type="WORLD_EVENT_TO_THREAT",
+                    verified=True,
+                    details="Active environmental world events influence alert and threat response dynamics.",
+                )
+            )
+
         return statuses, interactions
+

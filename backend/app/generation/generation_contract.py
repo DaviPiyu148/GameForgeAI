@@ -54,6 +54,8 @@ class GameGenerationContract:
     optional_capabilities: List[str] = field(default_factory=list)
     unsupported_requests: List[Tuple[str, str]] = field(default_factory=list)
     visual_direction: str = "neon"
+    design_pattern_id: str = "CP_PROGRESSIVE_ESCALATION"
+    palette: Dict[str, str] = field(default_factory=dict)
 
     @property
     def explicit_requirements(self) -> List[TrackedRequirement]:
@@ -61,6 +63,7 @@ class GameGenerationContract:
             r for r in self.tracked_requirements
             if r.confidence == RequirementConfidence.EXPLICIT_REQUIREMENT
         ]
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -208,12 +211,36 @@ def build_generation_contract(
     else:
         progression_plan = "3-5 level campaign: Introduction -> Learning -> Escalation -> Variation -> High-threat Finale."
 
-    # 5. Visual Direction
+    # 5. Visual Direction & Thematic Palette
     visual_direction = "neon"
+    theme_palettes = {
+        "cyberpunk": {"bg": "#0a0518", "player": "#00f0ff", "accent": "#ff0055", "hazard": "#ffaa00"},
+        "space": {"bg": "#020412", "player": "#66e3ff", "accent": "#bd00ff", "hazard": "#ff3366"},
+        "dungeon": {"bg": "#120d0a", "player": "#ffb84d", "accent": "#ff3300", "hazard": "#990000"},
+        "wasteland": {"bg": "#1a140e", "player": "#ffd166", "accent": "#ef476f", "hazard": "#06d6a0"},
+        "urban": {"bg": "#0f172a", "player": "#38bdf8", "accent": "#f43f5e", "hazard": "#fbbf24"},
+        "retro_arcade": {"bg": "#050014", "player": "#39ff14", "accent": "#ff073a", "hazard": "#ffe600"},
+        "fantasy": {"bg": "#0d1b1e", "player": "#70e000", "accent": "#9d4edd", "hazard": "#e85d04"},
+        "neon": {"bg": "#050510", "player": "#00f0ff", "accent": "#ff0077", "hazard": "#ffbb00"},
+    }
     for theme_opt in ["cyberpunk", "space", "dungeon", "wasteland", "urban", "retro_arcade", "fantasy"]:
         if theme_opt in text:
             visual_direction = theme_opt
             break
+
+    selected_palette = theme_palettes.get(visual_direction, theme_palettes["neon"])
+
+    # 6. Select Structural Design Pattern
+    from app.generation.design_patterns import select_design_pattern
+    resolved_world_mode = "open_world" if (world_mode == "open_world" or "open world" in text or "open-world" in text) else world_mode
+    pattern = select_design_pattern(
+        archetype=archetype,
+        world_mode=resolved_world_mode,
+        scale=scale,
+        has_vehicles=any(r.runtime_capability == "VEHICLES" for r in tracked),
+        has_factions=any(r.runtime_capability == "FACTIONS" for r in tracked),
+        has_threat=any(r.runtime_capability == "THREAT_SYSTEM" for r in tracked),
+    )
 
     # Required vs Optional Capabilities
     required_caps = [
@@ -226,7 +253,7 @@ def build_generation_contract(
         raw_prompt=prompt,
         genre=genre,
         archetype=archetype,
-        world_mode="open_world" if (world_mode == "open_world" or "open world" in text or "open-world" in text) else world_mode,
+        world_mode=resolved_world_mode,
         scale=scale,
         core_loop=core_loop,
         player_goal=player_goal,
@@ -237,4 +264,7 @@ def build_generation_contract(
         optional_capabilities=optional_caps,
         unsupported_requests=unsupported,
         visual_direction=visual_direction,
+        design_pattern_id=pattern.id,
+        palette=selected_palette,
     )
+

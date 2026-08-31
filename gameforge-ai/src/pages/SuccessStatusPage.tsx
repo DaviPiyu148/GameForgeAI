@@ -38,6 +38,17 @@ export const SuccessStatusPage = () => {
     return 88; // Default health score if not explicitly parsed
   }, [state.compilerLogs]);
 
+  // Extract Design Pattern if logged
+  const detectedPattern = useMemo(() => {
+    const logs = state.compilerLogs.length > 0 ? state.compilerLogs : [];
+    for (const line of logs) {
+      const match = line.match(/Design Pattern:\s*([A-Za-z0-9_]+)/i);
+      if (match) return match[1].replace('CP_', '').replace('OW_', '').replace('AR_', '').replace('PF_', '').replace('CO_', '').replace(/_/g, ' ');
+    }
+    return null;
+  }, [state.compilerLogs]);
+
+
 
   // If we somehow get here without a real SUCCESS state, kick back to builder
   useEffect(() => {
@@ -121,11 +132,17 @@ export const SuccessStatusPage = () => {
               <span className="font-mono text-xs text-primary font-bold tracking-wider uppercase">
                 GameForge Quality Health
               </span>
+              {detectedPattern && (
+                <span className="px-1.5 py-0.2 rounded bg-primary/20 text-primary border border-primary/40 text-[10px] font-mono uppercase">
+                  Pattern: {detectedPattern}
+                </span>
+              )}
               {hasRecoveredIssues && (
                 <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-mono uppercase">
                   Recovered Safe Drift
                 </span>
               )}
+
             </div>
             <p className="font-body text-xs text-on-surface-variant max-w-lg">
               Deterministic structural and gameplay health indicator evaluating core loop, progression, variety, and runtime capability coverage.

@@ -153,15 +153,28 @@ class GameDepthEvaluator:
 
         # Measure diversity across multi-level games
         unique_objs: Set[str] = set()
+        level_obj_list: List[str] = []
         for lvl in levels:
             if getattr(lvl, "objective", None):
                 unique_objs.add(lvl.objective.type)
+                level_obj_list.append(lvl.objective.type)
 
         if scale == "prototype":
             objective_score += 60.0  # Prototypes don't need multiple objective types
         else:
-            if len(unique_objs) >= scale_cfg["min_unique_objectives"]:
+            has_adjacent_repeats = False
+            if len(level_obj_list) >= 2:
+                for i in range(len(level_obj_list) - 1):
+                    if level_obj_list[i] == level_obj_list[i+1]:
+                        has_adjacent_repeats = True
+                        break
+
+            if len(unique_objs) >= scale_cfg["min_unique_objectives"] and not has_adjacent_repeats:
                 objective_score += 60.0
+            elif has_adjacent_repeats and scale == "campaign":
+                objective_score += 25.0
+                warnings.append("Repeated adjacent objective: Consecutive levels share identical objective structures.")
+                failure_codes.append(QualityFailureCode.REPEATED_ADJACENT_OBJECTIVES)
             elif len(levels) > 1 and len(unique_objs) <= 1:
                 objective_score += 20.0
                 warnings.append(f"Repeated objective: All levels share identical objective type '{list(unique_objs)[0] if unique_objs else 'default'}'.")
@@ -169,6 +182,7 @@ class GameDepthEvaluator:
                     failure_codes.append(QualityFailureCode.LOW_VARIETY)
             else:
                 objective_score += 40.0
+
 
         # ─────────────────────────────────────────────────────────────────────
         # 3. Progression & Escalation Score (0 - 100)

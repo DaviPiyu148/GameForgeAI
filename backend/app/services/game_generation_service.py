@@ -254,6 +254,8 @@ class GameGenerationService:
 
         # STAGE 2: [AI] Building game design
         log("INFO", "[AI] Building game design")
+        log("INFO", f"> Design Pattern: {contract.design_pattern_id}")
+        log("INFO", f"> Thematic Palette: {contract.visual_direction} (bg: {contract.palette.get('bg', '#050510')})")
 
         # STAGE 3: [AI] Mapping runtime capabilities
         log("INFO", "[AI] Mapping runtime capabilities")
@@ -262,6 +264,7 @@ class GameGenerationService:
 
         # STAGE 4: [AI] Generating GameDSL
         log("INFO", "[AI] Generating GameDSL")
+
 
         user_prompt = build_generation_prompt(
             prompt=prompt,

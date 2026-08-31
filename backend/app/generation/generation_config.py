@@ -89,7 +89,10 @@ class QualityFailureCode:
     LOW_VARIETY = "LOW_VARIETY"
     INSUFFICIENT_PROGRESSION = "INSUFFICIENT_PROGRESSION"
     UNSAFE_DSL = "UNSAFE_DSL"
+    REPEATED_ADJACENT_OBJECTIVES = "REPEATED_ADJACENT_OBJECTIVES"
+    DISCONNECTED_SYSTEMS = "DISCONNECTED_SYSTEMS"
     OTHER = "OTHER"
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

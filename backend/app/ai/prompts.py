@@ -166,16 +166,30 @@ TARGET CONFIGURATION:
 - Active Logic Modules: {mods_str}
 - Scale Tier ({scale}): {scale_guide}
 
-GAMEPLAY DESIGN REQUIREMENTS:
-1. CORE LOOP: Player action -> immediate feedback -> challenge/pressure -> progression -> win/lose resolution.
-2. STRUCTURAL PROGRESSION:
-   - For single-level games: introduce mechanics safely early, ramp up pressure mid-game, conclude with a distinct resolution moment.
-   - For multi-level campaigns: Level 1 (Introduction/Teaching) -> Level 2 (Combining mechanics/Escalation) -> Level 3+ (Variation/High Pressure) -> Finale Level (Climax, high danger, optional boss). Set 'is_finale: true' on the final level.
-3. OBJECTIVE DIVERSITY: Avoid repeating identical objective types across consecutive levels in campaign mode.
-4. REQUIREMENT INTEGRATION: Any requested gameplay element (vehicles, threat, factions, collectibles, hacking) must be backed by concrete DSL structures and interact meaningfully with other systems.
+GAMEPLAY DESIGN REQUIREMENTS (V3 QUALITY & DEPTH):
+1. CORE LOOP & PATTERN: Player action -> immediate feedback -> challenge/pressure -> progression -> win/lose resolution. Follow the selected structural progression without dead or passive subsystems.
+2. ADJACENT OBJECTIVE DIVERSIFICATION:
+   - In multi-level campaigns, NEVER use the exact same objective type on two adjacent levels.
+   - Example progression: Level 1 ("collect_all" or "survive_time") -> Level 2 ("defeat_all") -> Level 3 ("reach_exit") -> Finale Level ("defeat_all" with boss or "reach_exit" extraction).
+   - Each level must have a unique descriptive objective, not a generic "Complete stage objective".
+3. MEANINGFUL MECHANIC COMPOSITION:
+   - Merely defining an entity or subsystem is NOT enough; systems must interact.
+   - If Vehicles exist: place them in regions with dimensions >= 1200, ensure vehicle.max_speed > player.speed, and tie activities or extraction to vehicular traversal.
+   - If Factions exist: activities/missions MUST explicitly reference faction names in their title/description and affect standing.
+   - If Threat exists: combat defeat or high-profile activities must escalate alert levels with active response units.
+   - If Collectibles exist: create rules where collecting grants score or heals the player.
+4. ENCOUNTER VARIETY:
+   - Combine diverse enemy behaviors across levels (e.g. Level 1: "patrol" basic units; Level 2: "patrol" + "chase"; Level 3: "ranged_attack" + "guard" + hazards).
+   - Do NOT simply spawn the same 3 enemies in every level.
+5. MEANINGFUL FINALE:
+   - The finale level must be distinctly challenging: include a designated Boss entity (health >= 150, "is_boss": true, "boss_phases": 2) or an intense high-threat extraction gauntlet.
+6. COHESIVE VISUAL IDENTITY & PALETTE:
+   - Align background, player, enemy, and accent colors to the chosen theme. Avoid defaulting to generic cyan/magenta `#050510` for non-neon themes.
+   - Dungeon: deep brown/crimson/gold; Space: deep navy/starlight/silver; Wasteland: dust/rust/amber; Fantasy: deep emerald/violet/gold.
 
 LEVEL STRUCTURE (use the top-level "levels" array, each entry following the LevelDef shape, when generating more than one level):
 {level_structure_text}
+
 
 
 SCHEMA REQUIREMENT:
@@ -255,14 +269,15 @@ PREVIOUS CANDIDATE:
 {invalid_json_str}
 
 Repair the issues while strictly respecting the capability matrix, bounds, and rules:
-- Ensure primary objective is clear and achievable.
-- Ensure win conditions map to existing rules/entities.
+- MINIMAL PATCHING: Preserve the overall game concept, valid mechanics, and already-correct subsystems; do not completely rewrite valid parts of the game.
+- If repeated adjacent objectives failed: diversify the objective types across adjacent levels (e.g. Level 1: collect_all -> Level 2: defeat_all -> Level 3: reach_exit).
+- If system interaction failed: link subsystems meaningfully (e.g. ensure vehicle max_speed > player speed, tie activities to faction names, or link combat defeat to score/threat).
+- If finale quality failed: add a designated Boss entity (is_boss: true, health >= 150) or high-intensity extraction condition on the final level.
 - Ensure player spawn is at least 80px away from enemies/hazards.
-- Ensure entity type is STRICTLY one of ["enemy", "collectible", "obstacle", "platform", "hazard"] (e.g. use "collectible" for coins/gems/items, "obstacle" for walls/blocks, "enemy" with is_boss: true for bosses).
-- Ensure all entity width and height values are <= 500 (between 4 and 500).
-- Ensure all entity behaviors are from ["patrol", "chase", "stationary", "bounce", "float", "flee", "guard", "ranged_attack"].
+- Ensure entity type is STRICTLY one of ["enemy", "collectible", "obstacle", "platform", "hazard"].
 - If is_boss is true on an entity, health must be >= 150.
 - Output ONLY the repaired single JSON object with "design_spec" and "dsl"."""
+
 
 
 def build_playtest_analysis_prompt(

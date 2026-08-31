@@ -34,8 +34,22 @@ STAGE 10: [SYS] BUILD COMPLETE (Persistence & 0x00_SYS_READY)
 - **Zero Arbitrary Execution**: Never generate raw JavaScript, never use `eval()` or `new Function()`.
 - **Compiler Logs**: Real structured build progress emitted via SSE.
 
+## Game Generation Quality V3 (Depth, Progression & Composition)
+- **Deterministic Pattern Library**: Compact library of 9 structural gameplay flows across Campaign, Open World, Arena, Platformer, and Collector (`app/generation/design_patterns.py`).
+- **Canonical Composition Matrix**: Single source of truth defining verified relationships (`app/generation/composition_matrix.py`):
+  - `VEHICLE_TO_TRAVERSAL` (vehicle speed advantage across large districts)
+  - `THREAT_TO_ACTIVITY` (combat & activity consequences)
+  - `FACTION_TO_ACTIVITY` (named faction involvement in missions)
+  - `COLLECTIBLE_TO_OBJECTIVE` (scoring/healing on collection)
+  - `POI_TO_ACTIVITY` (anchored POIs)
+  - `WORLD_EVENT_TO_THREAT` (environmental alert dynamics)
+- **Adjacent Objective Diversification**: Forbids repeating identical objective types on consecutive campaign stages.
+- **Encounter Variety & Distinct Finales**: Mandates behavior mixing (`patrol`, `chase`, `ranged_attack`, `guard`) and boss encounters on final levels.
+- **Thematic Visual Palettes**: Deterministically binds world backgrounds, player colors, and accents to prompt themes rather than defaulting to generic neon dark styles.
+
 ## GameDesignSpec
 Acts as an intermediate structured design layer between natural-language user concepts and executable Phaser Game DSL schemas:
+
 - `title`, `elevator_pitch`, `genre`, `subgenre`, `theme`, `visual_style`, `camera`, `core_gameplay_loop`, `player_role`, `primary_objective`, `secondary_objectives`, `player_abilities`, `enemy_archetypes`, `hazards`, `collectibles`, `progression`, `difficulty_curve`, `win_conditions`, `loss_conditions`, `level_structure`, `estimated_session_length`, `selected_modules`, `rationale`.
 
 ## Game DSL Expansion (v2.0 Primitives)
