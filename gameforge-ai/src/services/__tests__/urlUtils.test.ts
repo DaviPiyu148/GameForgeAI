@@ -8,7 +8,7 @@
  * regardless of whether API_BASE_URL has a trailing slash.
  */
 
-import { joinApiUrl, getSwaggerDocsUrl } from '../urlUtils';
+import { joinApiUrl, getSwaggerDocsUrl, getApiBaseUrl } from '../urlUtils';
 
 let passed = 0;
 let failed = 0;
@@ -136,6 +136,25 @@ assert(
   'getSwaggerDocsUrl: production origin with /api/ trailing slash resolves to /docs',
   getSwaggerDocsUrl('https://api.gameforge.ai/api/'),
   'https://api.gameforge.ai/docs'
+);
+
+// --- Overridden BACKEND_PORT tests ---
+assert(
+  'getSwaggerDocsUrl: custom overridden port 8001 resolves to /docs',
+  getSwaggerDocsUrl('http://127.0.0.1:8001'),
+  'http://127.0.0.1:8001/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: custom overridden port 8001/api resolves to /docs',
+  getSwaggerDocsUrl('http://127.0.0.1:8001/api'),
+  'http://127.0.0.1:8001/docs'
+);
+
+assert(
+  'getApiBaseUrl: custom overridden port 8001 normalizes to /api',
+  getApiBaseUrl('http://127.0.0.1:8001'),
+  'http://127.0.0.1:8001/api'
 );
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

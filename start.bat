@@ -26,14 +26,18 @@ if "%FRONTEND_PORT%"=="" set "FRONTEND_PORT=5173"
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
 
 :: The Discovery embedding model (sentence-transformers/all-MiniLM-L6-v2) is
-:: fetched once and cached under %USERPROFILE%\.cache\huggingface\hub -- once
-:: it's there, no further network access to the HF Hub is needed. Without this,
-:: every load still makes an unauthenticated metadata check against HF's
-:: servers (the "sending unauthenticated requests" warning), which is an
-:: avoidable network dependency/latency source once the model is cached. If
-:: you ever need a *different*, not-yet-cached model, temporarily remove this
-:: line (or run `set HF_HUB_OFFLINE=0` first) so it can actually download.
-set "HF_HUB_OFFLINE=1"
+:: fetched once and cached under %USERPROFILE%\.cache\huggingface\hub (or %HF_HOME%\hub).
+:: If cached, we enable HF_HUB_OFFLINE=1 to prevent unauthenticated metadata pings on every load.
+:: If not cached (clean machine / fresh clone), we leave HF_HUB_OFFLINE unset so huggingface_hub
+:: can download the required embedding weights automatically on first run.
+set "HF_MODEL_CACHE=%USERPROFILE%\.cache\huggingface\hub\models--sentence-transformers--all-MiniLM-L6-v2"
+if defined HF_HOME set "HF_MODEL_CACHE=%HF_HOME%\hub\models--sentence-transformers--all-MiniLM-L6-v2"
+
+if exist "%HF_MODEL_CACHE%" (
+    set "HF_HUB_OFFLINE=1"
+) else (
+    set "HF_HUB_OFFLINE="
+)
 
 echo  Checking prerequisites ...
 echo.
@@ -58,16 +62,23 @@ if not exist "%VENV_PYTHON%" (
 echo        OK  (.venv found)
 
 :: ══════════════════════════════════════════════════════════════════════
-:: CHECK 2  Core packages installed (fast smoke-test: import fastapi)
+:: CHECK 2  Core packages installed (smoke-test runtime imports)
 :: ══════════════════════════════════════════════════════════════════════
 echo [2/6] Python packages ...
-"%VENV_PYTHON%" -c "import fastapi, uvicorn, alembic, sqlalchemy" >nul 2>&1
+"%VENV_PYTHON%" -c "import fastapi, uvicorn, alembic, sqlalchemy, google.genai, sentence_transformers, faiss, jwt, pwdlib" >nul 2>&1
 if errorlevel 1 (
     echo        Packages missing or incomplete -- running pip install ...
     "%VENV_PIP%" install -r "%BACKEND_DIR%\requirements.txt"
     if errorlevel 1 (
         echo.
         echo  [ERROR] pip install failed. Fix the errors above and re-run start.bat.
+        pause
+        exit /b 1
+    )
+    "%VENV_PYTHON%" -c "import fastapi, uvicorn, alembic, sqlalchemy, google.genai, sentence_transformers, faiss, jwt, pwdlib" >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo  [ERROR] Core runtime packages missing or incomplete after pip install.
         pause
         exit /b 1
     )
@@ -83,7 +94,8 @@ if not exist "%BACKEND_DIR%\.env" (
         echo        .env missing -- copying from .env.example ...
         copy "%BACKEND_DIR%\.env.example" "%BACKEND_DIR%\.env" >nul
         echo        Copied. You MUST edit "%BACKEND_DIR%\.env" and set:
-        echo          GEMINI_API_KEY=^<your key^>
+        echo          GEMINI_API_KEY=^<your primary key^>
+        echo          (or GEMINI_API_KEYS=key1,key2 for multi-account failover)
         echo          AUTH_JWT_SECRET=^<run: python -c "import secrets;print(secrets.token_hex(32))"^>
         echo.
         pause
@@ -112,12 +124,13 @@ if not errorlevel 1 (
 )
 
 :: Warn if GEMINI_API_KEY looks like a placeholder
-findstr /C:"your-gemini-api-key" "%BACKEND_DIR%\.env" >nul 2>&1
+findstr /C:"your-primary-gemini-api-key-here" "%BACKEND_DIR%\.env" >nul 2>&1
 if not errorlevel 1 (
     echo.
     echo  [WARN] GEMINI_API_KEY in .env appears to be a placeholder.
-    echo         AI game generation will fail until you add a real key.
+    echo         AI game generation will fail until you configure a real key.
     echo         Get a free key at: https://aistudio.google.com/
+    echo         (Supports comma-separated GEMINI_API_KEYS for multi-account failover)
     echo.
 )
 echo        OK  (.env ready)
@@ -260,6 +273,7 @@ echo    - Discovery   :  Lexical + Semantic Search
 echo    - Builder     :  AI Game Compilation + Phaser
 echo    - Game DNA    :  Preference Telemetry
 echo    - Creator XP  :  Levels, Badges, Milestones
+echo    - AI Pipeline :  Gemini Interactions API + Multi-Key Failover
 echo.
 echo    To stop: close the Backend and Frontend terminal windows.
 echo  ==========================================

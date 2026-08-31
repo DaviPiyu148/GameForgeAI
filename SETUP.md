@@ -75,6 +75,7 @@ Open `backend\.env` in any text editor and fill in the required values:
 
 ```env
 # REQUIRED — Get a free key at https://aistudio.google.com/
+# For multi-account project isolation / failover, provide comma-separated keys or use GEMINI_API_KEYS
 GEMINI_API_KEY=your-actual-gemini-api-key-here
 
 # REQUIRED — Generate a strong secret (run this once):
@@ -200,7 +201,7 @@ Then open **http://127.0.0.1:5173/#/** in your browser.
 | Backend health | http://127.0.0.1:8000/api/health |
 | API docs (Swagger) | http://127.0.0.1:8000/docs |
 | Frontend app | http://127.0.0.1:5173/#/ |
-| Backend tests | `cd backend && pytest -v` (335 passing at time of writing — the suite has grown well past its original count, so treat this as directional and trust the actual run) |
+| Backend tests | `cd backend && pytest -v` (430 passing tests) |
 
 ---
 
@@ -237,7 +238,7 @@ Install Node.js 18 LTS from https://nodejs.org and restart your terminal.
 The FAISS index was not built. Complete Steps 3a–3c.
 
 ### `GEMINI_API_KEY` error at startup
-Ensure `backend/.env` exists and contains a real Gemini API key (not the placeholder text from `.env.example`).
+Ensure `backend/.env` exists and contains a real Gemini API key (or `GEMINI_API_KEYS` list).
 
 ### Port already in use (8000 or 5173)
 `start.bat` clears stale processes automatically. For manual runs, kill the conflicting process or choose a different port number.
@@ -251,12 +252,14 @@ This is expected. The default model is ~90 MB and is cached in `~/.cache/hugging
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `GEMINI_API_KEY` | **Yes** | — | Google Gemini API key for AI generation |
-| `AUTH_JWT_SECRET` | **Yes** | — | Secret for signing JWT auth tokens |
+| `GEMINI_API_KEY` / `GEMINI_API_KEYS` | **Yes** | — | Google Gemini API key(s) for AI generation (supports comma-separated multi-account failover) |
+| `AUTH_JWT_SECRET` | **Yes** | — | Secret for signing JWT auth tokens (min 16 chars) |
+| `AI_TRANSPORT` | No | `interactions` | `interactions` (Google Gemini Interactions API) or `legacy_http` |
 | `APP_ENV` | No | `development` | `development` or `production` |
 | `DATABASE_URL` | No | `sqlite:///./gameforge.db` | SQLAlchemy database URL |
-| `CORS_ORIGINS` | No | `http://localhost:5173` | Comma-separated allowed CORS origins |
-| `GEMINI_MODEL` | No | `gemini-3-flash-preview` | Gemini model name to use |
-| `AI_TIMEOUT_SECONDS` | No | `150` | AI request timeout in seconds |
+| `CORS_ORIGINS` | No | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated allowed CORS origins |
+| `GEMINI_MODEL` | No | `gemini-3.7-flash` | Default Gemini model (superseded by task model chains) |
+| `AI_TIMEOUT_SECONDS` | No | `60` | AI per-attempt request timeout in seconds |
+| `AI_OVERALL_DEADLINE_SECONDS` | No | `60` | Overall budget deadline across all key and model fallback attempts |
 | `AI_MAX_RETRIES` | No | `2` | Max AI retry attempts |
 | `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | No | `60` | JWT token lifetime in minutes |

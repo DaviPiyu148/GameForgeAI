@@ -408,7 +408,7 @@ class BuildService:
                 runtime_meta = generate_runtime_metadata(seed_source=build.id)
                 if result.provider_meta:
                     runtime_meta["provider"] = result.provider_meta.get("provider", "gemini")
-                    runtime_meta["model"] = result.provider_meta.get("model", "gemini-3-flash-preview")
+                    runtime_meta["model"] = result.provider_meta.get("model", "gemini-3.7-flash")
                     runtime_meta["fallbackUsed"] = result.provider_meta.get("fallback_used", False)
                     if result.provider_meta.get("fallback_reason"):
                         runtime_meta["fallbackReason"] = result.provider_meta.get("fallback_reason")

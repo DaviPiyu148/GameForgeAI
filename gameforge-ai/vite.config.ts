@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+const backendPort = process.env.BACKEND_PORT || '8000';
+const backendTarget = `http://127.0.0.1:${backendPort}`;
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -17,15 +20,15 @@ export default defineConfig({
     host: '127.0.0.1',
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: backendTarget,
         changeOrigin: true,
       },
       '/docs': {
-        target: 'http://127.0.0.1:8000',
+        target: backendTarget,
         changeOrigin: true,
       },
       '/openapi.json': {
-        target: 'http://127.0.0.1:8000',
+        target: backendTarget,
         changeOrigin: true,
       },
     },

@@ -4,7 +4,7 @@ FastAPI modular monolith backend for GameForge AI. Fully implemented and running
 
 ## Current State
 
-Real AI game generation (Google Gemini), a hybrid FAISS + lexical Discovery engine, JWT + Argon2 authentication with per-user ownership, Game Blueprint + Remix, Creator Progression (XP/levels/milestones), Game DNA behavioral personalization, multi-level generation with bounded boss/finale support, and a generalized Open World system are all implemented and covered by the backend test suite (335 tests passing at the time of writing — run `pytest -v` for the current count, don't trust a hardcoded number in this doc).
+Real AI game generation (Google Gemini), a hybrid FAISS + lexical Discovery engine, JWT + Argon2 authentication with per-user ownership, Game Blueprint + Remix, Creator Progression (XP/levels/milestones), Game DNA behavioral personalization, multi-level generation with bounded boss/finale support, and a generalized Open World system are all implemented and covered by the backend test suite (430 tests passing at the time of writing — run `pytest -v` for the current count, don't trust a hardcoded number in this doc).
 
 Key capabilities:
 - **Phaser 3.88.2 runtime compatibility**: `RuntimeCompatibilityValidator` checks archetype boundaries, entity/rule capacity, and coordinates before a DSL is ever handed to the frontend.
