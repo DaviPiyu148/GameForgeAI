@@ -95,7 +95,7 @@ if not exist "%BACKEND_DIR%\.env" (
         copy "%BACKEND_DIR%\.env.example" "%BACKEND_DIR%\.env" >nul
         echo        Copied. You MUST edit "%BACKEND_DIR%\.env" and set:
         echo          GEMINI_API_KEY=^<your primary key^>
-        echo          (or GEMINI_API_KEYS=key1,key2 for multi-account failover)
+        echo          [or GEMINI_API_KEYS=key1,key2 for multi-account failover]
         echo          AUTH_JWT_SECRET=^<run: python -c "import secrets;print(secrets.token_hex(32))"^>
         echo.
         pause
@@ -130,7 +130,7 @@ if not errorlevel 1 (
     echo  [WARN] GEMINI_API_KEY in .env appears to be a placeholder.
     echo         AI game generation will fail until you configure a real key.
     echo         Get a free key at: https://aistudio.google.com/
-    echo         (Supports comma-separated GEMINI_API_KEYS for multi-account failover)
+    echo         [Supports comma-separated GEMINI_API_KEYS for multi-account failover]
     echo.
 )
 echo        OK  (.env ready)
