@@ -1,15 +1,14 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Discovery Intelligence V1 (Rich Intent, Negative Preferences, Personalization, Diversity, Feedback, Modes, Better Explanations, Benchmarking)
+Game Generation Pipeline V2 (Depth, Design Quality, Capability-Aware Generation, Quality Gates, Runtime Validation)
 
 ## Status
 COMPLETE
 
 ## Objective
-Evolve the existing GameForge AI Discovery Engine into a richer, intent-driven, personalized, diverse, and interactive recommendation system.
-Preserve the existing local/cost-free architecture (Sentence Transformers all-MiniLM-L6-v2, FAISS IndexFlatIP, lexical inverted index, RRF fusion, deterministic hard constraints, and IGDB enrichment).
-Zero LLM calls for discovery. Zero new external dependencies. Zero browser testing. No database migration needed.
+Transform the GameForge AI generation pipeline from generating technically valid but shallow/repetitive games into producing deep, coherent, capability-aware, scale-appropriate, and varied games with strict deterministic quality gates and runtime validation.
+Preserve 100% local deterministic safety: no extra LLM calls (1 normal Gemini call, max 1 semantic repair call), no browser testing, strict allowlist capability registry, scale-aware scoring, and explicit requirement coverage tracking.
 
 ## Started
 2026-08-31
@@ -18,97 +17,95 @@ Zero LLM calls for discovery. Zero new external dependencies. Zero browser testi
 
 ## 1. Pre-Implementation
 - [x] Read AGENTS.md constitution, Task Execution Ledger policy, and Git policy
-- [x] Read README.md, docs/10-DISCOVERY-ENGINE.md, docs/08-API-CONTRACT.md, docs/15-CURRENT-STATUS.md
-- [x] Inspect existing Discovery backend and frontend codebase
-- [x] Inspect FAISS vector index capabilities (`reconstruct` verified, `_id_to_pos` dict needed)
-- [x] Run git status and git log (working tree clean on `fresh-main` branch)
-- [x] Verify existing discovery and preference unit tests pass (10/10 passed)
-- [x] Check Alembic heads (`bc9ae398f146` single head)
+- [x] Inspect existing generation architecture (`game_generation_service.py`, `dsl_models.py`, `dsl_normalizer.py`, `validator.py`, `quality_validator.py`, `scale_tiers.py`, `prompts.py`)
+- [x] Inspect Phaser runtime capabilities (`GameScene.ts`, `RegionManager.ts`, `VehicleManager.ts`, `ActivityManager.ts`, `FactionManager.ts`, `ThreatManager.ts`, `WorldEventManager.ts`, `WorldManager.ts`)
+- [x] Inspect frontend builder and status pages (`BuilderPage.tsx`, `SuccessStatusPage.tsx`, `ErrorStatusPage.tsx`)
+- [x] Verify git status (working tree clean on `fresh-main` branch)
+- [x] Verify existing resilience tests (`pytest tests/test_generation_resilience.py` 10/10 passing)
 
 ### Evidence
-- FAISS IndexFlatIP supports `reconstruct(idx)` in 384 dimensions.
-- 10 targeted discovery & preference tests pass in 0.38s.
-- Working tree clean at commit `1f7f709`.
+- Working tree clean at commit `c320f83`.
+- 10 generation resilience tests pass in 0.05s.
+- Phaser runtime verified to have 7 dedicated open-world managers + core mechanics (dash, combat, wave, collectibles, reachability).
 
 ---
 
 ## 2. Implementation Subtasks
 
-### Subtask A: Centralized Ranking Configuration & O(1) FAISS Vector Lookup
-- [x] Create `backend/app/search/ranking_config.py` with all scoring weights, mode profiles, bounds, and thresholds.
-- [x] Add `_id_to_pos` O(1) dictionary and `get_vector(game_id: str) -> Optional[np.ndarray]` in `FAISSIndexManager`.
+### Subtask A: Centralized Capability Registry & Quality Config
+- [x] Create `backend/app/generation/generation_config.py` centralizing all quality thresholds, score weights, scale expectations, and bounds (no magic numbers).
+- [x] Create `backend/app/generation/runtime_capabilities.py` defining canonical capabilities (`capability` -> `runtime_owner`, `supported`, `required_dsl_structures`, `compatible_archetypes`, `known_limitations`).
 
-### Subtask B: Rich Structured Intent & Deterministic Parsing
-- [x] Expand `ParsedQuery` in `backend/app/search/query_parser.py` with structured dimensions (mood, session_length, combat, difficulty, avoid_genres, avoid_tags, avoid_modes, soft_preferences vs hard_constraints).
-- [x] Deterministic synonym and pattern mapping for negations, session lengths, mood/tone, and entity landmarks without LLM inference.
+### Subtask B: Request Understanding & Generation Contract
+- [x] Create `backend/app/generation/generation_contract.py` defining `GameGenerationContract` with requirement confidence (`EXPLICIT_REQUIREMENT`, `INFERRED_PREFERENCE`, `OPTIONAL_INTERPRETATION`).
+- [x] Implement deterministic request parser mapping user prompt + builder parameters into a structured contract.
 
-### Subtask C: Session Context, Negative Preferences & Personalization Signals
-- [x] Update `backend/app/schemas/discovery.py` with `DiscoverySessionContext`, `DiscoveryFeedbackRequest`, and mode definitions (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`).
-- [x] Add negative preference handling in `backend/app/services/preference_service.py`.
-- [x] Add lightweight user vector profile calculation (`liked_vector` from saved/liked games in FAISS, optional `disliked_vector` only when negative data exists).
-- [x] Add authenticated `POST /api/discovery/feedback` endpoint with anti-spam safeguards and idempotent state updates.
+### Subtask C: Capability-Aware Prompts & Archetype Quality Templates
+- [x] Update `backend/app/ai/prompts.py` (`SYSTEM_PROMPT` and `build_generation_prompt`):
+  - Strictly enforce runtime capability contract allowlist; forbid inventing unsupported mechanics.
+  - Require structural progression: Introduction -> Learning -> Escalation -> Variation -> Finale.
+  - Archetype quality design templates (Arena Survival, Platformer Campaign, Open World Courier/Sandbox, Collector, Dungeon Action).
 
-### Subtask D: Hybrid Ranker Evolution (Diversity, Modes, Grounded Explanations)
-- [x] Refactor `backend/app/search/ranker.py` to use centralized `ranking_config.py`.
-- [x] Implement modular scoring pipeline:
-  - `passes_filters` (hard constraints + explicit hard negative exclusions)
-  - `calculate_personalization` (Game DNA genre affinity + optional FAISS vector similarity)
-  - `calculate_negative_penalty` (soft negative tags/genres/vector)
-  - `calculate_quality` & `calculate_novelty` (Steam review count + positive percentage)
-  - `rerank_for_diversity` (MMR-style bounded diversity; soft franchise limit with max 2 per family unless query explicitly specifies it)
-  - `generate_grounded_explanations` (grounded highlights, trade-offs, personalization reasons, why-these summary)
-  - Mode adjustments (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`).
-- [x] Support deterministic "Surprise Me" respecting all hard constraints.
+### Subtask D: Requirement Coverage Matrix & Depth Evaluator
+- [x] Create `backend/app/generation/requirement_coverage.py` tracking:
+  `Requirement` -> `confidence` -> `requested?` -> `runtime_capability` -> `dsl_representation` -> `actually_used?` -> `status`.
+  Require actual supported DSL relationships for cross-system interactions (e.g. Vehicle -> Traversal, Activity -> Reward, Threat escalation).
+- [x] Create `backend/app/generation/depth_evaluator.py` evaluating:
+  - Core loop completeness (action -> challenge -> reward -> progression -> win/fail)
+  - Scale-aware quality scoring (Prototype: 1 loop, 1-2 levels; Standard: 2-3 levels; Campaign: 3-5 levels with escalation & finale)
+  - Level differentiation & objective variety
+  - Win/fail symmetry and reachability
+  - Returns `GenerationQualityReport` with structured failure codes (`MISSING_CORE_LOOP`, `UNSUPPORTED_CAPABILITY`, `INSUFFICIENT_PROGRESSION`, etc.).
 
-### Subtask E: Benchmark Dataset & Evaluation Tooling
-- [x] Create `backend/tests/data/discovery_benchmark.json` with 30 realistic natural language queries and expected behavioral properties.
-- [x] Create `backend/scripts/evaluate_discovery_intelligence.py` to evaluate Top-5 relevance, hard constraint satisfaction, negative satisfaction, diversity, and latency.
+### Subtask E: Normalizer Hardening & Safe Auto-Repair
+- [x] Update `backend/app/generation/dsl_normalizer.py`:
+  - Enforce strict policy: Known safe drift/aliases normalize; unknown/ambiguous fields trigger validation failure; unsafe/executable fields (`runtime_script`, `javascript`, `custom_callback`) trigger immediate rejection.
+  - Unambiguous deterministic repairs only (missing theme -> default; missing background -> theme default; implied finale marker -> set true).
+  - Never silently delete semantically meaningful unsupported features.
 
-### Subtask F: Frontend Discovery UX & Polish
-- [x] Update `gameforge-ai/src/types/index.ts` with Discovery Intelligence contracts.
-- [x] Update `gameforge-ai/src/services/discovery.ts` with mode, session context, and feedback methods.
-- [x] Update `gameforge-ai/src/pages/HomePage.tsx`:
-  - Mode selector tabs (`BEST MATCH`, `DISCOVER`, `HIDDEN GEMS`, `POPULAR`)
-  - Refinement chips (`More Relaxing`, `Less Combat`, `Free to Play`, etc.)
-  - Why These summary banner
-  - Card-level actions (`Less Like This`, `Save`, `More`, `Build`)
-  - Hidden Gem badge & grounded trade-offs
-  - Truthful cold-start personalization indicator.
+### Subtask F: Pipeline Orchestration & 10 Compiler Stages
+- [x] Update `backend/app/services/game_generation_service.py`:
+  - Build `GameGenerationContract` first.
+  - Emit 10 deterministic compiler stages via SSE.
+  - Validate schema -> Requirement coverage -> Depth evaluator.
+  - Attempt local deterministic repair before considering bounded semantic repair (max 1 attempt, 45s timeout).
+  - Attach `GenerationQualityReport` to `GenerationResult`.
+
+### Subtask G: Frontend Builder Brief & Quality Summary
+- [x] Update `gameforge-ai/src/components/Builder/BuilderDesignPreview.tsx`:
+  - Show pre-generation Design Brief (Genre, World, Scale, Levels, Core Loop, Requested Systems) derived dynamically from local state with 0 AI calls.
+- [x] Update `gameforge-ai/src/pages/SuccessStatusPage.tsx`:
+  - Display "GameForge Quality Score" summary card with scale-aware health indicator, active systems, recovered drift notice, and disclaimer tooltip.
+
+### Subtask H: Regression Dataset, Evaluator Script & Quality Tests
+- [x] Create `backend/tests/data/generation_quality_cases.json` with 10 diverse cases across genres/scales.
+- [x] Create `backend/scripts/evaluate_generation_quality_v2.py` benchmark script.
+- [x] Create `backend/tests/test_generation_quality_v2.py` testing capability filtering, requirement coverage, cross-system interaction detection, prototype simplicity, campaign progression, and deterministic repair.
 
 ---
 
-## 3. Verification Results
-
-### Automated Tests
-- `pytest tests/test_discovery_ranker.py`: 8/8 passed in 0.06s.
-- Full discovery regression suite: 36/36 passed in 65.21s:
-  - `tests/test_discovery_2.py`: 11 passed
-  - `tests/test_discovery_ranker.py`: 8 passed
-  - `tests/test_preference_service.py`: 2 passed
-  - `tests/test_saved_discoveries.py`: 9 passed
-  - `tests/test_multilingual_search.py`: 6 passed
-- Benchmark evaluation (`python scripts/evaluate_discovery_intelligence.py`):
-  - Total queries: 30
-  - Intent classification accuracy: 90.0% (27/30)
-  - Hard constraint violations: 0 (Zero tolerance satisfied)
-  - Mean Precision@5: 0.907
-  - Mean search latency: 367.4ms
-- Frontend production build (`npm run build`): SUCCESS, 0 TypeScript errors, 1.48s bundle time.
-- Alembic head: single head `bc9ae398f146`.
-- BROWSER TESTING: NOT PERFORMED (per explicit user directive).
+## 3. Verification
+- [x] Run `pytest tests/test_generation_quality_v2.py -v` (7 passed in 0.07s)
+- [x] Run `pytest tests/test_discovery_api.py -v` (3 passed in 0.14s)
+- [x] Run `pytest tests/test_builds.py tests/test_game_generation.py tests/test_generation_resilience.py tests/test_gameplay_quality.py -q` (42 passed in 1.71s)
+- [x] Run benchmark evaluation `python scripts/evaluate_generation_quality_v2.py` (10/10 passed, 93.3 mean score, 76.2% coverage, 1.18ms latency)
+- [x] Verify Alembic status (`alembic current`, `alembic heads`: head `bc9ae398f146`)
+- [x] Run `npx oxlint` in `gameforge-ai` (0 warnings, 0 errors)
+- [x] Run `npm run build` in `gameforge-ai` (79 modules transformed, 834ms, 0 errors)
+- [x] BROWSER TESTING: NOT PERFORMED (Strictly adhered to user instructions)
 
 ---
 
 ## 4. Documentation
-- [x] `DISCOVERY_INTELLIGENCE_V1.md` created
-- [x] `docs/10-DISCOVERY-ENGINE.md` updated
-- [x] `docs/08-API-CONTRACT.md` updated
-- [x] `docs/15-CURRENT-STATUS.md` updated
+- [x] Create `GAME_GENERATION_V2.md`
+- [x] Update `docs/09-AI-GAME-GENERATION.md`
+- [x] Update `docs/15-CURRENT-STATUS.md`
+- [x] Update `TASK.md`
 
 ---
 
 ## 5. Git Checkpoint
-- [x] Reviewed `git diff` and `git status`
-- [x] Verified zero secrets or unauthorized artifacts
-- [x] Commit created
-- [x] Working tree clean
+- [x] Review `git diff` and `git status`
+- [x] Verify zero secrets or extraneous build artifacts
+- [x] Create commit: `feat: improve game generation quality pipeline`
+- [x] Verify clean working tree

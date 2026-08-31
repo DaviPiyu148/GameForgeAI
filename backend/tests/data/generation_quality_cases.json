@@ -1,0 +1,112 @@
+[
+  {
+    "id": "case_1_cyberpunk_courier",
+    "prompt": "Create a cyberpunk open-world courier game with vehicles, factions, hacking, threat escalation, and three districts.",
+    "engine": "Top-Down Action",
+    "scale": "campaign",
+    "world_mode": "open_world",
+    "expected_genre": "Cyberpunk Action",
+    "required_capabilities": ["VEHICLES", "FACTIONS", "ACTIVITIES", "THREAT_SYSTEM", "OPEN_WORLD_REGIONS"],
+    "forbidden_concepts": ["dynamic NPC memory", "3d", "multiplayer"],
+    "min_expected_score": 75
+  },
+  {
+    "id": "case_2_fantasy_dungeon",
+    "prompt": "Make an intense fantasy dungeon adventure with melee combat, traps, escalating floors, and a final dragon boss.",
+    "engine": "Top-Down Action",
+    "scale": "campaign",
+    "world_mode": "campaign",
+    "expected_genre": "Fantasy Action",
+    "required_capabilities": ["COMBAT_MELEE", "BOSS_FINALE", "CAMPAIGN_LEVELS"],
+    "forbidden_concepts": ["skill trees", "inventory grid"],
+    "min_expected_score": 75
+  },
+  {
+    "id": "case_3_space_survival",
+    "prompt": "Space survival arena with dash mobility, hostile alien waves, laser weapons, and emergency extraction.",
+    "engine": "Arena Survival",
+    "scale": "standard",
+    "world_mode": "linear",
+    "expected_genre": "Sci-Fi Action Survival",
+    "required_capabilities": ["DASH", "ENEMY_WAVES", "COMBAT_RANGED"],
+    "forbidden_concepts": ["multiplayer"],
+    "min_expected_score": 70
+  },
+  {
+    "id": "case_4_roguelike_arena",
+    "prompt": "Fast-paced neon combat arena with dash mechanics, stamina management, and high damage enemies.",
+    "engine": "Top-Down Action",
+    "scale": "standard",
+    "world_mode": "linear",
+    "expected_genre": "Action",
+    "required_capabilities": ["DASH", "COMBAT_RANGED"],
+    "forbidden_concepts": [],
+    "min_expected_score": 68
+  },
+  {
+    "id": "case_5_platformer_campaign",
+    "prompt": "2D retro platformer campaign with double jump physics, dangerous spike hazards, coins to collect, and a stage exit flag.",
+    "engine": "2D Platformer",
+    "scale": "campaign",
+    "world_mode": "campaign",
+    "expected_genre": "Platformer",
+    "required_capabilities": ["PLATFORMING_JUMP", "COLLECTIBLES", "CAMPAIGN_LEVELS"],
+    "forbidden_concepts": [],
+    "min_expected_score": 72
+  },
+  {
+    "id": "case_6_racing_chase",
+    "prompt": "High-speed city street chase with cars, speed boosts, roadblock obstacles, and checkpoint milestones.",
+    "engine": "Top-Down Action",
+    "scale": "standard",
+    "world_mode": "open_world",
+    "expected_genre": "Open World Action",
+    "required_capabilities": ["VEHICLES", "OPEN_WORLD_REGIONS"],
+    "forbidden_concepts": [],
+    "min_expected_score": 68
+  },
+  {
+    "id": "case_7_zombie_survival",
+    "prompt": "Post-apocalyptic wasteland survival with roaming zombie swarms, supply scavenging, barricades, and rescue helicopter finale.",
+    "engine": "Arena Survival",
+    "scale": "campaign",
+    "world_mode": "campaign",
+    "expected_genre": "Survival Horror",
+    "required_capabilities": ["ENEMY_WAVES", "COLLECTIBLES", "BOSS_FINALE", "CAMPAIGN_LEVELS"],
+    "forbidden_concepts": [],
+    "min_expected_score": 72
+  },
+  {
+    "id": "case_8_stealth_infiltration",
+    "prompt": "Stealth infiltration game with patrolling security cameras, guard routes, terminal hacking, and evasion.",
+    "engine": "Top-Down Action",
+    "scale": "standard",
+    "world_mode": "linear",
+    "expected_genre": "Action",
+    "required_capabilities": ["DASH", "ACTIVITIES"],
+    "forbidden_concepts": ["dynamic NPC memory"],
+    "min_expected_score": 65
+  },
+  {
+    "id": "case_9_data_collector",
+    "prompt": "Peaceful puzzle node collector gathering ancient crystals in an alien forest while avoiding bouncing energy spheres.",
+    "engine": "Data Collector",
+    "scale": "standard",
+    "world_mode": "linear",
+    "expected_genre": "Collector",
+    "required_capabilities": ["COLLECTIBLES"],
+    "forbidden_concepts": [],
+    "min_expected_score": 68
+  },
+  {
+    "id": "case_10_casual_prototype",
+    "prompt": "Simple prototype with a player dot, red bouncing enemies, and yellow score tokens.",
+    "engine": "Top-Down Action",
+    "scale": "prototype",
+    "world_mode": "linear",
+    "expected_genre": "Action",
+    "required_capabilities": ["COLLECTIBLES"],
+    "forbidden_concepts": [],
+    "min_expected_score": 60
+  }
+]

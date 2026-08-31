@@ -1,35 +1,30 @@
 # 09 — AI Game Generation
 
-## Game Generation V2 Pipeline
+## Game Generation Pipeline V2 (Quality, Depth & Capability Contract)
 ```text
-USER IDEA
-    ↓
-AI GAME DESIGN & SPECIFICATION (GameDesignSpec + GameDSL)
-    ↓
-STAGE 1: PARSING & SECURITY SCANNING (Extract JSON, Block Code Injection / Unsafe Keys)
-    ↓
-STAGE 2: DETERMINISTIC NORMALIZATION (dsl_normalizer.py: Schema Drift, Levels Migration, Aliases, Scalars)
-    ↓
-STAGE 3: STRICT DSL SCHEMA VALIDATION (Pydantic v2 with extra="forbid")
-    ↓
-STAGE 4: GAMEPLAY QUALITY & SCALE BUDGET (Deterministic Quality & Clearance Checks)
-    ↓
-STAGE 5: BOUNDED AI REPAIR (Max 1 Attempt for Semantic Errors, Dedicated 45s Timeout)
-    ↓
-STAGE 6: DETERMINISTIC PHASER PROTOTYPE (Procedural Generation & Game Feel)
-    ↓
-PLAYTEST TELEMETRY (Non-Intrusive In-Game Event Tracker)
-    ↓
-AI PLAYTEST ANALYSIS (Post-Game Critique & Ratings)
-    ↓
-IMPROVEMENT PLAN (Selectable Actionable Recommendations)
-    ↓
-USER APPROVES CHANGES
-    ↓
-DSL PATCH / REVISION
-    ↓
-REBUILD / VERSION PROTOTYPE (v1 → v2 → v3)
+USER BUILD REQUEST (Prompt + Engine + Scale + Modules)
+      ↓
+STAGE 1: [SYS] UNDERSTANDING GAME REQUEST (build_generation_contract, capability allowlist, reject unsupported)
+      ↓
+STAGE 2: [AI] BUILDING GAME DESIGN (Core loop & progression formulation)
+      ↓
+STAGE 3: [AI] MAPPING RUNTIME CAPABILITIES (Phaser Arcade 3.88.2 Capability Registry)
+      ↓
+STAGE 4: [AI] GENERATING GAMEDSL (Single structured Gemini generation call)
+      ↓
+STAGE 5: [VALIDATION] SCHEMA VALIDATION (Pydantic models with extra="forbid")
+      ↓
+STAGE 6: [VALIDATION] GAMEPLAY QUALITY (GameDepthEvaluator, RequirementCoverageMatrix, GameForge Quality Score)
+      ↓
+STAGE 7: [REPAIR] DETERMINISTIC NORMALIZATION/REPAIR (Safe auto-repair: implied finale, drift normalization)
+      ↓
+STAGE 8: [PHASER] RUNTIME COMPILATION (Phaser 3.88.2 Arcade Physics compilation)
+      ↓
+STAGE 9: [PHASER] RUNTIME VERIFICATION (Procedural seed & reachability guarantee)
+      ↓
+STAGE 10: [SYS] BUILD COMPLETE (Persistence & 0x00_SYS_READY)
 ```
+
 
 ## Provider Abstraction & Model Invariants (Architecture V2)
 - **Active Provider**: Google Gemini (Gemini 3 Family: `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).

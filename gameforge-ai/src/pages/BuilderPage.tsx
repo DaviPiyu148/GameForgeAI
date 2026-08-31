@@ -192,7 +192,7 @@ const BuilderPage = () => {
                 </h3>
                 <span className="font-mono text-[9px] text-on-surface-variant/60">Configuration Preview</span>
               </div>
-              <BuilderDesignPreview params={state.currentBuildParams} />
+              <BuilderDesignPreview params={state.currentBuildParams} prompt={state.currentPrompt} />
             </div>
 
             <div className="p-4 flex-1">

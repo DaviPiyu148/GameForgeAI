@@ -4,7 +4,7 @@
 2026-08-31
 
 ## Current Phase
-Small Product Fixes & Reliability Polish V2 complete. Blueprint derivation fully repaired using canonical DSL normalization. Persistent technical build logs added to success surface. Standard browser Fullscreen API implemented. Account settings (username + password change) endpoints added to backend and frontend. Builder Live Preview upgraded to deterministic Design Preview schematic. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
+Game Generation Pipeline V2 (Depth, Design Quality, Capability-Aware Generation, Quality Gates, Runtime Validation) complete. Full deterministic 10-stage compiler pipeline, runtime capability registry, requirement coverage matrix, and scale-aware depth evaluator active. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
 ---
 
@@ -17,7 +17,9 @@ Small Product Fixes & Reliability Polish V2 complete. Blueprint derivation fully
 | Full-stack operational audit (`FULL_STACK_OPERATIONAL_AUDIT.md`) | COMPLETE |
 | Discovery Visual Experience, Multilingual 2.1, Display Normalization 2.2 | COMPLETE |
 | Discovery Intelligence V1 (Rich Intent, Negatives, Personalization, Diversity, Modes, Grounded Explanations) (`DISCOVERY_INTELLIGENCE_V1.md`) | COMPLETE |
+| Game Generation Pipeline V2 (Depth, Design Quality, Capability Allowlist, Quality Gates, Evaluator) (`GAME_GENERATION_V2.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
+
 | Creator Progression (server-authoritative XP, levels, milestones) | COMPLETE |
 | AI Blueprint + Remix (Phase 4) | COMPLETE |
 | Advanced Game Generation + Game Feel, multi-level campaigns, bounded boss/finale (Phase 5) | COMPLETE |

@@ -1119,8 +1119,21 @@ class DSLNormalizer:
         if "levels" in dsl_candidate:
             normalized["levels"] = cls.normalize_levels(dsl_candidate, issues)
 
+            # Unambiguous auto-repair: If multi-level and no level has is_finale set to True,
+            # mark the final level as finale (safe structural implication)
+            if normalized["levels"] and not any(lvl.get("is_finale") for lvl in normalized["levels"]):
+                normalized["levels"][-1]["is_finale"] = True
+                issues.append(ValidationIssue(
+                    path=["levels", len(normalized["levels"]) - 1, "is_finale"],
+                    issue_type="AUTO_REPAIR",
+                    message="Derived unambiguous finale marker on final level of multi-level campaign.",
+                    severity="LOW",
+                    repairability="DETERMINISTIC",
+                ))
+
         # Normalize Open World if present
         if "open_world" in dsl_candidate and isinstance(dsl_candidate["open_world"], dict):
             normalized["open_world"] = cls.normalize_open_world(dsl_candidate["open_world"], issues)
 
         return normalized, issues
+

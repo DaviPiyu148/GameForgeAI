@@ -14,7 +14,7 @@ from app.services.discovery_service import DiscoveryService
 @pytest.fixture
 def mock_discovery_service():
     class MockService:
-        async def search(self, request: DiscoverySearchRequest) -> DiscoverySearchResponse:
+        async def search(self, request: DiscoverySearchRequest, **kwargs) -> DiscoverySearchResponse:
             if "nomatch" in request.prompt.lower() or "xyz" in request.prompt.lower():
                 return DiscoverySearchResponse(
                     query=request.prompt,

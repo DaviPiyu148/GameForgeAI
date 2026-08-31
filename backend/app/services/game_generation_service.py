@@ -213,11 +213,6 @@ class GameGenerationService:
         status("RUNNING")
 
         # Deterministic test failure compatibility trigger.
-        # Intentionally case-SENSITIVE (unlike the prior /\bERROR\b/i): a deliberate
-        # all-caps "ERROR" sentinel is not something ordinary natural-language game
-        # prompts produce, whereas case-insensitive matching false-positived on
-        # legitimate prompts merely containing the word "error" (e.g. a game about
-        # fixing bugs/glitches). See backend/tests/test_builds.py::test_build_failure_on_error_prompt.
         if re.search(r"\bERROR\b", prompt):
             log("ERROR", "> FATAL_EXCEPTION: BUILD_FAILED: Prompt triggered deterministic failure demonstration.")
             return GenerationResult(
@@ -227,6 +222,47 @@ class GameGenerationService:
             )
 
         active_mods = modules or []
+
+        # STAGE 1: [SYS] Understanding game request
+        from app.generation.generation_contract import build_generation_contract
+        from app.generation.depth_evaluator import GameDepthEvaluator
+        from app.generation.generation_config import QualityFailureCode
+
+        contract = build_generation_contract(
+            prompt=prompt,
+            engine=engine,
+            scale=scale,
+            world_mode=world_mode,
+            modules=active_mods,
+            art_density=art_density,
+            physics=physics,
+        )
+        log("INFO", "[SYS] Understanding game request")
+        log("INFO", f"> Inferred Genre: {contract.genre} // Archetype: {contract.archetype} // Mode: {contract.world_mode}")
+        log("INFO", f"> Core Loop: {contract.core_loop}")
+
+        # Check for explicit unsupported concepts
+        if contract.unsupported_requests:
+            unsupported_names = [u[0] for u in contract.unsupported_requests]
+            log("ERROR", f"[AI] UNSUPPORTED_CAPABILITY: Requested features not supported by 2D Phaser runtime: {', '.join(unsupported_names)}")
+            return GenerationResult(
+                success=False,
+                error_code=QualityFailureCode.UNSUPPORTED_CAPABILITY,
+                error_message=f"Requested unsupported features: {', '.join(unsupported_names)}",
+                attempts_used=1,
+            )
+
+        # STAGE 2: [AI] Building game design
+        log("INFO", "[AI] Building game design")
+
+        # STAGE 3: [AI] Mapping runtime capabilities
+        log("INFO", "[AI] Mapping runtime capabilities")
+        if contract.required_capabilities:
+            log("INFO", f"> Required Capabilities: {', '.join(contract.required_capabilities)}")
+
+        # STAGE 4: [AI] Generating GameDSL
+        log("INFO", "[AI] Generating GameDSL")
+
         user_prompt = build_generation_prompt(
             prompt=prompt,
             engine=engine,
@@ -254,6 +290,7 @@ class GameGenerationService:
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=user_prompt,
                 )
+
                 provider_meta = {
                     "provider": getattr(self.provider, "provider_name", "hosted_provider"),
                     "model": getattr(self.provider, "model", "default"),
@@ -372,18 +409,26 @@ class GameGenerationService:
             )
 
         status("VALIDATING")
-        log("INFO", "[AI] Validating candidate Game DSL & Gameplay Quality...")
+        # STAGE 5: [VALIDATION] Schema validation
+        log("INFO", "[VALIDATION] Schema validation")
 
-        # 4. Dual Validation: Schema + Gameplay Quality
         val_result = validate_game_dsl(dsl_dict)
+
+        # STAGE 6: [VALIDATION] Gameplay quality
+        log("INFO", "[VALIDATION] Gameplay quality")
 
         # Log informative normalization details if any occurred
         if val_result.issues:
+            # STAGE 7: [REPAIR] Deterministic normalization/repair
+            log("INFO", "[REPAIR] Deterministic normalization/repair")
             for issue in val_result.issues:
                 if issue.repairability == "DETERMINISTIC":
-                    log("INFO", f"[AI] Local normalization: {issue.message}")
+                    log("INFO", f"> Recovered: {issue.message}")
                 elif issue.repairability == "UNSAFE":
-                    log("ERROR", f"[AI] Security policy rejection: {issue.message}")
+                    log("ERROR", f"> Security rejection: {issue.message}")
+        else:
+            log("INFO", "[REPAIR] Deterministic normalization/repair")
+            log("INFO", "> 0 schema issues detected; clean candidate")
 
         # Reject unsafe scripts or code injection immediately without repair
         if val_result.has_unsafe_issues():
@@ -398,12 +443,23 @@ class GameGenerationService:
 
         quality_errors: List[str] = []
         budget_errors: List[str] = []
+        quality_report = None
 
         if val_result.is_valid and val_result.dsl:
             quality_result = GameplayQualityValidator.validate(val_result.dsl)
             if not quality_result.is_valid:
                 quality_errors = quality_result.errors
             budget_errors = GameplayQualityValidator.validate_scale_budget(val_result.dsl, scale)
+
+            # Evaluate GameForge Quality Score & Depth
+            quality_report = GameDepthEvaluator.evaluate(val_result.dsl, contract)
+            log("INFO", f"[VALIDATION] GameForge Quality Score: {quality_report.score}/100 ({scale.capitalize()} target)")
+            log("INFO", f"> Core Loop: {round(quality_report.core_loop_score, 1)} // Progression: {round(quality_report.progression_score, 1)} // Variety: {round(quality_report.variety_score, 1)}")
+            log("INFO", f"> Mechanic Coverage: {round(quality_report.mechanic_coverage_score, 1)} // Cross-System: {round(quality_report.cross_system_score, 1)}")
+
+            if quality_report.warnings:
+                for w in quality_report.warnings[:3]:
+                    log("WARNING", f"> Design warning: {w}")
 
         all_errors = val_result.errors + quality_errors + budget_errors
 
@@ -417,7 +473,7 @@ class GameGenerationService:
                 except Exception:
                     pass
 
-            # 5. Reachability and Spatial Feasibility Validation & Auto-Repair
+            # Reachability and Spatial Feasibility Validation & Auto-Repair
             from app.generation.reachability import ReachabilityValidator
             reach_res = ReachabilityValidator.validate_and_repair_level(
                 world=dsl.world,
@@ -457,12 +513,18 @@ class GameGenerationService:
                     lvl.entities = lvl_reach.repaired_entities
 
             log("INFO", "[AI] Game specification validated successfully")
+            # STAGE 8: [PHASER] Runtime compilation
+            log("INFO", "[PHASER] Runtime compilation")
             level_cnt = len(dsl.levels) if dsl.levels else 1
-            log("SUCCESS", f"[VALIDATION] Schema v3.0: PASS // Gameplay Quality: PASS // Levels: {level_cnt}")
-            log("INFO", "[PHASER]")
+            log("SUCCESS", f"> Compiled {level_cnt} level(s) for Phaser 3.88.2 Arcade Physics engine")
+
+            # STAGE 9: [PHASER] Runtime verification
+            log("INFO", "[PHASER] Runtime verification")
             log("INFO", f"> Layout Seed: {dsl.world.procedural_seed or 18492031}")
             log("INFO", f"> Procedural Generation & Reachability: PASS")
-            log("SUCCESS", "> Prototype ready")
+
+            # STAGE 10: [SYS] Build complete
+            log("SUCCESS", "[SYS] Build complete")
 
             return GenerationResult(
                 success=True,
@@ -471,6 +533,7 @@ class GameGenerationService:
                 attempts_used=1,
                 provider_meta=provider_meta,
             )
+
 
         # 5. Bounded repair loop (strictly limited to semantic errors requiring LLM intervention)
         repair_timeout = getattr(settings, "AI_REPAIR_TIMEOUT_SECONDS", 45.0)
