@@ -16,6 +16,7 @@ Small Product Fixes & Reliability Polish V2 complete. Blueprint derivation fully
 | Forensic security remediation (multiple rounds) | COMPLETE |
 | Full-stack operational audit (`FULL_STACK_OPERATIONAL_AUDIT.md`) | COMPLETE |
 | Discovery Visual Experience, Multilingual 2.1, Display Normalization 2.2 | COMPLETE |
+| Discovery Intelligence V1 (Rich Intent, Negatives, Personalization, Diversity, Modes, Grounded Explanations) (`DISCOVERY_INTELLIGENCE_V1.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
 | Creator Progression (server-authoritative XP, levels, milestones) | COMPLETE |
 | AI Blueprint + Remix (Phase 4) | COMPLETE |

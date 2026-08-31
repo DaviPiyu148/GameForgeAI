@@ -7,6 +7,7 @@ import type {
   GameProject,
   LoginRequest,
   RegisterRequest,
+  DiscoverySessionContext,
 } from '../types';
 import { projectService } from '../services/projects';
 import { buildService } from '../services/builds';
@@ -44,6 +45,9 @@ const defaultState: AppState = {
   lastError: null,
   isSearching: false,
   discoveryResults: [],
+  discoveryMode: 'BEST_MATCH',
+  discoveryResponse: null,
+  discoverySession: {},
   isProjectsLoading: false,
   projectsError: null,
   progress: null,
@@ -479,23 +483,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // 5. Real Discovery Search Flow (Public, zero auth requirement)
-  const searchDiscovery = async (promptText: string, navigate: (path: string) => void) => {
+  const searchDiscovery = async (
+    promptText: string,
+    navigate: (path: string) => void,
+    mode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR',
+    sessionContext?: DiscoverySessionContext
+  ) => {
     const trimmed = promptText.trim();
     if (!trimmed) {
       navigate('/build');
       return;
     }
 
+    const activeMode = mode || state.discoveryMode || 'BEST_MATCH';
+    const activeSession = sessionContext || state.discoverySession || {};
+
     setPrompt(trimmed);
-    setState((s) => ({ ...s, isSearching: true, discoveryResults: [] }));
+    setState((s) => ({
+      ...s,
+      isSearching: true,
+      discoveryResults: [],
+      discoveryMode: activeMode,
+      discoverySession: activeSession,
+    }));
 
     try {
       // Request up to 24 candidates from backend discovery index
-      const response = await discoveryService.searchGames(trimmed, 24);
+      const response = await discoveryService.searchGames(trimmed, 24, undefined, activeMode, activeSession);
       setState((s) => ({
         ...s,
         isSearching: false,
         discoveryResults: response.results || [],
+        discoveryResponse: response,
       }));
 
       if (response.no_strong_match || !response.results || response.results.length === 0) {
@@ -510,6 +529,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       navigate('/discover/no-matches');
     }
   };
+
 
   // 6. Real Build Pipeline Execution (Auth Gated)
   const compileProject = async (navigate: (path: string) => void) => {

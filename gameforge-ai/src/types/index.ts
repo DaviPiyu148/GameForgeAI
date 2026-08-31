@@ -193,10 +193,32 @@ export interface DiscoveryFilters {
   max_year?: number;
 }
 
+export interface DiscoverySessionContext {
+  refinements?: string[];
+  less_like_this_game_ids?: string[];
+  temporary_avoid_tags?: string[];
+  temporary_avoid_genres?: string[];
+  surprise_seed?: number;
+}
+
+export interface DiscoveryFeedbackRequest {
+  game_id: string;
+  feedback: 'like' | 'dislike' | 'less_like_this';
+}
+
+export interface DiscoveryFeedbackResponse {
+  status: string;
+  game_id: string;
+  feedback: string;
+  message: string;
+}
+
 export interface DiscoverySearchRequest {
   prompt: string;
   limit?: number;
   filters?: DiscoveryFilters;
+  mode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR';
+  session_context?: DiscoverySessionContext;
 }
 
 export interface GameEnrichment {
@@ -255,6 +277,9 @@ export interface DiscoverySearchResult {
   score: number;
   match_highlights: string[];
   explanation: string;
+  is_hidden_gem?: boolean;
+  trade_offs?: string[];
+  personalization_reasons?: string[];
 }
 
 export interface DiscoverySearchResponse {
@@ -263,8 +288,13 @@ export interface DiscoverySearchResponse {
   no_strong_match: boolean;
   query_type?: string;
   target_entity?: string | null;
+  mode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR';
+  why_these?: string | null;
+  personalized?: boolean;
+  personalization_evidence?: string[];
   results: DiscoverySearchResult[];
 }
+
 
 // --- Phase 4: Game Blueprint & Remix ---
 export interface BlueprintObjective {
@@ -379,6 +409,9 @@ export interface AppState {
   lastError?: AppError | null;
   isSearching?: boolean;
   discoveryResults?: DiscoverySearchResult[];
+  discoveryMode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR';
+  discoveryResponse?: DiscoverySearchResponse | null;
+  discoverySession?: DiscoverySessionContext;
   isProjectsLoading?: boolean;
   projectsError?: string | null;
   progress?: UserProgressData | null;
@@ -396,7 +429,12 @@ export interface AppContextType {
   compileProject: (navigate: (path: string) => void) => Promise<void>;
   cancelCurrentBuild: () => Promise<void>;
   retryBuild: (navigate: (path: string) => void) => Promise<void>;
-  searchDiscovery: (prompt: string, navigate: (path: string) => void) => Promise<void>;
+  searchDiscovery: (
+    prompt: string,
+    navigate: (path: string) => void,
+    mode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR',
+    sessionContext?: DiscoverySessionContext
+  ) => Promise<void>;
   refreshProjects: () => Promise<void>;
   clearCompilerLogs: () => void;
   // B7 Auth + Saved Discoveries Actions
@@ -420,3 +458,4 @@ export interface AppContextType {
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<void>;
 }
+

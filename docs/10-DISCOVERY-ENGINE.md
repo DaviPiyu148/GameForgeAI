@@ -1,7 +1,8 @@
-# 10 — Discovery Engine 2.2 & Recommendation System
+# 10 — Discovery Engine 2.3 & Discovery Intelligence V1
 
-## Implementation Status (IMPLEMENTED — Discovery 2.2)
-The Discovery Engine features hybrid semantic + lexical retrieval, deterministic intent parsing, multilingual catalog normalization and query translation, three-layer metadata separation (ORIGINAL / SEARCH / DISPLAY), user-facing English display normalization, reciprocal rank fusion, S-curve score calibration, multi-mode recommendation service, and resilient IGDB media enrichment.
+## Implementation Status (IMPLEMENTED — Discovery Intelligence V1)
+The Discovery Engine features hybrid semantic + lexical retrieval, deterministic rich intent parsing (moods, session lengths, combat/difficulty preferences, hard/soft negations), centralized ranking configuration (`ranking_config.py`), O(1) FAISS vector retrieval, multi-signal ranking with bounded Game DNA personalization, soft franchise diversity reranking, interactive discovery modes (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`), interactive feedback API (`POST /api/discovery/feedback`), grounded explanations, honest trade-offs, and clean English display normalization.
+
 
 ## User-Facing English Display Normalization (Discovery 2.2)
 - **Three-Layer Decoupling**:

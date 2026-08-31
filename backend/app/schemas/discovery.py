@@ -37,6 +37,46 @@ class DiscoveryFilters(BaseModel):
     max_year: Optional[int] = Field(default=None, ge=1970, le=2035)
 
 
+class DiscoverySessionContext(BaseModel):
+    """Client-side session context and interactive refinements for discovery."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    refinements: Optional[List[str]] = Field(default=None, description="Active refinement tags, e.g. 'More Relaxing', 'Less Combat'")
+    less_like_this_game_ids: Optional[List[str]] = Field(default=None, description="Game IDs user selected 'Less Like This' for in current session")
+    temporary_avoid_tags: Optional[List[str]] = Field(default=None, description="Session-scoped avoid tags")
+    temporary_avoid_genres: Optional[List[str]] = Field(default=None, description="Session-scoped avoid genres")
+    surprise_seed: Optional[int] = Field(default=None, description="Stable seed for deterministic Surprise Me perturbation")
+
+
+class DiscoveryFeedbackRequest(BaseModel):
+    """Request payload for POST /api/discovery/feedback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    game_id: str = Field(..., description="Canonical game ID or Steam App ID")
+    feedback: str = Field(..., description="Interaction signal: 'like', 'dislike', 'less_like_this'")
+
+    @field_validator("feedback")
+    @classmethod
+    def validate_feedback(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in ("like", "dislike", "less_like_this"):
+            raise ValueError("Feedback must be one of: 'like', 'dislike', 'less_like_this'.")
+        return clean
+
+
+class DiscoveryFeedbackResponse(BaseModel):
+    """Response payload for POST /api/discovery/feedback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = "success"
+    game_id: str
+    feedback: str
+    message: str
+
+
 class DiscoverySearchRequest(BaseModel):
     """Inbound search request payload for POST /api/discovery/search."""
 
@@ -55,6 +95,15 @@ class DiscoverySearchRequest(BaseModel):
         description="Maximum number of games to return",
     )
     filters: Optional[DiscoveryFilters] = None
+    mode: Optional[str] = Field(
+        default="BEST_MATCH",
+        description="Discovery ranking mode: 'BEST_MATCH', 'DISCOVER', 'HIDDEN_GEMS', 'POPULAR'",
+    )
+    session_context: Optional[DiscoverySessionContext] = Field(
+        default=None,
+        description="Optional session-scoped context, refinements, and temporary negative preferences",
+    )
+
 
 
 class MoreLikeThisRequest(BaseModel):
@@ -152,6 +201,9 @@ class DiscoverySearchResult(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0, description="Calibrated relevance score (0.0 - 1.0)")
     match_highlights: List[str] = Field(default_factory=list, description="Specific matched tags, modes, and genres")
     explanation: str = Field(..., description="Deterministic explanation of why this game matches")
+    is_hidden_gem: bool = Field(default=False, description="Whether this title satisfies the hidden gem criteria")
+    trade_offs: List[str] = Field(default_factory=list, description="Explicit grounded trade-offs, e.g. 'More combat than requested'")
+    personalization_reasons: List[str] = Field(default_factory=list, description="Explicit reasons grounded in user profile, e.g. 'Because you like RPG'")
 
 
 class DiscoverySearchResponse(BaseModel):
@@ -164,7 +216,12 @@ class DiscoverySearchResponse(BaseModel):
     no_strong_match: bool
     query_type: Optional[str] = "CONCEPT"
     target_entity: Optional[str] = None
+    mode: str = "BEST_MATCH"
+    why_these: Optional[str] = None
+    personalized: bool = False
+    personalization_evidence: List[str] = Field(default_factory=list)
     results: List[DiscoverySearchResult]
+
 
 
 class BuildInspirationResponse(BaseModel):

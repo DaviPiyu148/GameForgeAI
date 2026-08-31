@@ -47,12 +47,13 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 - `GET /api/builds/{id}/logs` -> Retrieve all persisted logs in ascending sequence order. Owner mismatch returns 404.
 - `POST /api/builds/{id}/sse-token` -> Issue a short-lived (90s TTL) SSE credential bound to `{id}` for secure EventSource streaming without exposing long-lived JWT bearer tokens in URLs. Returns `{ "sse_token": "...", "expires_in_seconds": 90 }`.
 - `GET /api/builds/{id}/events` -> Server-Sent Events (`text/event-stream`) streaming live logs and status transitions until terminal state. Authenticated via `?sse_token=<short-lived-token>` or `Authorization: Bearer <token>`. Owner mismatch returns 404 before stream starts.
-- `POST /api/builds/{id}/cancel` -> Cancel an active (non-terminal) build job. Returns `200 OK` with the updated `BuildResponse` (`status: "CANCELLED"`). Owner mismatch returns 404.
+## Discovery & Recommendations (IMPLEMENTED — B6, Discovery 2.2, Discovery Intelligence V1)
+- `POST /api/discovery/search` -> Search games using natural language descriptions, entity names, or concepts. Optional filters, modes (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`), and session context (`refinements`, `less_like_this_game_ids`, `temporary_avoid_tags`). Returns `DiscoverySearchResponse` with calibrated score, grounded evidence, honest trade-offs, and personalization reasons.
+- `POST /api/discovery/feedback` -> Submit user feedback (`like`, `dislike`, `less_like_this`). `like` awards rate-limited anti-spam progression XP; negative feedback refines session context without rewarding exploits. Returns `200 OK` with `{ status, game_id, feedback, message }`.
+- `GET /api/discovery/similar/{steam_app_id}` -> Retrieve similar games based on nearest neighbor vectors in FAISS.
+- `POST /api/discovery/more-like-this` -> Multi-seed recommendation blend.
+- `GET /api/discovery/build-inspiration/{steam_app_id}` -> Extract 2D prototype archetype, modules, and starter prompt.
 
----
-
-## Profile & Personalization (IMPLEMENTED — Product Expansion V1 / Creator Progression V1)
-*All routes require `Authorization: Bearer <token>`.*
 - `GET /api/profile/progress` -> Server-authoritative XP/level/milestone status. Returns `200 OK` with `{ user_id, total_xp, current_level, creator_title, current_level_base_xp, next_level_xp, xp_into_level, xp_needed_for_next, progress_percentage, milestones: [{ milestone_key, title, description, icon, xp_bonus, is_unlocked, unlocked_at }], unlocked_milestone_count, total_milestone_count, recent_events: [{ id, event_type, xp_amount, source_reference, created_at }] }`.
 - `GET /api/profile/preferences` -> Behavioral genre-affinity distribution ("Game DNA") derived from search/save/build/play activity. Returns `200 OK` with `{ user_id, top_genres: [{ genre, score, percentage, interaction_count, affinity_tier }], total_interactions, strongest_match, recent_interest, confidence_level, summary_headline, has_sufficient_data }`.
 

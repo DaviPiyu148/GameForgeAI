@@ -96,12 +96,18 @@ class DiscoveryService:
         _ = self.lexical_index
         _ = self.query_parser
 
-    async def search(self, request: DiscoverySearchRequest) -> DiscoverySearchResponse:
+    async def search(
+        self,
+        request: DiscoverySearchRequest,
+        user_id: Optional[str] = None,
+        db: Optional[Any] = None,
+    ) -> DiscoverySearchResponse:
         """
         Execute deterministic hybrid discovery search combining lexical full-catalog matching
         and dense FAISS semantic similarity with calibrated evidence-based ranking.
         """
         raw_prompt = request.prompt.strip()
+        mode = request.mode or "BEST_MATCH"
         if not raw_prompt:
             return DiscoverySearchResponse(
                 query=request.prompt,
@@ -109,6 +115,8 @@ class DiscoveryService:
                 no_strong_match=True,
                 query_type="CONCEPT",
                 target_entity=None,
+                mode=mode,
+                why_these=None,
                 results=[],
             )
 
@@ -154,7 +162,33 @@ class DiscoveryService:
                 query_type=parsed_query.query_type,
             )
 
-        # 4. Candidate Fusion & Hybrid Ranking
+        # 4. Extract User Profile & Vectors if authenticated
+        user_prefs = None
+        user_liked_vec = None
+        user_disliked_vec = None
+        personalized = False
+        pers_evidence: List[str] = []
+
+        if user_id and db:
+            try:
+                from app.services.preference_service import preference_service
+                user_prefs = preference_service.get_preferences(db, user_id)
+                if user_prefs and user_prefs.has_sufficient_data:
+                    personalized = True
+                    pers_evidence = [f"Affinities: {item.genre}" for item in user_prefs.top_genres[:2]]
+
+                liked_v, dis_v = preference_service.get_user_vectors(
+                    db=db,
+                    user_id=user_id,
+                    index_manager=self.index_manager,
+                    catalog_manager=self.catalog_manager,
+                )
+                user_liked_vec = liked_v
+                user_disliked_vec = dis_v
+            except Exception as ex:
+                logger.warning(f"Failed to load user preferences in discovery search: {ex}")
+
+        # 5. Candidate Fusion & Multi-Signal Hybrid Ranking
         results: List[DiscoverySearchResult] = Ranker.rank_hybrid(
             semantic_candidates=semantic_candidates,
             lexical_candidates=lexical_candidates,
@@ -162,9 +196,23 @@ class DiscoveryService:
             filters=request.filters,
             limit=request.limit,
             min_threshold=MIN_MATCH_SCORE_THRESHOLD,
+            mode=mode,
+            session_context=request.session_context,
+            user_preferences=user_prefs,
+            user_liked_vector=user_liked_vec,
+            user_disliked_vector=user_disliked_vec,
+            index_manager=self.index_manager,
         )
 
-        # 5. Enrich Top Results with IGDB Media & Summaries (Non-blocking / cached)
+        # 6. Generate grounded Why These summary
+        why_these = Ranker.generate_why_these_summary(
+            parsed_query=parsed_query,
+            results=results,
+            mode=mode,
+            personalized=personalized,
+        )
+
+        # 7. Enrich Top Results with IGDB Media & Summaries (Non-blocking / cached)
         await self._attach_enrichment_and_update_display(results)
 
         no_strong_match = len(results) == 0 or (len(results) > 0 and results[0].score < STRONG_MATCH_THRESHOLD)
@@ -175,8 +223,13 @@ class DiscoveryService:
             no_strong_match=no_strong_match,
             query_type=parsed_query.query_type,
             target_entity=parsed_query.target_entity,
+            mode=mode,
+            why_these=why_these,
+            personalized=personalized,
+            personalization_evidence=pers_evidence,
             results=results,
         )
+
 
     async def get_similar_games(self, steam_app_id: str, limit: int = 12) -> DiscoverySearchResponse:
         """

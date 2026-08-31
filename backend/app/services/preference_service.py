@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.preference import UserGenrePreference
@@ -274,4 +274,97 @@ class PreferenceService:
         }
 
 
+    @classmethod
+    def record_negative_signal(
+        cls,
+        db: Session,
+        user_id: str,
+        raw_genres_or_tags: List[str],
+        weight: float = 2.0,
+        source: str = "generic_negative",
+    ) -> None:
+        """
+        Record negative interaction signal (e.g. Dislike, Less Like This).
+        Gradually dampens the corresponding genre score in a bounded way without destroying history.
+        """
+        if not raw_genres_or_tags or weight <= 0:
+            return
+
+        canonical_genres = cls.map_to_canonical_genres(raw_genres_or_tags)
+        if not canonical_genres:
+            return
+
+        now = datetime.now(timezone.utc)
+        for genre in canonical_genres:
+            pref = (
+                db.query(UserGenrePreference)
+                .filter(
+                    UserGenrePreference.user_id == user_id,
+                    UserGenrePreference.genre == genre,
+                )
+                .first()
+            )
+            if pref:
+                # Bounded score reduction: never drop below 0.0
+                pref.score = max(0.0, round(pref.score - weight * 0.5, 2))
+                pref.last_interaction_at = now
+
+        db.commit()
+        logger.debug(
+            "Recorded negative signal for user %s: genres=%s weight=%.1f source=%s",
+            user_id,
+            list(canonical_genres),
+            weight,
+            source,
+        )
+
+    @classmethod
+    def get_user_vectors(
+        cls,
+        db: Session,
+        user_id: Optional[str],
+        index_manager: Any,
+        catalog_manager: Any,
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """
+        Extract user preference vectors:
+        liked_vector: mean(embeddings(user's saved games))
+        disliked_vector: None unless genuine negative interaction records exist.
+        Returns: (liked_vector, disliked_vector) as numpy arrays or (None, None).
+        """
+        if not user_id or not index_manager or not index_manager.is_ready():
+            return None, None
+
+        import numpy as np
+        from app.models.saved_discovery import SavedDiscovery
+
+        # 1. Compute liked_vector from user's saved games
+        saved_records = (
+            db.query(SavedDiscovery.steam_app_id)
+            .filter(SavedDiscovery.user_id == user_id)
+            .limit(20)
+            .all()
+        )
+        if not saved_records:
+            return None, None
+
+        vectors: List[np.ndarray] = []
+        for (steam_app_id,) in saved_records:
+            vec = index_manager.get_vector(str(steam_app_id))
+            if vec is not None:
+                vectors.append(vec)
+
+        if not vectors:
+            return None, None
+
+        # Mean and L2 normalize
+        mean_vec = np.mean(vectors, axis=0)
+        norm = np.linalg.norm(mean_vec)
+        liked_vec = (mean_vec / norm).astype(np.float32) if norm > 0 else None
+
+        # Disliked vector is strictly None unless genuine persistent negative data exists
+        return liked_vec, None
+
+
 preference_service = PreferenceService()
+

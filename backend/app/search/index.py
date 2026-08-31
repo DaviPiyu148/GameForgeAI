@@ -56,6 +56,7 @@ class FAISSIndexManager:
             self.metadata = json.load(f)
 
         self.id_mapping = [str(x) for x in self.metadata.get("id_mapping", [])]
+        self._id_to_pos: Dict[str, int] = {gid: idx for idx, gid in enumerate(self.id_mapping)}
         logger.info(f"FAISS index loaded successfully with {self.index.ntotal} vectors.")
 
     @classmethod
@@ -100,3 +101,30 @@ class FAISSIndexManager:
                 results.append((game_id, float(score)))
 
         return results
+    
+    def get_vector(self, game_id: str) -> Optional[np.ndarray]:
+        """
+        Retrieve precomputed normalized embedding vector for a game in O(1) time.
+        Returns None if index not ready or game ID not present in 20k indexed vectors.
+        """
+        if not self.is_ready() or not hasattr(self, "_id_to_pos"):
+            return None
+        idx = self._id_to_pos.get(str(game_id))
+        if idx is None:
+            return None
+        try:
+            vec = self.index.reconstruct(idx)
+            return np.asarray(vec, dtype=np.float32)
+        except Exception as e:
+            logger.debug(f"Failed to reconstruct vector for game_id {game_id}: {e}")
+            return None
+
+    def get_vectors(self, game_ids: List[str]) -> Dict[str, np.ndarray]:
+        """Batch retrieve precomputed vectors for existing games."""
+        result: Dict[str, np.ndarray] = {}
+        for gid in game_ids:
+            v = self.get_vector(gid)
+            if v is not None:
+                result[str(gid)] = v
+        return result
+

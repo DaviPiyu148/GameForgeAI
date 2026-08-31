@@ -7,6 +7,8 @@ import type { DiscoverySearchResult } from '../types';
 
 const INITIAL_VISIBLE_RESULTS = 12;
 
+type DiscoveryMode = 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR';
+
 const HomePage = () => {
   const [promptText, setPromptText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -14,6 +16,9 @@ const HomePage = () => {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [selectedGameForDetails, setSelectedGameForDetails] = useState<DiscoverySearchResult | null>(null);
   const [failedCardImages, setFailedCardImages] = useState<Record<string, boolean>>({});
+  const [activeMode, setActiveMode] = useState<DiscoveryMode>('BEST_MATCH');
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<string, string>>({});
+
   const navigate = useNavigate();
   const {
     setPrompt,
@@ -40,13 +45,20 @@ const HomePage = () => {
   const handleChipClick = (text: string) => {
     setPromptText(text);
     setPrompt(text);
-    searchDiscovery(text, navigate);
+    searchDiscovery(text, navigate, activeMode);
+  };
+
+  const handleModeChange = (mode: DiscoveryMode) => {
+    setActiveMode(mode);
+    if (promptText.trim()) {
+      searchDiscovery(promptText, navigate, mode);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (promptText.trim()) {
-      searchDiscovery(promptText, navigate);
+      searchDiscovery(promptText, navigate, activeMode);
     } else {
       navigate('/build');
     }
@@ -61,22 +73,36 @@ const HomePage = () => {
     }
   };
 
-  const handleMoreLikeThis = async (gameId: string, gameTitle: string) => {
+  const handleFeedback = async (gameId: string, feedbackType: 'like' | 'dislike' | 'less_like_this') => {
+    setFeedbackGiven((prev) => ({ ...prev, [gameId]: feedbackType }));
     try {
-      setIsActionLoading(gameId);
-      const res = await discoveryService.getSimilarGames(gameId, 24);
-      setPromptText(`games like ${gameTitle}`);
-      setPrompt(`games like ${gameTitle}`);
-      setState((s) => ({
-        ...s,
-        discoveryResults: res.results || [],
-      }));
-      window.scrollTo({ top: 400, behavior: 'smooth' });
+      await discoveryService.submitFeedback(gameId, feedbackType);
+      if (feedbackType === 'less_like_this') {
+        // Add to session context and filter out immediately
+        setState((s) => ({
+          ...s,
+          discoveryResults: (s.discoveryResults || []).filter(
+            (r) => r.game.id !== gameId && r.game.external_id !== gameId
+          ),
+          discoverySession: {
+            ...s.discoverySession,
+            less_like_this_game_ids: [
+              ...(s.discoverySession?.less_like_this_game_ids || []),
+              gameId,
+            ],
+          },
+        }));
+      }
     } catch (err) {
-      console.warn('Failed to fetch similar games:', err);
-    } finally {
-      setIsActionLoading(null);
+      console.warn('Failed to submit discovery feedback:', err);
     }
+  };
+
+  const handleRefinement = (refinementText: string) => {
+    const combinedPrompt = `${promptText} ${refinementText}`.trim();
+    setPromptText(combinedPrompt);
+    setPrompt(combinedPrompt);
+    searchDiscovery(combinedPrompt, navigate, activeMode);
   };
 
   const handleBuildSimilar = async (result: DiscoverySearchResult) => {
@@ -84,7 +110,7 @@ const HomePage = () => {
     try {
       setIsActionLoading(`build-${gameId}`);
       const inspiration = await discoveryService.getBuildInspiration(gameId);
-      
+
       updateBuildParams({
         modules: inspiration.suggested_modules,
         ...(inspiration.suggested_art_density !== undefined ? { artDensity: inspiration.suggested_art_density } : {}),
@@ -114,59 +140,65 @@ const HomePage = () => {
         {/* Status Pill */}
         <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-terminal-bg glow-box-cyan text-xs font-mono text-primary font-medium uppercase tracking-wider">
           <span className="w-2 h-2 rounded-full bg-emerald-400 ai-pulse inline-block"></span>
-          <span>DISCOVERY ENGINE 2.0 // HYBRID FAISS + LEXICAL RANKER</span>
+          <span>DISCOVERY INTELLIGENCE V1 // MULTI-SIGNAL ENGINE</span>
         </div>
 
         {/* Main Heading */}
-        <h1 className="font-display text-3xl sm:text-4xl md:text-5xl text-white leading-tight tracking-tight max-w-3xl">
-          Describe the game you
-          <br className="hidden sm:inline" />{' '}
-          <span className="text-secondary text-glow-magenta">wish existed.</span>
-        </h1>
-
-        {/* Subtitle Paragraph */}
-        <p className="text-on-surface-variant font-body text-base sm:text-lg max-w-2xl text-center leading-relaxed">
-          GameForge AI combines dense semantic embeddings with full lexical indexing, intent classification, and IGDB enrichment to discover existing games and synthesize playable prototypes.
-        </p>
+        <div className="space-y-2">
+          <h1 className="font-display tracking-tight text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white uppercase glow-text-cyan">
+            DISCOVER & REMIX <br className="hidden sm:inline" />
+            <span className="text-secondary glow-text-magenta">ANY GAME CONCEPT</span>
+          </h1>
+          <p className="font-body text-sm sm:text-base md:text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
+            Search 120,000+ PC titles with natural intent, mood, and negative filters — or jumpstart playable browser prototypes.
+          </p>
+        </div>
       </section>
 
-      {/* 2. Terminal Input */}
-      <section className="w-full max-w-3xl mx-auto mb-4 stagger-enter stagger-2">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-terminal-bg rounded-lg border border-primary/50 glow-box-cyan focus-within:border-primary-bright focus-within:shadow-[0_0_20px_rgba(76,224,210,0.5)] transition-all overflow-hidden shadow-2xl"
-        >
-          {/* Header bar */}
-          <div className="bg-terminal-header px-4 py-2.5 flex items-center justify-between border-b border-outline-variant/30">
+      {/* 2. Interactive Discovery Search & Mode Selector */}
+      <section className="w-full max-w-3xl mx-auto space-y-4 mb-6 stagger-enter stagger-2">
+        {/* Mode Selector Tabs */}
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {(
+            [
+              { id: 'BEST_MATCH', label: 'Best Match', icon: 'verified' },
+              { id: 'DISCOVER', label: 'Discover', icon: 'explore' },
+              { id: 'HIDDEN_GEMS', label: 'Hidden Gems', icon: 'diamond' },
+              { id: 'POPULAR', label: 'Popular', icon: 'local_fire_department' },
+            ] as const
+          ).map((m) => {
+            const isSelected = activeMode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleModeChange(m.id)}
+                className={`px-3.5 py-1.5 rounded-full font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-primary text-on-primary shadow-[0_0_12px_rgba(76,224,210,0.5)]'
+                    : 'border border-outline-variant bg-terminal-bg text-on-surface-variant hover:border-primary/50 hover:text-white'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">{m.icon}</span>
+                <span>{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search Input Bar */}
+        <form onSubmit={handleSubmit} className="w-full">
+          <div className="relative bg-terminal-bg border-2 border-primary/60 rounded-xl p-2 sm:p-3 shadow-2xl glow-box-cyan flex items-center gap-2 sm:gap-3 transition-all focus-within:border-primary focus-within:glow-box-cyan-intense">
+            <span className="material-symbols-outlined text-primary text-2xl pl-2 hidden sm:inline">search</span>
+            <input
+              type="text"
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              placeholder="e.g. relaxing farming game without horror, or games like Cyberpunk but less combat..."
+              className="flex-1 bg-transparent text-white font-mono text-xs sm:text-sm md:text-base outline-none placeholder:text-on-surface-variant/50 px-2"
+            />
+
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-secondary inline-block"></span>
-              <span className="w-3 h-3 rounded-full bg-tertiary inline-block"></span>
-              <span className="w-3 h-3 rounded-full bg-primary inline-block"></span>
-            </div>
-            <span className="font-mono text-xs text-on-surface-variant font-semibold tracking-wide">
-              bash - gameforge discovery_engine_2.0
-            </span>
-            <div className="w-12"></div>
-          </div>
-
-          {/* Body */}
-          <div className="p-4 sm:p-5 flex items-center gap-3 bg-terminal-bg">
-            <span className="text-primary font-mono font-bold text-lg select-none shrink-0">
-              ~ $
-            </span>
-
-            <div className="flex-1 flex items-center relative min-w-0">
-              <input
-                type="text"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                placeholder="A relaxing 2D co-op survival game with crafting..."
-                className="w-full bg-transparent text-on-surface font-mono text-sm sm:text-base outline-none border-none p-0 focus:ring-0 placeholder:text-on-surface-variant/40"
-              />
-              <span className="w-2 h-4 bg-primary terminal-cursor inline-block shrink-0 ml-1"></span>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={toggleMic}
@@ -198,15 +230,15 @@ const HomePage = () => {
         </form>
       </section>
 
-      {/* 3. Suggestion Chips (when no results or fresh query) */}
+      {/* 3. Suggestion & Refinement Chips */}
       {!hasResults && !state.isSearching && (
         <section className="flex flex-wrap items-center justify-center gap-3 w-full max-w-3xl mx-auto mb-16 sm:mb-20 stagger-enter stagger-3">
           <button
             type="button"
-            onClick={() => handleChipClick('Cozy farming + exploration')}
+            onClick={() => handleChipClick('Cozy farming without horror')}
             className="border border-secondary text-secondary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
-            <span>&gt; Cozy farming + exploration</span>
+            <span>&gt; Cozy farming without horror</span>
           </button>
 
           <button
@@ -219,10 +251,10 @@ const HomePage = () => {
 
           <button
             type="button"
-            onClick={() => handleChipClick('Space survival arena')}
+            onClick={() => handleChipClick('Space exploration no pvp')}
             className="border border-primary text-primary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
-            <span>&gt; Space survival arena</span>
+            <span>&gt; Space exploration no pvp</span>
           </button>
         </section>
       )}
@@ -233,16 +265,16 @@ const HomePage = () => {
           <div className="flex items-center justify-center gap-3 mb-4">
             <span className="w-3 h-3 rounded-full bg-primary ai-pulse inline-block"></span>
             <span className="font-mono text-primary text-sm uppercase font-bold tracking-widest">
-              [DISCOVERY 2.0] RETRIEVING CANDIDATES & RANKING HYBRID SIGNALS...
+              [DISCOVERY INTELLIGENCE] SEARCHING & RANKING RELEVANCE...
             </span>
           </div>
           <p className="font-mono text-xs text-on-surface-variant max-w-lg mx-auto">
-            Executing hybrid FAISS semantic search + lexical token index, applying Reciprocal Rank Fusion, and calibrating match confidence.
+            Applying structured intent understanding, negative filters, diversity reranking, and personalized calibration.
           </p>
         </section>
       )}
 
-      {/* 5. Discovery Results Section (Displayed on Home Page) */}
+      {/* 5. Discovery Results Section */}
       {hasResults && !state.isSearching && (
         <section className="w-full max-w-6xl mx-auto my-8 space-y-6 animate-fade-in">
           {/* Header Console */}
@@ -251,15 +283,22 @@ const HomePage = () => {
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ai-pulse inline-block"></span>
                 <span className="font-mono text-xs text-primary font-bold tracking-widest uppercase">
-                  DISCOVERY 2.0 // HYBRID RANKING & ENRICHMENT
+                  DISCOVERY INTELLIGENCE V1 // {activeMode}
                 </span>
+                {state.discoveryResponse?.personalized && (
+                  <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-400 text-[10px] font-mono">
+                    TAILORED FOR YOU
+                  </span>
+                )}
               </div>
               <h2 className="font-display text-lg sm:text-xl text-white uppercase tracking-wide">
                 Matched Games ({state.discoveryResults?.length} Candidates)
               </h2>
-              <p className="font-mono text-xs text-on-surface-variant mt-1">
-                Concept: &ldquo;{promptText || state.currentPrompt}&rdquo;
-              </p>
+              {state.discoveryResponse?.why_these && (
+                <p className="font-mono text-xs text-primary/90 mt-1 italic">
+                  &gt; {state.discoveryResponse.why_these}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
@@ -282,6 +321,21 @@ const HomePage = () => {
             </div>
           </div>
 
+          {/* Quick Interactive Refinement Chips */}
+          <div className="flex items-center gap-2 flex-wrap pb-2">
+            <span className="font-mono text-xs text-on-surface-variant uppercase font-bold">Refine:</span>
+            {['More Relaxing', 'Less Combat', 'Free to Play', 'Under ₹500', 'Co-op Only'].map((ref) => (
+              <button
+                key={ref}
+                type="button"
+                onClick={() => handleRefinement(ref)}
+                className="px-2.5 py-1 rounded border border-outline-variant hover:border-primary bg-terminal-bg text-on-surface-variant hover:text-primary font-mono text-[11px] transition-colors cursor-pointer"
+              >
+                + {ref}
+              </button>
+            ))}
+          </div>
+
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayedResults.map((result) => {
@@ -293,6 +347,7 @@ const HomePage = () => {
               const isStrong = result.score >= 0.85;
               const isGood = result.score >= 0.70 && result.score < 0.85;
               const tierLabel = isStrong ? 'STRONG MATCH' : isGood ? 'GOOD MATCH' : 'POSSIBLE MATCH';
+              const userFeedback = feedbackGiven[gameKey];
 
               const coverUrl =
                 result.game.cover_image_url ||
@@ -327,12 +382,19 @@ const HomePage = () => {
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-terminal-bg via-terminal-bg/30 to-transparent"></div>
+
+                    {/* Hidden Gem Badge */}
+                    {result.is_hidden_gem && (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-500/90 text-black font-mono text-[10px] font-bold uppercase tracking-wider shadow">
+                        💎 HIDDEN GEM
+                      </div>
+                    )}
                   </div>
 
                   {/* Top: Score Badge & Title */}
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
-                      {/* Calibrated Match Score Badge */}
+                      {/* Match Score Badge */}
                       <div
                         className={`px-2.5 py-1 rounded font-mono text-xs font-bold uppercase tracking-wider shrink-0 ${
                           isStrong
@@ -345,19 +407,11 @@ const HomePage = () => {
                         {tierLabel} • {matchPct}%
                       </div>
 
-                      {/* Platforms / Year / Language */}
+                      {/* Platforms / Year */}
                       <div className="font-mono text-[10px] text-on-surface-variant text-right flex items-center gap-1 justify-end">
                         <span>{result.game.release_year > 0 ? result.game.release_year : 'Steam'}</span>
                         <span>•</span>
                         <span>{result.game.platforms?.join(', ') || 'PC'}</span>
-                        {result.game.description_language && result.game.description_language !== 'en' && (
-                          <span
-                            title="Localized source description"
-                            className="ml-1 px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-surface-container border border-outline-variant text-on-surface-variant/80"
-                          >
-                            {result.game.description_language.toUpperCase()}
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -384,7 +438,7 @@ const HomePage = () => {
                     </p>
                   </div>
 
-                  {/* Middle: AI Match Insights Box */}
+                  {/* Middle: AI Match Insights & Trade-Offs Box */}
                   <div className="my-4 pt-3 border-t border-outline-variant/30 space-y-2">
                     <div className="flex items-center gap-1.5 text-primary text-[11px] font-mono font-bold uppercase">
                       <span className="material-symbols-outlined text-xs">auto_awesome</span>
@@ -409,49 +463,107 @@ const HomePage = () => {
                     <p className="font-mono text-[11px] text-on-surface-variant/90 italic leading-snug">
                       &gt; {result.explanation}
                     </p>
+
+                    {/* Trade-Offs Pill */}
+                    {result.trade_offs && result.trade_offs.length > 0 && (
+                      <div className="text-[10px] font-mono text-amber-400/90 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">info</span>
+                        <span>Trade-off: {result.trade_offs[0]}</span>
+                      </div>
+                    )}
+
+                    {/* Personalization Reason */}
+                    {result.personalization_reasons && result.personalization_reasons.length > 0 && (
+                      <div className="text-[10px] font-mono text-purple-400 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">person</span>
+                        <span>{result.personalization_reasons[0]}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Bottom: Action Buttons */}
-                  <div className="pt-3 border-t border-outline-variant/30 flex items-center gap-2">
-                    {/* Save Action */}
-                    <button
-                      type="button"
-                      onClick={() => saveDiscovery(result.game.external_id)}
-                      disabled={isSaved}
-                      className={`flex-1 px-2 py-2 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded border transition-colors flex items-center justify-center gap-1 cursor-pointer ${
-                        isSaved
-                          ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-default'
-                          : 'border-outline-variant hover:border-primary text-on-surface hover:text-primary hover:bg-primary/5'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-xs">
-                        {isSaved ? 'bookmark_added' : 'bookmark_add'}
-                      </span>
-                      <span>{isSaved ? 'Saved' : 'Save'}</span>
-                    </button>
+                  {/* Bottom: Action & Feedback Buttons */}
+                  <div className="pt-3 border-t border-outline-variant/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {/* Save Action */}
+                      <button
+                        type="button"
+                        onClick={() => saveDiscovery(result.game.external_id)}
+                        disabled={isSaved}
+                        className={`flex-1 px-2 py-2 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded border transition-colors flex items-center justify-center gap-1 cursor-pointer ${
+                          isSaved
+                            ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-default'
+                            : 'border-outline-variant hover:border-primary text-on-surface hover:text-primary hover:bg-primary/5'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-xs">
+                          {isSaved ? 'bookmark_added' : 'bookmark_add'}
+                        </span>
+                        <span>{isSaved ? 'Saved' : 'Save'}</span>
+                      </button>
 
-                    {/* More Intel Modal Action */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGameForDetails(result)}
-                      className="flex-1 px-2 py-2 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                      title="View rich game details, screenshots, and storefront links"
-                    >
-                      <span className="material-symbols-outlined text-xs">visibility</span>
-                      <span>More</span>
-                    </button>
+                      {/* Details Modal Action */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGameForDetails(result)}
+                        className="flex-1 px-2 py-2 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        title="View rich game details, screenshots, and storefront links"
+                      >
+                        <span className="material-symbols-outlined text-xs">visibility</span>
+                        <span>More</span>
+                      </button>
 
-                    {/* Build Similar Action */}
-                    <button
-                      type="button"
-                      onClick={() => handleBuildSimilar(result)}
-                      disabled={isActionLoading === `build-${result.game.external_id || result.game.id}`}
-                      className="flex-1 px-2 py-2 bg-primary text-on-primary font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded btn-interactive glow-cyan flex items-center justify-center gap-1 cursor-pointer"
-                      title="Synthesize game prototype inspired by this title"
-                    >
-                      <span className="material-symbols-outlined text-xs">construction</span>
-                      <span>Build</span>
-                    </button>
+                      {/* Build Similar Action */}
+                      <button
+                        type="button"
+                        onClick={() => handleBuildSimilar(result)}
+                        disabled={isActionLoading === `build-${result.game.external_id || result.game.id}`}
+                        className="flex-1 px-2 py-2 bg-primary text-on-primary font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded btn-interactive glow-cyan flex items-center justify-center gap-1 cursor-pointer"
+                        title="Synthesize game prototype inspired by this title"
+                      >
+                        <span className="material-symbols-outlined text-xs">construction</span>
+                        <span>Build</span>
+                      </button>
+                    </div>
+
+                    {/* Feedback row: Like, Dislike, Less Like This */}
+                    <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant pt-1">
+                      <span className="text-[9px] uppercase tracking-wider text-on-surface-variant/70">Tune:</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(gameKey, 'like')}
+                          className={`hover:text-emerald-400 cursor-pointer flex items-center gap-0.5 ${
+                            userFeedback === 'like' ? 'text-emerald-400 font-bold' : ''
+                          }`}
+                          title="Like this match"
+                        >
+                          <span className="material-symbols-outlined text-xs">thumb_up</span>
+                          <span>Like</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(gameKey, 'dislike')}
+                          className={`hover:text-secondary cursor-pointer flex items-center gap-0.5 ${
+                            userFeedback === 'dislike' ? 'text-secondary font-bold' : ''
+                          }`}
+                          title="Dislike"
+                        >
+                          <span className="material-symbols-outlined text-xs">thumb_down</span>
+                          <span>Dislike</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(gameKey, 'less_like_this')}
+                          className="hover:text-amber-400 cursor-pointer flex items-center gap-0.5"
+                          title="Less like this"
+                        >
+                          <span className="material-symbols-outlined text-xs">block</span>
+                          <span>Less</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -474,11 +586,10 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* 6. Features Bento Grid (when no search results are active) */}
+      {/* 6. Features Bento Grid */}
       {!hasResults && !state.isSearching && (
         <section className="w-full max-w-5xl mx-auto mt-8 stagger-enter stagger-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card 1 */}
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-cyan flex flex-col items-start transition-colors hover:border-primary-bright hover:shadow-[0_0_20px_rgba(76,224,210,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-primary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-primary/10 transition-colors">
                 <span className="material-symbols-outlined text-primary text-2xl">psychology</span>
@@ -487,33 +598,31 @@ const HomePage = () => {
                 Understand Intent
               </h3>
               <p className="text-on-surface-variant font-body text-sm leading-relaxed">
-                Natural language parsing extracts core gameplay loops, thematic vibes, mechanics, and visual styles from prompt inputs.
+                Extracts gameplay loops, moods, time budgets, and hard negative constraints directly from natural language.
               </p>
             </div>
 
-            {/* Card 2 */}
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-magenta flex flex-col items-start transition-colors hover:border-secondary hover:shadow-[0_0_20px_rgba(255,61,129,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-secondary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-secondary/10 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-2xl">radar</span>
               </div>
               <h3 className="text-secondary text-glow-magenta font-display text-sm md:text-base mb-3 leading-snug uppercase">
-                Find Matches
+                Multi-Signal Ranking
               </h3>
               <p className="text-on-surface-variant font-body text-sm leading-relaxed">
-                Deep vector indexing compares your concept against 50,000+ indie and AAA games to identify market gaps and similarity scores.
+                Blends FAISS vector search, full lexical indexing, community acclaim, and personalized Game DNA affinities.
               </p>
             </div>
 
-            {/* Card 3 */}
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-amber flex flex-col items-start transition-colors hover:border-tertiary-bright hover:shadow-[0_0_20px_rgba(255,194,76,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-tertiary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-tertiary/10 transition-colors">
                 <span className="material-symbols-outlined text-tertiary text-2xl">architecture</span>
               </div>
               <h3 className="text-tertiary text-glow-amber font-display text-sm md:text-base mb-3 leading-snug uppercase">
-                Build Ideas
+                Build & Remix
               </h3>
               <p className="text-on-surface-variant font-body text-sm leading-relaxed">
-                Generates actionable game design documents, target audience profiles, core loop breakdowns, and pitch blueprints instantly.
+                Synthesize playable 2D browser games directly from discovered titles using the GameForge studio generator.
               </p>
             </div>
           </div>
@@ -533,7 +642,17 @@ const HomePage = () => {
             setSelectedGameForDetails(null);
             handleBuildSimilar(res);
           }}
-          onMoreLikeThis={handleMoreLikeThis}
+          onMoreLikeThis={async (gameId, gameTitle) => {
+            setSelectedGameForDetails(null);
+            const res = await discoveryService.getSimilarGames(gameId, 24);
+            setPromptText(`games like ${gameTitle}`);
+            setPrompt(`games like ${gameTitle}`);
+            setState((s) => ({
+              ...s,
+              discoveryResults: res.results || [],
+            }));
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+          }}
           isActionLoading={
             isActionLoading ===
             `build-${selectedGameForDetails.game.external_id || selectedGameForDetails.game.id}`

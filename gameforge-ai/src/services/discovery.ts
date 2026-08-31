@@ -1,5 +1,11 @@
 import { apiClient } from './api';
-import type { DiscoveryFilters, DiscoverySearchResponse, BuildInspirationResponse } from '../types';
+import type {
+  DiscoveryFilters,
+  DiscoverySearchResponse,
+  BuildInspirationResponse,
+  DiscoverySessionContext,
+  DiscoveryFeedbackResponse,
+} from '../types';
 
 export const discoveryService = {
   /**
@@ -8,14 +14,32 @@ export const discoveryService = {
   async searchGames(
     prompt: string,
     limit: number = 24,
-    filters?: DiscoveryFilters
+    filters?: DiscoveryFilters,
+    mode?: 'BEST_MATCH' | 'DISCOVER' | 'HIDDEN_GEMS' | 'POPULAR',
+    sessionContext?: DiscoverySessionContext
   ): Promise<DiscoverySearchResponse> {
     return await apiClient.post<DiscoverySearchResponse>('/discovery/search', {
       prompt,
       limit,
       filters: filters && Object.keys(filters).length > 0 ? filters : undefined,
+      mode: mode || 'BEST_MATCH',
+      session_context: sessionContext,
     });
   },
+
+  /**
+   * Submit Like, Dislike, or Less Like This feedback.
+   */
+  async submitFeedback(
+    gameId: string,
+    feedback: 'like' | 'dislike' | 'less_like_this'
+  ): Promise<DiscoveryFeedbackResponse> {
+    return await apiClient.post<DiscoveryFeedbackResponse>('/discovery/feedback', {
+      game_id: gameId,
+      feedback,
+    });
+  },
+
 
   /**
    * Retrieve games similar to a specific game by Steam App ID.

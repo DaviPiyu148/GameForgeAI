@@ -1,117 +1,114 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-
-Small Product Fixes & Reliability Polish V2 (Blueprint Recovery, Persistent Technical Logs, Fullscreen Fix, Profile Account Settings, Functional Builder Preview)
+Discovery Intelligence V1 (Rich Intent, Negative Preferences, Personalization, Diversity, Feedback, Modes, Better Explanations, Benchmarking)
 
 ## Status
-
 COMPLETE
 
 ## Objective
-
-Deliver focused reliability and product polish:
-1. Fix Blueprint derivation by ensuring it uses canonical DSL normalization and safe compatibility recovery.
-2. Persist complete technical build logs throughout successful/failed generation runs and display them in a collapsible technical log section on the success surface.
-3. Fix the Prototype modal fullscreen control to use standard browser Fullscreen API without canvas distortion or duplicate Phaser instances.
-4. Add a compact Account Settings section in Profile for username and password updates.
-5. Upgrade the Builder live preview wireframe into a dynamic, deterministic design preview driven by configuration parameters.
+Evolve the existing GameForge AI Discovery Engine into a richer, intent-driven, personalized, diverse, and interactive recommendation system.
+Preserve the existing local/cost-free architecture (Sentence Transformers all-MiniLM-L6-v2, FAISS IndexFlatIP, lexical inverted index, RRF fusion, deterministic hard constraints, and IGDB enrichment).
+Zero LLM calls for discovery. Zero new external dependencies. Zero browser testing. No database migration needed.
 
 ## Started
-
 2026-08-31
 
 ---
 
-## Previous Completed Milestones
+## 1. Pre-Implementation
+- [x] Read AGENTS.md constitution, Task Execution Ledger policy, and Git policy
+- [x] Read README.md, docs/10-DISCOVERY-ENGINE.md, docs/08-API-CONTRACT.md, docs/15-CURRENT-STATUS.md
+- [x] Inspect existing Discovery backend and frontend codebase
+- [x] Inspect FAISS vector index capabilities (`reconstruct` verified, `_id_to_pos` dict needed)
+- [x] Run git status and git log (working tree clean on `fresh-main` branch)
+- [x] Verify existing discovery and preference unit tests pass (10/10 passed)
+- [x] Check Alembic heads (`bc9ae398f146` single head)
 
-- **AI Provider Architecture V2** (Commit `b7b934d`): Sequential credential failover, Gemini 3 family routing, model fallback chains.
-- **Game Generation Hardening V1** (Commit `db766d8`): Deterministic normalization for schema drift, bounded repair timeouts.
-- **Product Polish Sprint A** (Commit `48bf712`): Project Management CRUD, generated covers, builder presets.
+### Evidence
+- FAISS IndexFlatIP supports `reconstruct(idx)` in 384 dimensions.
+- 10 targeted discovery & preference tests pass in 0.38s.
+- Working tree clean at commit `1f7f709`.
 
 ---
 
 ## 2. Implementation Subtasks
 
-### Subtask A: Blueprint Derivation Fix — COMPLETE
-- [x] DSLNormalizer.normalize_levels() skips None values; normalize_world() falls back to "neon" for null/unrecognized theme.
-- [x] 22/22 playable projects in gameforge.db derive valid blueprints.
-- [x] 11/11 new tests in backend/tests/test_blueprint.py pass.
+### Subtask A: Centralized Ranking Configuration & O(1) FAISS Vector Lookup
+- [x] Create `backend/app/search/ranking_config.py` with all scoring weights, mode profiles, bounds, and thresholds.
+- [x] Add `_id_to_pos` O(1) dictionary and `get_vector(game_id: str) -> Optional[np.ndarray]` in `FAISSIndexManager`.
 
-### Subtask B: Persistent Technical Build Logs — COMPLETE
-- [x] Collapsible TECHNICAL BUILD LOG accordion added to SuccessStatusPage.tsx.
-- [x] Shows full ordered event sequence, RECOVERED badge, severity color-coding.
+### Subtask B: Rich Structured Intent & Deterministic Parsing
+- [x] Expand `ParsedQuery` in `backend/app/search/query_parser.py` with structured dimensions (mood, session_length, combat, difficulty, avoid_genres, avoid_tags, avoid_modes, soft_preferences vs hard_constraints).
+- [x] Deterministic synonym and pattern mapping for negations, session lengths, mood/tone, and entity landmarks without LLM inference.
 
-### Subtask C: Fullscreen Fix — COMPLETE
-- [x] PrototypeModal.tsx uses element.requestFullscreen() + WebKit fallback.
-- [x] fullscreenchange + webkitfullscreenchange listeners keep state in sync.
-- [x] ESC handler guards against double-close when browser handles ESC itself.
-- [x] Modal fills display with Tailwind classes when fullscreen.
+### Subtask C: Session Context, Negative Preferences & Personalization Signals
+- [x] Update `backend/app/schemas/discovery.py` with `DiscoverySessionContext`, `DiscoveryFeedbackRequest`, and mode definitions (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`).
+- [x] Add negative preference handling in `backend/app/services/preference_service.py`.
+- [x] Add lightweight user vector profile calculation (`liked_vector` from saved/liked games in FAISS, optional `disliked_vector` only when negative data exists).
+- [x] Add authenticated `POST /api/discovery/feedback` endpoint with anti-spam safeguards and idempotent state updates.
 
-### Subtask D: Profile Account Settings — COMPLETE
-- [x] UpdateProfileRequest, ChangePasswordRequest, ChangePasswordResponse schemas.
-- [x] update_username() and change_password() service methods.
-- [x] PATCH /api/auth/profile, PATCH /api/auth/me, POST /api/auth/change-password registered in live backend.
-- [x] 4/4 tests in backend/tests/test_profile_api.py pass.
-- [x] Frontend auth.ts, AppContext.tsx, ProfilePage.tsx updated.
+### Subtask D: Hybrid Ranker Evolution (Diversity, Modes, Grounded Explanations)
+- [x] Refactor `backend/app/search/ranker.py` to use centralized `ranking_config.py`.
+- [x] Implement modular scoring pipeline:
+  - `passes_filters` (hard constraints + explicit hard negative exclusions)
+  - `calculate_personalization` (Game DNA genre affinity + optional FAISS vector similarity)
+  - `calculate_negative_penalty` (soft negative tags/genres/vector)
+  - `calculate_quality` & `calculate_novelty` (Steam review count + positive percentage)
+  - `rerank_for_diversity` (MMR-style bounded diversity; soft franchise limit with max 2 per family unless query explicitly specifies it)
+  - `generate_grounded_explanations` (grounded highlights, trade-offs, personalization reasons, why-these summary)
+  - Mode adjustments (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`).
+- [x] Support deterministic "Surprise Me" respecting all hard constraints.
 
-### Subtask E: Functional Builder Design Preview — COMPLETE
-- [x] BuilderDesignPreview.tsx created — deterministic, zero-API, zero-AI schematic renderer.
-- [x] Open World (topology graph), Campaign (stage progression), Linear/Arena (flow) layouts.
-- [x] Integrated into BuilderPage.tsx.
+### Subtask E: Benchmark Dataset & Evaluation Tooling
+- [x] Create `backend/tests/data/discovery_benchmark.json` with 30 realistic natural language queries and expected behavioral properties.
+- [x] Create `backend/scripts/evaluate_discovery_intelligence.py` to evaluate Top-5 relevance, hard constraint satisfaction, negative satisfaction, diversity, and latency.
+
+### Subtask F: Frontend Discovery UX & Polish
+- [x] Update `gameforge-ai/src/types/index.ts` with Discovery Intelligence contracts.
+- [x] Update `gameforge-ai/src/services/discovery.ts` with mode, session context, and feedback methods.
+- [x] Update `gameforge-ai/src/pages/HomePage.tsx`:
+  - Mode selector tabs (`BEST MATCH`, `DISCOVER`, `HIDDEN GEMS`, `POPULAR`)
+  - Refinement chips (`More Relaxing`, `Less Combat`, `Free to Play`, etc.)
+  - Why These summary banner
+  - Card-level actions (`Less Like This`, `Save`, `More`, `Build`)
+  - Hidden Gem badge & grounded trade-offs
+  - Truthful cold-start personalization indicator.
 
 ---
 
-## 3. Verification Evidence
+## 3. Verification Results
 
-### Backend Tests
-- Command: cd backend && .venv\Scripts\python.exe -m pytest tests/ -q
-- Result: 386 passed, 1 warning in 188.80s (warning = httpx deprecation in FastAPI TestClient, not a code defect)
-
-### Specific Suites
-- pytest tests/test_blueprint.py -> 11/11 PASSED
-- pytest tests/test_profile_api.py -> 4/4 PASSED
-- pytest tests/test_auth.py -> 15/15 PASSED
-- pytest tests/test_builds.py tests/test_projects.py tests/test_project_management.py -> 36/36 PASSED
-- pytest tests/test_ai_provider.py -> 36/36 PASSED
-- pytest tests/test_generation_resilience.py -> 10/10 PASSED
-
-### Frontend Verification
-- npx tsc --noEmit -> 0 errors
-- npm run build -> 0 errors, 79 modules transformed, built in 3.72s
-
-### Database
-- alembic current -> bc9ae398f146 (head)
-
-### Live Backend Routes
-- PATCH /api/auth/profile -> REGISTERED (confirmed via live OpenAPI inspection)
-- POST /api/auth/change-password -> REGISTERED (confirmed via live OpenAPI inspection)
-- Blueprint derivation -> 22/22 playable projects derive valid blueprints
-
-### Browser Testing
-- PARTIAL -- account settings (username update) and design preview schematic verified via browser session; fullscreen API and blueprint tab pending due to model quota exhaustion. Endpoint behavior verified directly via JS fetch in browser.
+### Automated Tests
+- `pytest tests/test_discovery_ranker.py`: 8/8 passed in 0.06s.
+- Full discovery regression suite: 36/36 passed in 65.21s:
+  - `tests/test_discovery_2.py`: 11 passed
+  - `tests/test_discovery_ranker.py`: 8 passed
+  - `tests/test_preference_service.py`: 2 passed
+  - `tests/test_saved_discoveries.py`: 9 passed
+  - `tests/test_multilingual_search.py`: 6 passed
+- Benchmark evaluation (`python scripts/evaluate_discovery_intelligence.py`):
+  - Total queries: 30
+  - Intent classification accuracy: 90.0% (27/30)
+  - Hard constraint violations: 0 (Zero tolerance satisfied)
+  - Mean Precision@5: 0.907
+  - Mean search latency: 367.4ms
+- Frontend production build (`npm run build`): SUCCESS, 0 TypeScript errors, 1.48s bundle time.
+- Alembic head: single head `bc9ae398f146`.
+- BROWSER TESTING: NOT PERFORMED (per explicit user directive).
 
 ---
 
 ## 4. Documentation
-
-- [x] docs/08-API-CONTRACT.md updated -- PATCH /api/auth/profile and POST /api/auth/change-password documented.
-- [x] docs/15-CURRENT-STATUS.md updated -- date, current phase, milestone row, verification numbers.
-- [x] docs/SMALL_PRODUCT_FIXES_V2.md created -- comprehensive post-implementation record.
+- [x] `DISCOVERY_INTELLIGENCE_V1.md` created
+- [x] `docs/10-DISCOVERY-ENGINE.md` updated
+- [x] `docs/08-API-CONTRACT.md` updated
+- [x] `docs/15-CURRENT-STATUS.md` updated
 
 ---
 
 ## 5. Git Checkpoint
-
-- [x] git diff --stat HEAD reviewed -- 14 changed files, 744 insertions, 83 deletions (all intended)
-- [x] Untracked: gameforge-ai/src/components/Builder/ (new BuilderDesignPreview.tsx -- intended)
-- [x] No secrets, credentials, .env, databases, or build artifacts in changed files
-- [x] No unrelated user changes in working tree
-
-Commit: fix: polish blueprint logs fullscreen and account settings
-
----
-
-## Change Log
-
-- **2026-08-31**: Initiated and completed Small Product Fixes & Reliability Polish V2.
+- [x] Reviewed `git diff` and `git status`
+- [x] Verified zero secrets or unauthorized artifacts
+- [x] Commit created
+- [x] Working tree clean

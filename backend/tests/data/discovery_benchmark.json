@@ -1,0 +1,234 @@
+{
+  "benchmark_version": "1.0",
+  "description": "Deterministic Discovery Intelligence V1 Evaluation Suite across intent classification, constraints, diversity, and relevance.",
+  "queries": [
+    {
+      "id": "q01",
+      "query": "Hollow Knight",
+      "expected_type": "ENTITY",
+      "must_include_titles": ["Hollow Knight"],
+      "hard_constraints": {},
+      "category": "Entity Exact Match"
+    },
+    {
+      "id": "q02",
+      "query": "Terraria",
+      "expected_type": "ENTITY",
+      "must_include_titles": ["Terraria"],
+      "hard_constraints": {},
+      "category": "Entity Exact Match"
+    },
+    {
+      "id": "q03",
+      "query": "Stardew Valley",
+      "expected_type": "ENTITY",
+      "must_include_titles": ["Stardew Valley"],
+      "hard_constraints": {},
+      "category": "Entity Exact Match"
+    },
+    {
+      "id": "q04",
+      "query": "games like Stardew Valley",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Stardew Valley",
+      "acceptable_genres": ["Simulation", "RPG", "Casual", "Adventure"],
+      "category": "Similarity Standard"
+    },
+    {
+      "id": "q05",
+      "query": "games like Dark Souls",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Dark Souls",
+      "acceptable_genres": ["Action", "RPG"],
+      "category": "Similarity Standard"
+    },
+    {
+      "id": "q06",
+      "query": "something like Civilization VI",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Civilization VI",
+      "acceptable_genres": ["Strategy"],
+      "category": "Similarity Standard"
+    },
+    {
+      "id": "q07",
+      "query": "deckbuilder",
+      "expected_type": "TOPIC_TAG",
+      "acceptable_genres": ["Strategy", "RPG", "Card Game"],
+      "category": "Topic Tag Single"
+    },
+    {
+      "id": "q08",
+      "query": "metroidvania",
+      "expected_type": "TOPIC_TAG",
+      "acceptable_genres": ["Action", "Adventure", "Platformer"],
+      "category": "Topic Tag Single"
+    },
+    {
+      "id": "q09",
+      "query": "city builder",
+      "expected_type": "TOPIC_TAG",
+      "acceptable_genres": ["Strategy", "Simulation"],
+      "category": "Topic Tag Single"
+    },
+    {
+      "id": "q10",
+      "query": "co-op roguelike",
+      "expected_type": "MIXED",
+      "acceptable_modes": ["Co-op", "Multi-player"],
+      "acceptable_genres": ["Action", "RPG", "Roguelike"],
+      "category": "Mixed Multi-attribute"
+    },
+    {
+      "id": "q11",
+      "query": "turn-based strategy with co-op",
+      "expected_type": "MIXED",
+      "acceptable_modes": ["Co-op", "Multi-player"],
+      "acceptable_genres": ["Strategy"],
+      "category": "Mixed Multi-attribute"
+    },
+    {
+      "id": "q12",
+      "query": "2D puzzle platformer",
+      "expected_type": "MIXED",
+      "acceptable_genres": ["Puzzle", "Platformer", "Adventure"],
+      "category": "Mixed Multi-attribute"
+    },
+    {
+      "id": "q13",
+      "query": "cozy farming game without horror",
+      "expected_type": "CONCEPT",
+      "must_not_contain_genres": ["Horror"],
+      "must_not_contain_tags": ["Horror", "Survival Horror", "Psychological Horror"],
+      "category": "Negative Constraint Hard"
+    },
+    {
+      "id": "q14",
+      "query": "relaxing exploration game no combat",
+      "expected_type": "CONCEPT",
+      "expected_combat": "low",
+      "must_not_contain_tags": ["Violent", "Combat"],
+      "category": "Negative Constraint Hard"
+    },
+    {
+      "id": "q15",
+      "query": "space game without pvp",
+      "expected_type": "CONCEPT",
+      "must_not_contain_modes": ["PvP"],
+      "category": "Negative Constraint Hard"
+    },
+    {
+      "id": "q16",
+      "query": "relaxing cozy game",
+      "expected_type": "CONCEPT",
+      "expected_moods": ["relaxing"],
+      "acceptable_genres": ["Casual", "Simulation", "Adventure", "Puzzle"],
+      "category": "Mood / Tone"
+    },
+    {
+      "id": "q17",
+      "query": "dark atmospheric mystery",
+      "expected_type": "CONCEPT",
+      "expected_moods": ["dark", "atmospheric"],
+      "acceptable_genres": ["Adventure", "Horror", "RPG"],
+      "category": "Mood / Tone"
+    },
+    {
+      "id": "q18",
+      "query": "fast-paced intense shooter",
+      "expected_type": "CONCEPT",
+      "expected_moods": ["intense"],
+      "acceptable_genres": ["Action", "Shooter"],
+      "category": "Mood / Tone"
+    },
+    {
+      "id": "q19",
+      "query": "quick 15 minute sessions puzzle game",
+      "expected_type": "CONCEPT",
+      "expected_session_length": "short",
+      "acceptable_genres": ["Puzzle", "Casual", "Arcade"],
+      "category": "Session Duration"
+    },
+    {
+      "id": "q20",
+      "query": "short bite-sized runs roguelite",
+      "expected_type": "CONCEPT",
+      "expected_session_length": "short",
+      "acceptable_genres": ["Action", "RPG", "Strategy"],
+      "category": "Session Duration"
+    },
+    {
+      "id": "q21",
+      "query": "deep long campaign RPG",
+      "expected_type": "CONCEPT",
+      "expected_session_length": "long",
+      "acceptable_genres": ["RPG", "Strategy"],
+      "category": "Session Duration"
+    },
+    {
+      "id": "q22",
+      "query": "free to play multiplayer action",
+      "expected_type": "MIXED",
+      "must_be_free": true,
+      "acceptable_modes": ["Multi-player", "Co-op", "PvP"],
+      "category": "Price Constraint"
+    },
+    {
+      "id": "q23",
+      "query": "f2p card game",
+      "expected_type": "CONCEPT",
+      "must_be_free": true,
+      "acceptable_genres": ["Strategy", "Card Game"],
+      "category": "Price Constraint"
+    },
+    {
+      "id": "q24",
+      "query": "cheap casual simulator",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Casual", "Simulation"],
+      "category": "Price Constraint"
+    },
+    {
+      "id": "q25",
+      "query": "cyberpunk RPG",
+      "expected_type": "MIXED",
+      "acceptable_genres": ["RPG", "Action"],
+      "category": "Genre & Aesthetic Combination"
+    },
+    {
+      "id": "q26",
+      "query": "survival horror in space",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Action", "Horror", "Adventure"],
+      "category": "Genre & Aesthetic Combination"
+    },
+    {
+      "id": "q27",
+      "query": "tactical turn-based mech combat",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Strategy", "RPG", "Action"],
+      "category": "Genre & Aesthetic Combination"
+    },
+    {
+      "id": "q28",
+      "query": "post-apocalyptic colony management",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Strategy", "Simulation"],
+      "category": "Complex Multi-word Concept"
+    },
+    {
+      "id": "q29",
+      "query": "underwater submarine exploration",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Adventure", "Simulation", "Action"],
+      "category": "Complex Multi-word Concept"
+    },
+    {
+      "id": "q30",
+      "query": "time loop detective murder mystery",
+      "expected_type": "CONCEPT",
+      "acceptable_genres": ["Adventure", "Puzzle", "RPG"],
+      "category": "Complex Multi-word Concept"
+    }
+  ]
+}

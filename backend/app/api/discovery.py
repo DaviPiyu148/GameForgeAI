@@ -10,6 +10,8 @@ from app.dependencies import get_optional_user
 from app.models.user import User
 from app.schemas.discovery import (
     BuildInspirationResponse,
+    DiscoveryFeedbackRequest,
+    DiscoveryFeedbackResponse,
     DiscoverySearchRequest,
     DiscoverySearchResponse,
     MoreLikeThisRequest,
@@ -46,10 +48,12 @@ async def search_games(
     Search the catalog of games using natural language descriptions, entity names, or concept phrases.
     """
     try:
-        response = await service.search(request)
+        user_id = current_user.id if current_user else None
+        response = await service.search(request, user_id=user_id, db=db)
 
         # Behavioral personalization and XP tracking for authenticated users
         if current_user and db:
+
             try:
                 # 1. Grant search XP (subject to anti-spam duplicate rate limit)
                 normalized_query = request.prompt.strip().lower()
@@ -209,3 +213,64 @@ async def get_build_inspiration(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to extract build inspiration.",
         )
+
+
+@router.post(
+    "/feedback",
+    response_model=DiscoveryFeedbackResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Record user recommendation feedback (Like, Dislike, Less Like This)",
+    description="Updates user behavioral preferences and grants rate-limited progression XP without rewarding spam.",
+)
+async def submit_feedback(
+    request: DiscoveryFeedbackRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+    service: DiscoveryService = Depends(get_discovery_service),
+    db: Session = Depends(get_db),
+) -> DiscoveryFeedbackResponse:
+    """Submit interaction feedback for a game to refine future recommendations."""
+    game = service.catalog_manager.get_game(request.game_id)
+    if not game:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Game '{request.game_id}' not found in discovery catalog.",
+        )
+
+    genres_or_tags = list(game.get("genres", [])) + list(game.get("tags", []))[:3]
+
+    if current_user and db:
+        try:
+            if request.feedback == "like":
+                # Rate-limited XP grant (anti-spam protected)
+                progression_service.grant_xp(
+                    db=db,
+                    user_id=current_user.id,
+                    event_type="DISCOVERY_LIKE",
+                    source_ref=request.game_id,
+                )
+                preference_service.record_signal(
+                    db=db,
+                    user_id=current_user.id,
+                    raw_genres_or_tags=genres_or_tags,
+                    weight=3.0,
+                    source="feedback_like",
+                )
+            elif request.feedback in ("dislike", "less_like_this"):
+                # Negative feedback does NOT grant XP to prevent abuse
+                preference_service.record_negative_signal(
+                    db=db,
+                    user_id=current_user.id,
+                    raw_genres_or_tags=genres_or_tags,
+                    weight=3.0 if request.feedback == "dislike" else 2.0,
+                    source=f"feedback_{request.feedback}",
+                )
+        except Exception as e:
+            logger.warning(f"Failed to record feedback signal: {e}")
+
+    return DiscoveryFeedbackResponse(
+        status="success",
+        game_id=request.game_id,
+        feedback=request.feedback,
+        message=f"Recorded '{request.feedback}' feedback for '{game.get('title', request.game_id)}'.",
+    )
+

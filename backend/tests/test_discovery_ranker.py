@@ -1,5 +1,6 @@
 import pytest
-from app.schemas.discovery import DiscoveryFilters
+from app.schemas.discovery import DiscoveryFilters, DiscoverySessionContext
+from app.search.query_parser import QueryParser
 from app.search.ranker import Ranker, MIN_MATCH_SCORE_THRESHOLD
 
 
@@ -53,6 +54,18 @@ def test_ranker_rejects_non_matching_filters(sample_game):
     assert Ranker.passes_filters(sample_game, DiscoveryFilters(max_year=2005)) is False
 
 
+def test_ranker_hard_negative_constraints(sample_game):
+    qp = QueryParser()
+    parsed = qp.parse("farming game without action")
+    assert "Action" in parsed.avoid_genres
+    assert Ranker.passes_filters(sample_game, hard_constraints=parsed.hard_constraints) is False
+
+
+def test_ranker_session_less_like_this(sample_game):
+    session = DiscoverySessionContext(less_like_this_game_ids=["105600"])
+    assert Ranker.passes_filters(sample_game, session_context=session) is False
+
+
 def test_ranker_extract_highlights_finds_overlapping_words(sample_game):
     query = "2D sandbox survival with co-op building"
     highlights = Ranker.extract_highlights(query, sample_game)
@@ -72,6 +85,24 @@ def test_ranker_generate_explanation(sample_game):
     assert "Survival" in explanation
     assert "Action" in explanation or "Adventure" in explanation or "RPG" in explanation
     assert "Overwhelmingly Positive" in explanation
+
+
+def test_ranker_hidden_gem_detection():
+    gem_game = {
+        "id": "1",
+        "title": "Indie Masterpiece",
+        "total_reviews": 500,
+        "positive_percent": 95.0,
+    }
+    assert Ranker.check_hidden_gem(gem_game) is True
+
+    huge_game = {
+        "id": "2",
+        "title": "Mainstream Hit",
+        "total_reviews": 150000,
+        "positive_percent": 95.0,
+    }
+    assert Ranker.check_hidden_gem(huge_game) is False
 
 
 def test_ranker_rank_and_format_applies_threshold_and_limit(sample_game):
