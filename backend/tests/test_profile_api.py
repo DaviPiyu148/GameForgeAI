@@ -75,3 +75,83 @@ def test_avatar_upload_and_delete_api(client: TestClient, auth_headers: tuple[di
     me_res2 = client.get("/api/auth/me", headers=headers)
     assert me_res2.status_code == 200
     assert me_res2.json()["avatar_url"] is None
+
+
+def test_update_username_api(client: TestClient, auth_headers: tuple[dict, User], db_session: Session):
+    headers, user = auth_headers
+
+    # Create another user to test uniqueness collision
+    other = User(email="other_unique@example.com", username="taken_name", password_hash="fake", level=1)
+    db_session.add(other)
+    db_session.commit()
+
+    # 1. Successful update
+    res = client.patch("/api/auth/profile", headers=headers, json={"username": "new_handle_42"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["username"] == "new_handle_42"
+
+    # Verify persistence via /auth/me
+    me_res = client.get("/api/auth/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["username"] == "new_handle_42"
+
+    # 2. Collision with taken username
+    res_dup = client.patch("/api/auth/profile", headers=headers, json={"username": "taken_name"})
+    assert res_dup.status_code == 409
+    assert res_dup.json()["error"]["code"] == "USERNAME_TAKEN"
+
+    # 3. Invalid characters
+    res_inv = client.patch("/api/auth/profile", headers=headers, json={"username": "invalid space name!"})
+    assert res_inv.status_code == 422
+
+    # 4. Unauthenticated
+    res_unauth = client.patch("/api/auth/profile", json={"username": "sneaky"})
+    assert res_unauth.status_code == 401
+
+
+def test_change_password_api(client: TestClient, db_session: Session):
+    from app.auth.password import hash_password
+
+    # Create user with known password
+    user = User(email="pwd_tester@example.com", username="pwd_tester", password_hash=hash_password("OldPassword123!"), level=1)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = create_access_token(user.id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Wrong current password -> 400
+    res_wrong = client.post(
+        "/api/auth/change-password",
+        headers=headers,
+        json={"current_password": "WrongPassword123!", "new_password": "NewValidPassword123!"},
+    )
+    assert res_wrong.status_code == 400
+    assert res_wrong.json()["error"]["code"] == "INCORRECT_PASSWORD"
+
+    # 2. Weak new password -> 422
+    res_weak = client.post(
+        "/api/auth/change-password",
+        headers=headers,
+        json={"current_password": "OldPassword123!", "new_password": "short"},
+    )
+    assert res_weak.status_code == 422
+
+    # 3. Successful password change
+    res_ok = client.post(
+        "/api/auth/change-password",
+        headers=headers,
+        json={"current_password": "OldPassword123!", "new_password": "NewValidPassword123!"},
+    )
+    assert res_ok.status_code == 200
+    assert res_ok.json()["success"] is True
+
+    # 4. Verify login succeeds with new password and fails with old password
+    login_new = client.post("/api/auth/login", json={"email": "pwd_tester@example.com", "password": "NewValidPassword123!"})
+    assert login_new.status_code == 200
+
+    login_old = client.post("/api/auth/login", json={"email": "pwd_tester@example.com", "password": "OldPassword123!"})
+    assert login_old.status_code == 401
+

@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BUILDER_PRESETS, applyPreset, detectActivePreset } from '../data/builderPresets';
+import { BuilderDesignPreview } from '../components/Builder/BuilderDesignPreview';
 
 const BuilderPage = () => {
   const { state, setPrompt, updateBuildParams, compileProject, cancelCurrentBuild, clearCompilerLogs } = useAppContext();
@@ -184,21 +185,14 @@ const BuilderPage = () => {
           {/* ═══ Configuration Panel (Right Sidebar, Rows 1-2) ═══ */}
           <div className="order-2 lg:col-start-2 lg:col-end-3 lg:row-start-1 lg:row-end-3 flex flex-col pane-border bg-surface-container-low overflow-y-auto">
             <div className="p-4 border-b pane-border">
-              <h3 className="font-mono text-[10px] text-secondary-soft mb-3 flex items-center gap-2 uppercase tracking-wide">
-                <span className="material-symbols-outlined text-[14px]">preview</span>
-                Live Preview (Wireframe)
-              </h3>
-              <div className="bg-terminal-bg border border-secondary-soft/30 aspect-video relative overflow-hidden flex items-center justify-center scan-sweep">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: 'linear-gradient(rgba(105, 248, 234, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(105, 248, 234, 0.2) 1px, transparent 1px)',
-                  backgroundSize: '20px 20px',
-                  opacity: 0.5
-                }}></div>
-                <div className="relative z-10 text-center">
-                  <span className="material-symbols-outlined text-2xl text-primary mb-1 opacity-80 ai-pulse">view_in_ar</span>
-                  <p className="font-mono text-[10px] text-primary/80 uppercase tracking-widest">Awaiting_Render_Data</p>
-                </div>
+              <div className="flex justify-between items-baseline mb-2">
+                <h3 className="font-mono text-[10px] text-secondary-soft flex items-center gap-1.5 uppercase tracking-wide">
+                  <span className="material-symbols-outlined text-[14px]">preview</span>
+                  Live Preview (Wireframe)
+                </h3>
+                <span className="font-mono text-[9px] text-on-surface-variant/60">Configuration Preview</span>
               </div>
+              <BuilderDesignPreview params={state.currentBuildParams} />
             </div>
 
             <div className="p-4 flex-1">

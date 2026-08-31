@@ -47,3 +47,31 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateProfileRequest(BaseModel):
+    """Request body for PATCH /api/auth/profile."""
+    username: str = Field(
+        ...,
+        min_length=2,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="New display username (alphanumeric, underscore, hyphen only).",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request body for POST /api/auth/change-password."""
+    current_password: str = Field(..., min_length=1, max_length=128, description="Current plaintext password.")
+    new_password: str = Field(..., min_length=8, max_length=128, description="New plaintext password (min 8 chars).")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChangePasswordResponse(BaseModel):
+    """Response body for successful password change."""
+    success: bool = True
+    message: str = "Password changed successfully."
+

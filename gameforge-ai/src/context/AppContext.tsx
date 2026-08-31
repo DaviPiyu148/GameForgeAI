@@ -215,6 +215,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
+  // 2E. Username and Password Updates
+  const updateUsername = useCallback(async (username: string): Promise<void> => {
+    const updatedUser = await authService.updateUsername(username);
+    setState((s) => ({
+      ...s,
+      user: updatedUser,
+    }));
+    pushToast({ variant: 'success', title: 'USERNAME UPDATED', description: `Your username is now ${updatedUser.username}` });
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<void> => {
+    await authService.changePassword(currentPassword, newPassword);
+    pushToast({ variant: 'success', title: 'PASSWORD CHANGED', description: 'Your password was successfully updated.' });
+  }, []);
+
+
   // 3. Initial Auth Hydration from /api/auth/me
   useEffect(() => {
     const initAuth = async () => {
@@ -678,6 +694,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         refreshPreferences,
         uploadAvatar,
         deleteAvatar,
+        updateUsername,
+        changePassword,
         deleteProject,
         duplicateProject,
       }}

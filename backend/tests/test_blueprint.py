@@ -169,3 +169,64 @@ class TestBlueprintAPI:
         client, user, token, other_user, project = blueprint_client
         res = client.get("/api/projects/does-not-exist/blueprint", headers={"Authorization": f"Bearer {token}"})
         assert res.status_code == 404
+
+    def test_get_blueprint_with_null_theme_and_world_drift(self, blueprint_client, db_session):
+        """Stored projects with null theme/world fields on levels should derive blueprint without error."""
+        client, user, token, other_user, project = blueprint_client
+        drift_dsl = {
+            "metadata": {"title": "Drift Campaign", "genre": "Action", "description": "Desc", "archetype": "survival"},
+            "world": {"theme": "cyberpunk"},
+            "player": {"color": "#00f0ff"},
+            "levels": [
+                {
+                    "level_number": 1,
+                    "title": "Level 1",
+                    "theme": None,
+                    "world": None,
+                    "objective": {"type": "collect_all", "target_count": 5},
+                    "entities": [{"id": "c1", "type": "collectible", "x": 100, "y": 100, "points": 50}],
+                    "rules": [{"id": "r1", "trigger": "on_collect", "action": "add_score"}],
+                },
+                {
+                    "level_number": 2,
+                    "title": "Level 2",
+                    "theme": None,
+                    "world": None,
+                    "objective": {"type": "defeat_all", "target_count": 2},
+                    "entities": [{"id": "e1", "type": "enemy", "x": 200, "y": 200, "health": 30, "speed": 100}],
+                    "rules": [{"id": "r2", "trigger": "on_enemy_defeat", "action": "add_score"}],
+                }
+            ]
+        }
+        project.game_dsl = drift_dsl
+        db_session.commit()
+
+        res = client.get(f"/api/projects/{project.id}/blueprint", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["title"] == "Drift Campaign"
+        assert data["level_count"] == 2
+
+    def test_get_blueprint_corrupted_dsl_returns_400(self, blueprint_client, db_session):
+        """Corrupted/invalid stored DSL returns 400 BLUEPRINT_UNAVAILABLE without crash or fake data."""
+        client, user, token, other_user, project = blueprint_client
+        project.game_dsl = {"not_a_valid_game": True}
+        db_session.commit()
+
+        res = client.get(f"/api/projects/{project.id}/blueprint", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 400
+        data = res.json()
+        assert data["error"]["code"] == "BLUEPRINT_UNAVAILABLE"
+        assert "cannot derive blueprint" in data["error"]["message"].lower()
+
+    def test_get_blueprint_no_dsl_returns_400(self, blueprint_client, db_session):
+        """Project with no Game DSL returns 400 BLUEPRINT_UNAVAILABLE."""
+        client, user, token, other_user, project = blueprint_client
+        project.game_dsl = None
+        db_session.commit()
+
+        res = client.get(f"/api/projects/{project.id}/blueprint", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 400
+        data = res.json()
+        assert data["error"]["code"] == "BLUEPRINT_UNAVAILABLE"
+

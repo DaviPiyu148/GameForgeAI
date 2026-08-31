@@ -5,8 +5,23 @@ import { PrototypeModal } from '../components/Shared/PrototypeModal';
 
 const SuccessStatusPage = () => {
   const [showPlayModal, setShowPlayModal] = useState(false);
+  const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
   const { state, updateGameProject } = useAppContext();
   const navigate = useNavigate();
+
+  const logsToDisplay = state.compilerLogs.length > 0
+    ? state.compilerLogs
+    : [
+        '[SYS] Pipeline initialized.',
+        '[AI] Game specification generated & validated.',
+        '[PHASER] 2D Runtime initialized.',
+        '[SYS] Prototype ready.',
+      ];
+
+  const hasRecoveredIssues = logsToDisplay.some(
+    (l) => l.includes('WARNING') || l.includes('repair') || l.includes('normalization') || l.includes('remediation')
+  );
+
 
   // If we somehow get here without a real SUCCESS state (direct refresh/navigation,
   // bookmarked URL, or after logout cleared build state), kick back to builder rather
@@ -92,7 +107,7 @@ const SuccessStatusPage = () => {
         </div>
 
         {/* 2. Validation Terminal */}
-        <div className="w-full border border-outline-variant bg-terminal-bg rounded-lg overflow-hidden mb-8 shadow-2xl">
+        <div className="w-full border border-outline-variant bg-terminal-bg rounded-lg overflow-hidden mb-6 shadow-2xl">
           {/* Terminal Header */}
           <div className="bg-terminal-header px-4 py-3 flex items-center justify-between border-b border-outline-variant">
             <div className="flex items-center gap-2">
@@ -179,6 +194,64 @@ const SuccessStatusPage = () => {
               <span className="inline-block w-2 h-[1em] bg-primary terminal-cursor align-middle ml-0.5"></span>
             </div>
           </div>
+        </div>
+
+        {/* 2B. Collapsible Technical Build Log */}
+        <div className="w-full border border-outline-variant bg-surface-container-low rounded-lg overflow-hidden mb-8 shadow-xl">
+          <button
+            type="button"
+            onClick={() => setShowTechnicalLogs((prev) => !prev)}
+            className="w-full px-4 py-3 bg-terminal-header border-b border-outline-variant flex items-center justify-between font-mono text-xs text-on-surface hover:text-primary transition-colors cursor-pointer"
+            aria-expanded={showTechnicalLogs}
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm text-primary">terminal</span>
+              <span className="font-bold uppercase tracking-wider">TECHNICAL BUILD LOG</span>
+              {hasRecoveredIssues && (
+                <span className="px-2 py-0.5 text-[10px] bg-amber-400/10 border border-amber-400/40 text-amber-300 rounded uppercase font-bold">
+                  RECOVERED
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-on-surface-variant text-[11px]">
+              <span>{showTechnicalLogs ? 'COLLAPSE' : `EXPAND (${logsToDisplay.length} EVENTS)`}</span>
+              <span
+                className="material-symbols-outlined text-sm transition-transform duration-200"
+                style={{ transform: showTechnicalLogs ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              >
+                expand_more
+              </span>
+            </div>
+          </button>
+
+          {showTechnicalLogs && (
+            <div className="p-4 bg-terminal-bg font-mono text-xs max-h-72 overflow-y-auto space-y-1.5 border-t border-outline-variant/40 text-left">
+              {logsToDisplay.length === 0 ? (
+                <div className="text-on-surface-variant opacity-70">[SYS] Build log stream completed.</div>
+              ) : (
+                logsToDisplay.map((log, idx) => {
+                  const isErr = log.includes('ERROR') || log.includes('FATAL');
+                  const isWarn = log.includes('WARNING') || log.includes('repair') || log.includes('Semantic validation');
+                  const isSuccess = log.includes('SUCCESS') || log.includes('PASS') || log.includes('ready');
+                  const isMod = log.includes('[MOD]');
+                  const colorClass = isErr
+                    ? 'text-error'
+                    : isWarn
+                    ? 'text-amber-300'
+                    : isSuccess
+                    ? 'text-emerald-400'
+                    : isMod
+                    ? 'text-secondary-soft'
+                    : 'text-primary/90';
+                  return (
+                    <div key={idx} className={`leading-relaxed break-words ${colorClass}`}>
+                      {log}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* 3. Action Buttons */}

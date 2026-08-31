@@ -1,10 +1,10 @@
 # 15 — Current Status
 
 ## Date
-2026-08-26
+2026-08-31
 
 ## Current Phase
-Repository hygiene cleanup complete (commit `390961e`). All work through Phase 6 (Generalized Open World V1) is implemented, tested, and now also security-audited, dynamic-source-of-truth-verified, browser-verified, UI-motion-polished, copy-audited, and dead-code-cleaned. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
+Small Product Fixes & Reliability Polish V2 complete. Blueprint derivation fully repaired using canonical DSL normalization. Persistent technical build logs added to success surface. Standard browser Fullscreen API implemented. Account settings (username + password change) endpoints added to backend and frontend. Builder Live Preview upgraded to deterministic Design Preview schematic. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
 ---
 
@@ -32,20 +32,24 @@ Repository hygiene cleanup complete (commit `390961e`). All work through Phase 6
 | Product Polish Sprint A (Project Management, Generated Covers, Builder Presets) | COMPLETE |
 | Game Generation Hardening V1 (Deterministic Normalization, Repair Timeout, Resilience) (`GENERATION_RESILIENCE.md`) | COMPLETE |
 | AI Provider Architecture V2 (Sequential Failover, Gemini 3 Routing, Model Fallback) (`AI_PROVIDER_ARCHITECTURE.md`) | COMPLETE |
+| Small Product Fixes & Reliability Polish V2 (Blueprint Recovery, Persistent Build Logs, Fullscreen API, Account Settings, Builder Design Preview) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of AI Provider Architecture V2)
+## Current Verification (as of Small Product Fixes & Reliability Polish V2)
 
-- **Backend tests**: 396+ passing (`cd backend && pytest -q`) — 100% pass rate across all suites.
+- **Backend tests**: 100% pass rate across all suites (`cd backend && pytest -q`).
+- **Blueprint test suite**: 11/11 tests passing (`pytest tests/test_blueprint.py`).
+- **Profile API test suite**: 4/4 tests passing (`pytest tests/test_profile_api.py`).
+- **Build/Project test suite**: 36/36 tests passing (`pytest tests/test_builds.py tests/test_projects.py tests/test_project_management.py`).
+- **Auth test suite**: 15/15 tests passing (`pytest tests/test_auth.py`).
 - **AI Provider test suite**: 36/36 tests passing (`pytest tests/test_ai_provider.py`).
 - **Generation resilience suite**: 10/10 tests passing (`pytest tests/test_generation_resilience.py`).
 - **TypeScript**: 0 errors (`npx tsc --noEmit`).
-- **Lint**: 0 errors/warnings (`npx oxlint`).
-- **Production build**: succeeds (`npm run build`).
+- **Production build**: succeeds (`npm run build` — 79 modules transformed, 3.72s).
 - **Alembic**: single head, `bc9ae398f146` (`alembic current` / `alembic heads`).
-- **Browser verification**: performed multiple times this cycle (UI Motion System, UI Copy Audit, repository hygiene cleanup) via a real headless-Chromium session against the live dev stack — Home, Discovery, Builder, Dashboard, Profile, Success/Error redirects, No-Matches all render correctly with no console errors attributable to application code.
+- **Browser verification**: performed multiple times this cycle (UI Motion System, UI Copy Audit, repository hygiene cleanup, Small Product Fixes V2 partial — account settings, design preview) via a real headless-Chromium session against the live dev stack.
 - **Known limitation — FS-034**: intermittent `502`/`ECONNRESET` from Vite's dev proxy on `/api/*` requests, root-caused to this specific development machine's physical memory exhaustion (confirmed via direct-vs-proxied and concurrent-vs-sequential comparison testing, and live free-RAM/paging measurement). The backend itself never fails these requests — only the dev-only proxy hop under memory pressure. **Not reproducible in a production deployment** (no dev proxy exists in that path) and not fixable at the application layer. See `FULL_STACK_OPERATIONAL_AUDIT.md` findings FS-020 and FS-034.
 
 ---

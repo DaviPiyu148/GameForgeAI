@@ -17,6 +17,8 @@ export default function ProfilePage() {
     updateGameProject,
     uploadAvatar,
     deleteAvatar,
+    updateUsername,
+    changePassword,
     refreshProgress,
     refreshPreferences,
   } = useAppContext();
@@ -35,6 +37,83 @@ export default function ProfilePage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const initialFetchDoneRef = useRef(false);
+
+  // Account Settings State
+  const [newUsername, setNewUsername] = useState(state.user?.username || '');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Sync newUsername with state.user when user changes
+  useEffect(() => {
+    if (state.user?.username) {
+      setNewUsername(state.user.username);
+    }
+  }, [state.user?.username]);
+
+  const handleSaveUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newUsername.trim();
+    if (!trimmed) {
+      setUsernameError('Username cannot be empty.');
+      return;
+    }
+    if (trimmed.length < 2 || trimmed.length > 50) {
+      setUsernameError('Username must be between 2 and 50 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      setUsernameError('Username may only contain letters, numbers, hyphens, and underscores.');
+      return;
+    }
+
+    setIsUpdatingUsername(true);
+    setUsernameError(null);
+    try {
+      await updateUsername(trimmed);
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Failed to update username.';
+      setUsernameError(msg);
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordError(null);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Failed to change password.';
+      setPasswordError(msg);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
 
   // Refresh progress and preferences once on mount if authenticated
   useEffect(() => {
@@ -733,6 +812,161 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
+          {/* Account Settings (Username & Password) */}
+          {state.authStatus === 'AUTHENTICATED' && (
+            <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">manage_accounts</span>
+                  <h2 className="font-display text-lg uppercase tracking-wide">Account Settings</h2>
+                </div>
+                <span className="font-mono text-xs text-on-surface-variant">Profile & Security</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* 1. Username Section */}
+                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-mono text-xs text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">badge</span>
+                      Display Username
+                    </h3>
+                    <p className="text-[11px] text-on-surface-variant mb-4">
+                      Change your public creator handle. 2–50 characters, letters, numbers, hyphens, and underscores.
+                    </p>
+
+                    <form onSubmit={handleSaveUsername} className="space-y-3">
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={newUsername}
+                          onChange={(e) => {
+                            setNewUsername(e.target.value);
+                            setUsernameError(null);
+                          }}
+                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                          placeholder="Enter new username"
+                          disabled={isUpdatingUsername}
+                        />
+                        {usernameError && (
+                          <p className="font-mono text-[10px] text-error mt-1">{usernameError}</p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isUpdatingUsername || !newUsername.trim() || newUsername.trim() === state.user?.username}
+                        className="px-4 py-2 bg-primary text-on-primary font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive glow-cyan disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isUpdatingUsername ? (
+                          <>
+                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                            SAVING...
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-sm">save</span>
+                            SAVE USERNAME
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                {/* 2. Password Change Section */}
+                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-mono text-xs text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">lock</span>
+                      Security & Password
+                    </h3>
+                    <p className="text-[11px] text-on-surface-variant mb-4">
+                      Update your password. Requires current password verification.
+                    </p>
+
+                    <form onSubmit={handleChangePassword} className="space-y-3">
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                          Current Password
+                        </label>
+                        <input
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => {
+                            setCurrentPassword(e.target.value);
+                            setPasswordError(null);
+                          }}
+                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                          placeholder="••••••••"
+                          disabled={isChangingPassword}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            setPasswordError(null);
+                          }}
+                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                          placeholder="•••••••• (min 8 chars)"
+                          disabled={isChangingPassword}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                          Confirm New Password
+                        </label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            setPasswordError(null);
+                          }}
+                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                          placeholder="••••••••"
+                          disabled={isChangingPassword}
+                        />
+                        {passwordError && (
+                          <p className="font-mono text-[10px] text-error mt-1">{passwordError}</p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                        className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isChangingPassword ? (
+                          <>
+                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                            UPDATING...
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-sm">key</span>
+                            CHANGE PASSWORD
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

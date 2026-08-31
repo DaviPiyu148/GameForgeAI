@@ -20,7 +20,15 @@ from app.auth.rate_limit import check_login_rate, check_register_rate
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserResponse
+from app.schemas.auth import (
+    AuthResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+    LoginRequest,
+    RegisterRequest,
+    UpdateProfileRequest,
+    UserResponse,
+)
 from app.services.auth_service import (
     AuthService,
     DuplicateEmailError,
@@ -103,6 +111,56 @@ async def get_me(
 ):
     """Return the authenticated user's profile."""
     return auth_service.get_profile(current_user)
+
+
+@router.patch("/profile", response_model=UserResponse)
+@router.patch("/me", response_model=UserResponse)
+async def update_profile(
+    data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update the authenticated user's display username.
+    Validates format, length, and uniqueness across accounts.
+    """
+    try:
+        return auth_service.update_username(db, current_user, data.username)
+    except DuplicateUsernameError:
+        return _error("USERNAME_TAKEN", "This username is already taken.", 409)
+    except ValueError as e:
+        return _error("INVALID_USERNAME", str(e), 422)
+    except Exception:
+        logger.exception("Unexpected error updating profile")
+        return _error("UPDATE_FAILED", "Failed to update profile. Please try again.", 500)
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Change the authenticated user's password.
+    Requires validating current password before applying new password.
+    """
+    try:
+        auth_service.change_password(
+            db=db,
+            user=current_user,
+            current_password=data.current_password,
+            new_password=data.new_password,
+        )
+        return ChangePasswordResponse(success=True, message="Password changed successfully.")
+    except InvalidCredentialsError:
+        return _error("INCORRECT_PASSWORD", "Current password is incorrect.", 400)
+    except ValueError as e:
+        return _error("INVALID_PASSWORD", str(e), 422)
+    except Exception:
+        logger.exception("Unexpected error changing password")
+        return _error("CHANGE_PASSWORD_FAILED", "Failed to change password. Please try again.", 500)
+
 
 
 @router.post("/avatar")

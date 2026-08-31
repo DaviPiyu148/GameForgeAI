@@ -310,6 +310,7 @@ class DSLNormalizer:
         if "background_color" in w:
             w["background_color"] = cls.coerce_hex_color(w["background_color"])
 
+        valid_world_themes = {"cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal", "wasteland", "urban", "colony", "fantasy"}
         if "theme" in w and w["theme"] is not None:
             theme = str(w["theme"]).lower().strip()
             theme_alias = {
@@ -323,8 +324,12 @@ class DSLNormalizer:
             }
             if theme in theme_alias:
                 w["theme"] = theme_alias[theme]
-            else:
+            elif theme in valid_world_themes:
                 w["theme"] = theme
+            else:
+                w["theme"] = "neon"
+        elif "theme" in w:
+            w["theme"] = "neon"
 
         if "difficulty_scaling" in w:
             w["difficulty_scaling"] = cls.coerce_float(w["difficulty_scaling"])
@@ -653,8 +658,13 @@ class DSLNormalizer:
             l = dict(lvl)
 
             # 1. Check for world fields placed directly on level (e.g. levels[0].width)
-            level_world_fields = {"width", "height", "gravity", "background_color", "theme", "hazard_density", "wave_count", "difficulty_scaling"}
-            found_world_fields = {k: l.pop(k) for k in list(l.keys()) if k in level_world_fields}
+            level_world_fields = {"width", "height", "gravity", "background_color", "hazard_density", "wave_count", "difficulty_scaling"}
+            found_world_fields = {k: l.pop(k) for k in list(l.keys()) if k in level_world_fields and l[k] is not None}
+            # Also clean up any None world fields on level without migrating them
+            for k in list(l.keys()):
+                if k in level_world_fields and l[k] is None:
+                    l.pop(k)
+
             if found_world_fields:
                 issues.append(ValidationIssue(
                     path=["levels", idx, list(found_world_fields.keys())[0]],
@@ -665,10 +675,16 @@ class DSLNormalizer:
                 if "world" not in l or not isinstance(l.get("world"), dict):
                     # Inherit base world defaults and overlay level fields
                     base_world = dict(raw.get("world") or {})
+                    # Only copy non-null fields from base_world
+                    base_world = {bk: bv for bk, bv in base_world.items() if bv is not None}
                     base_world.update(found_world_fields)
                     l["world"] = base_world
                 else:
                     l["world"].update(found_world_fields)
+
+            # If level.world is None or not a dict, remove it so LevelDef defaults to None
+            if "world" in l and (l["world"] is None or not isinstance(l["world"], dict)):
+                l.pop("world", None)
 
             # 2. Extract / clean level metadata & legacy fields
             raw_num = l.get("level_number", l.get("level_id", l.get("id", l.get("stage_number", l.get("stage", idx + 1)))))
@@ -682,6 +698,30 @@ class DSLNormalizer:
 
             if "title" not in l or not isinstance(l.get("title"), str) or not l["title"].strip():
                 l["title"] = l.get("name", f"Level {l['level_number']}")
+
+            # Clean theme if present on level
+            if "theme" in l:
+                if l["theme"] is None:
+                    l.pop("theme", None)
+                elif isinstance(l["theme"], str):
+                    lvl_th = l["theme"].lower().strip()
+                    valid_lvl_themes = {"cyberpunk", "retro_arcade", "dungeon", "space", "neon", "minimal"}
+                    theme_alias = {
+                        "cyber": "cyberpunk",
+                        "scifi": "space",
+                        "sci_fi": "space",
+                        "retro": "retro_arcade",
+                        "pixel": "retro_arcade",
+                        "dark": "dungeon",
+                        "cave": "dungeon",
+                    }
+                    if lvl_th in theme_alias:
+                        l["theme"] = theme_alias[lvl_th]
+                    elif lvl_th in valid_lvl_themes:
+                        l["theme"] = lvl_th
+                    else:
+                        # Unknown level theme - drop it safely so schema validator doesn't reject
+                        l.pop("theme", None)
 
             # Strip known safe non-schema fields on LevelDef
             for k in list(l.keys()):

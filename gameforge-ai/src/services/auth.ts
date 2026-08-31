@@ -53,6 +53,17 @@ export const authService = {
     return apiClient.get<AuthUser>('/auth/me');
   },
 
+  updateUsername: async (username: string): Promise<AuthUser> => {
+    return apiClient.patch<AuthUser>('/auth/profile', { username });
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient.post<{ success: boolean; message: string }>('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+  },
+
   logout: (): void => {
     authStorage.clearToken();
   },

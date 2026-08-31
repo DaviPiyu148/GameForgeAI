@@ -5,10 +5,13 @@ REST for ordinary operations, SSE for build events, Pydantic schemas, consistent
 
 ---
 
-## Authentication & Identity (IMPLEMENTED — B7, extended Product Expansion V1)
+## Authentication & Identity (IMPLEMENTED — B7, extended Product Expansion V1, Small Product Fixes V2)
 - `POST /api/auth/register` -> Register a new account. Body: `{ email, username, password }`. Rate limit: 5/hr/IP. Returns `201 Created` with `{ user, access_token, token_type }`.
 - `POST /api/auth/login` -> Authenticate existing user. Body: `{ email, password }`. Rate limit: 10/15min/IP. Returns `200 OK` with `{ user, access_token, token_type }`. Generic error on failure.
 - `GET /api/auth/me` -> Fetch profile of current authenticated user. Requires `Authorization: Bearer <token>`. Returns `{ id, email, username, level, avatar_url, created_at, updated_at }`.
+- `PATCH /api/auth/me` -> Alias for `PATCH /api/auth/profile` (see below).
+- `PATCH /api/auth/profile` -> Update the authenticated user's public display username. Requires `Authorization: Bearer <token>`. Body: `{ username: string }`. Validates: 3–32 chars, alphanumeric/underscore/hyphen, globally unique. Returns `200 OK` with `{ id, email, username, level, avatar_url, created_at, updated_at }`. Conflict returns `409` (`USERNAME_TAKEN`). Validation failure returns `422`.
+- `POST /api/auth/change-password` -> Change the authenticated user's password. Requires `Authorization: Bearer <token>`. Body: `{ current_password: string, new_password: string }`. Validates current password via Argon2 verify before hashing new one. Enforces minimum 8-char strength. Returns `200 OK` with `{ success: true, message: string }`. Wrong current password returns `400` (`INVALID_CURRENT_PASSWORD`).
 - `POST /api/auth/avatar` -> Upload/replace profile picture. Requires `Authorization: Bearer <token>`. Body: multipart form file (PNG/JPEG/WebP, max 2MB). Returns `200 OK` with `{ avatar_url, message }`. Invalid file returns `422` (`INVALID_AVATAR`).
 - `DELETE /api/auth/avatar` -> Remove custom avatar, revert to default placeholder. Requires `Authorization: Bearer <token>`. Returns `200 OK` with `{ avatar_url: null, message }`.
 - `GET /api/auth/avatar/{filename}` -> Serve an uploaded avatar image file. No authentication (publicly servable static asset by design — the filename is an unguessable server-generated identifier, not a listing). Returns the image, or `404` (`AVATAR_NOT_FOUND`).

@@ -117,5 +117,43 @@ class AuthService:
         """Return safe profile data for an already-authenticated user."""
         return UserResponse.model_validate(user)
 
+    def update_username(self, db: Session, user: User, new_username: str) -> UserResponse:
+        """
+        Update a user's display username.
+        Checks for uniqueness against other users.
+        """
+        clean_username = new_username.strip()
+        if len(clean_username) < 2:
+            raise ValueError("Username must be at least 2 characters long.")
+        if len(clean_username) > 50:
+            raise ValueError("Username must not exceed 50 characters.")
+
+        existing = self.repo.get_by_username(db, clean_username)
+        if existing and existing.id != user.id:
+            raise DuplicateUsernameError("This username is already taken.")
+
+        user.username = clean_username
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return UserResponse.model_validate(user)
+
+    def change_password(self, db: Session, user: User, current_password: str, new_password: str) -> None:
+        """
+        Change an authenticated user's password.
+        Requires verifying the current password first.
+        Validates new password strength before hashing.
+        """
+        if not verify_password(current_password, user.password_hash):
+            raise InvalidCredentialsError("Current password is incorrect.")
+
+        validate_password_strength(new_password)
+
+        user.password_hash = hash_password(new_password)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
 
 auth_service = AuthService()
+
