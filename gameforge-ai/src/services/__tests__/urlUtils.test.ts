@@ -157,6 +157,93 @@ assert(
   'http://127.0.0.1:8001/api'
 );
 
+// --- Direct Local Dev & Production REST/SSE URL joining tests ---
+console.log('\n=== Direct API Base & Endpoint Joining Tests ===\n');
+
+assert(
+  'getApiBaseUrl: undefined returns relative /api',
+  getApiBaseUrl(undefined),
+  '/api'
+);
+
+assert(
+  'getApiBaseUrl: empty string returns relative /api',
+  getApiBaseUrl(''),
+  '/api'
+);
+
+assert(
+  'getApiBaseUrl: default 127.0.0.1:8000 normalizes to http://127.0.0.1:8000/api',
+  getApiBaseUrl('http://127.0.0.1:8000'),
+  'http://127.0.0.1:8000/api'
+);
+
+assert(
+  'getApiBaseUrl: 127.0.0.1:8000/ with trailing slash normalizes to http://127.0.0.1:8000/api',
+  getApiBaseUrl('http://127.0.0.1:8000/'),
+  'http://127.0.0.1:8000/api'
+);
+
+assert(
+  'getApiBaseUrl: 127.0.0.1:8000/api already ending in /api preserves /api without duplication',
+  getApiBaseUrl('http://127.0.0.1:8000/api'),
+  'http://127.0.0.1:8000/api'
+);
+
+assert(
+  'getApiBaseUrl: 127.0.0.1:8000/api/ with trailing slash preserves /api',
+  getApiBaseUrl('http://127.0.0.1:8000/api/'),
+  'http://127.0.0.1:8000/api'
+);
+
+assert(
+  'getApiBaseUrl: production origin normalizes to https://production-api.example.com/api',
+  getApiBaseUrl('https://production-api.example.com'),
+  'https://production-api.example.com/api'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: discovery search has no double /api',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8000'), '/discovery/search'),
+  'http://127.0.0.1:8000/api/discovery/search'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: auth me has no double /api',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8000'), '/auth/me'),
+  'http://127.0.0.1:8000/api/auth/me'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: profile progress has no double /api',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8000'), '/profile/progress'),
+  'http://127.0.0.1:8000/api/profile/progress'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: profile preferences has no double /api',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8000'), '/profile/preferences'),
+  'http://127.0.0.1:8000/api/profile/preferences'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: SSE build events URL is direct to backend origin',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8000'), `builds/test-build-1/events?sse_token=sample_token_123`),
+  'http://127.0.0.1:8000/api/builds/test-build-1/events?sse_token=sample_token_123'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: custom port 8001 routes discovery search to port 8001',
+  joinApiUrl(getApiBaseUrl('http://127.0.0.1:8001'), '/discovery/search'),
+  'http://127.0.0.1:8001/api/discovery/search'
+);
+
+assert(
+  'joinApiUrl + getApiBaseUrl: explicit custom domain is preserved without double /api',
+  joinApiUrl(getApiBaseUrl('https://api.customgame.io'), '/projects'),
+  'https://api.customgame.io/api/projects'
+);
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) {
   if (typeof (globalThis as any).process !== 'undefined') {

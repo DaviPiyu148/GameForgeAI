@@ -54,16 +54,16 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 
 ## Current Verification (as of Deployment & Product Hygiene Fix V1)
 
-- **Backend tests**: 424/424 passing (100% pass rate across all suites via `uv run pytest tests/ -q`).
+- **Backend tests**: 430/430 passing (100% pass rate across all suites via `uv run pytest tests/ -q`).
 - **Auth test suite**: 16/16 tests passing.
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 64 files).
-- **URL normalization unit tests**: 11/11 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
-- **Production build**: succeeds (`npm run build` — 91 modules transformed in 798ms).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 65 files).
+- **URL normalization & direct transport unit tests**: 34/34 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
+- **Production build**: succeeds (`npm run build` — built in 944ms).
 - **Alembic**: single head, `bc9ae398f146` (`alembic current` / `alembic heads`).
-- **Browser verification**: Explicitly NOT PERFORMED for this hygiene milestone per instructions (`BROWSER TESTING: NOT PERFORMED`).
+- **Browser verification**: Explicitly NOT PERFORMED for this milestone per instructions (`BROWSER TESTING: NOT PERFORMED`).
 
-- **Known limitation — FS-034**: intermittent `502`/`ECONNRESET` from Vite's dev proxy on `/api/*` requests, root-caused to this specific development machine's physical memory exhaustion (confirmed via direct-vs-proxied and concurrent-vs-sequential comparison testing, and live free-RAM/paging measurement). The backend itself never fails these requests — only the dev-only proxy hop under memory pressure. **Not reproducible in a production deployment** (no dev proxy exists in that path) and not fixable at the application layer. See `FULL_STACK_OPERATIONAL_AUDIT.md` findings FS-020 and FS-034.
+- **Dev API Transport (Elimination of FS-034 Dev Proxy Dependency)**: Local development (`start.bat`) automatically supplies `VITE_API_URL=http://127.0.0.1:<BACKEND_PORT>` and `CORS_ORIGINS` when not explicitly set, routing browser REST and SSE traffic directly to FastAPI. This bypasses the development-only Vite proxy hop and permanently eliminates intermittent `ECONNRESET` socket drops in local dev. The Vite proxy remains in place only as a backward-compatible fallback for environments without `VITE_API_URL`.
 
 ---
 

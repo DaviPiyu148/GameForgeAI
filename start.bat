@@ -18,9 +18,14 @@ set "FRONTEND_DIR=%ROOT%\gameforge-ai"
 set "VENV_DIR=%BACKEND_DIR%\.venv"
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "VENV_PIP=%VENV_DIR%\Scripts\pip.exe"
-set "VENV_ALEMBIC=%VENV_DIR%\Scripts\alembic.exe"
 if "%BACKEND_PORT%"=="" set "BACKEND_PORT=8000"
 if "%FRONTEND_PORT%"=="" set "FRONTEND_PORT=5173"
+
+:: Direct API URL for local development: routes browser REST/SSE traffic directly to FastAPI,
+:: eliminating dependence on the unstable Vite dev proxy (prevents ECONNRESET socket drops).
+:: Preserves any custom VITE_API_URL if already set in the caller's environment.
+if "%VITE_API_URL%"=="" set "VITE_API_URL=http://127.0.0.1:%BACKEND_PORT%"
+if "%CORS_ORIGINS%"=="" set "CORS_ORIGINS=http://localhost:%FRONTEND_PORT%,http://127.0.0.1:%FRONTEND_PORT%"
 
 :: Suppress HuggingFace cache symlink noise on Windows
 set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
