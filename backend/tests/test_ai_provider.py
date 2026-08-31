@@ -64,6 +64,7 @@ from app.ai.provider import (
     is_credential_failover_eligible,
     is_model_fallback_eligible,
 )
+from app.config import settings
 from app.ai.key_registry import GeminiKeyRegistry, ProviderKeyState
 from app.ai.model_router import TaskType, resolve_model_chain
 from app.ai.failover_executor import execute_with_failover, FailoverResult
@@ -348,20 +349,22 @@ def test_failover_eligibility_matrix():
 def test_task_model_chains_have_correct_defaults():
     """resolve_model_chain must return correct Gemini 3 defaults per task."""
     gen_chain = resolve_model_chain(TaskType.GAME_GENERATION)
-    assert gen_chain[0] == "gemini-3.7-flash"
-    assert "gemini-3.6-flash" in gen_chain
+    assert gen_chain == ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
 
     remix_chain = resolve_model_chain(TaskType.REMIX)
-    assert remix_chain[0] == "gemini-3.6-flash"
+    assert remix_chain == ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+
+    blueprint_chain = resolve_model_chain(TaskType.BLUEPRINT)
+    assert blueprint_chain == ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 
     patch_chain = resolve_model_chain(TaskType.DSL_PATCH)
-    assert patch_chain[0] == "gemini-3.6-flash"
-    # Lighter models should appear in the fallback positions
-    assert any("lite" in m or "3.5" in m or "3.1" in m for m in patch_chain[1:])
+    assert patch_chain == ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 
     analysis_chain = resolve_model_chain(TaskType.PLAYTEST_ANALYSIS)
-    # Primary should be a lighter/faster model for analysis
-    assert "lite" in analysis_chain[0] or "3.5" in analysis_chain[0]
+    assert analysis_chain == ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+
+    director_chain = resolve_model_chain(TaskType.DIRECTOR)
+    assert director_chain == ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
 
 
 def test_task_model_chains_all_non_empty():
@@ -482,7 +485,7 @@ async def test_key1_used_first():
     registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_c"])
     expected_result = {"ok": True}
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         MockProvider.return_value.generate_structured_with_meta = AsyncMock(
             return_value=(expected_result, {})
         )
@@ -510,7 +513,7 @@ async def test_key1_stays_primary_on_successive_success():
     registry = GeminiKeyRegistry(api_keys=["key_a", "key_b", "key_c"])
     seen_keys = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         MockProvider.return_value.generate_structured_with_meta = AsyncMock(
             return_value=({"ok": True}, {})
         )
@@ -535,7 +538,7 @@ async def test_key2_not_called_after_key1_success():
     """After Key 1 succeeds, Key 2 must NOT be called."""
     registry = GeminiKeyRegistry(api_keys=["key_a", "key_b"])
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         MockProvider.return_value.generate_structured_with_meta = AsyncMock(
             return_value=({"ok": True}, {})
         )
@@ -560,7 +563,7 @@ async def test_key1_eligible_failure_triggers_key2():
     )
     call_sequence = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         def provider_factory(*args, **kwargs):
             key = kwargs.get("api_key", "")
             call_sequence.append(key)
@@ -600,7 +603,7 @@ async def test_key2_success_key3_not_called():
     )
     call_sequence = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         def provider_factory(*args, **kwargs):
             key = kwargs.get("api_key", "")
             call_sequence.append(key)
@@ -637,7 +640,7 @@ async def test_invalid_request_no_failover():
         cooldown_seconds=3600,
     )
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         mock = MagicMock()
         mock.generate_structured_with_meta = AsyncMock(
             side_effect=AIError("INVALID_REQUEST", "bad payload", status_code=400,
@@ -667,7 +670,7 @@ async def test_schema_parsing_no_failover():
         cooldown_seconds=3600,
     )
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         mock = MagicMock()
         mock.generate_structured_with_meta = AsyncMock(
             side_effect=ModelInvalidResponseError("bad json")
@@ -695,7 +698,7 @@ async def test_model_unavailable_triggers_model_fallback_not_key_cycling():
     )
     call_sequence = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         def provider_factory(*args, **kwargs):
             key = kwargs.get("api_key", "")
             model = kwargs.get("model", "")
@@ -735,7 +738,7 @@ async def test_all_credentials_fail_triggers_model_fallback():
     )
     call_sequence = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         def provider_factory(*args, **kwargs):
             model = kwargs.get("model", "")
             key = kwargs.get("api_key", "")
@@ -776,7 +779,7 @@ async def test_next_model_starts_from_key1():
     )
     call_sequence = []
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         def provider_factory(*args, **kwargs):
             model = kwargs.get("model", "")
             key = kwargs.get("api_key", "")
@@ -826,7 +829,7 @@ async def test_failover_result_no_credential_details():
     """FailoverResult.to_provider_meta() must not expose raw credential values."""
     registry = GeminiKeyRegistry(api_keys=["my_super_secret_key_12345"])
 
-    with patch("app.ai.hosted_provider.GeminiProvider") as MockProvider:
+    with patch("app.ai.gemini_interactions_adapter.GeminiInteractionsAdapter") as MockProvider:
         MockProvider.return_value.generate_structured_with_meta = AsyncMock(
             return_value=({"ok": True}, {})
         )
@@ -877,3 +880,132 @@ async def test_router_with_injected_mock_primary_bypasses_executor(monkeypatch):
     assert meta["provider"] == "gemini"
     assert meta["model"] == "gemini-3.6-flash"
     assert meta["fallback_used"] is False
+
+
+# ================================================================
+# 36. GeminiInteractionsAdapter — Transport & Schema Tests
+# ================================================================
+
+from app.ai.gemini_interactions_adapter import GeminiInteractionsAdapter
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_missing_api_key_raises_configuration_error(monkeypatch):
+    """Interactions adapter with no API key must raise AIConfigurationError."""
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", None)
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", None)
+    monkeypatch.setattr(settings, "AI_API_KEY", None)
+
+    adapter = GeminiInteractionsAdapter(api_key="")
+    with pytest.raises(AIConfigurationError) as exc_info:
+        await adapter.generate_structured("System", "User")
+    assert "Gemini API key is not configured" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_valid_structured_response():
+    """Interactions adapter must parse valid JSON output and return interaction metadata."""
+    adapter = GeminiInteractionsAdapter(api_key="test-key-123", model="gemini-3.7-flash")
+
+    mock_interaction = MagicMock()
+    mock_interaction.output_text = json.dumps({"schema_version": "1.0", "title": "Interactions Game"})
+    mock_interaction.id = "interaction-abc-123"
+    mock_interaction.usage = {"total_tokens": 500}
+
+    with patch("google.genai.Client") as MockClient:
+        mock_instance = MagicMock()
+        mock_instance.aio.interactions.create = AsyncMock(return_value=mock_interaction)
+        MockClient.return_value = mock_instance
+
+        res, meta = await adapter.generate_structured_with_meta("System", "User")
+
+    assert res["title"] == "Interactions Game"
+    assert meta["provider"] == "gemini"
+    assert meta["model"] == "gemini-3.7-flash"
+    assert meta["interaction_id"] == "interaction-abc-123"
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_thought_tag_stripping():
+    """Interactions adapter must strip reasoning tags server-side before parsing JSON."""
+    adapter = GeminiInteractionsAdapter(api_key="test-key-123")
+
+    mock_interaction = MagicMock()
+    mock_interaction.output_text = (
+        "<thought>Plan: Generate topdown shooter mechanics with player velocity 200</thought>\n"
+        '{"schema_version": "1.0", "title": "Clean Game"}'
+    )
+    mock_interaction.id = "int-123"
+
+    with patch("google.genai.Client") as MockClient:
+        mock_instance = MagicMock()
+        mock_instance.aio.interactions.create = AsyncMock(return_value=mock_interaction)
+        MockClient.return_value = mock_instance
+
+        res = await adapter.generate_structured("System", "User")
+
+    assert res["title"] == "Clean Game"
+    assert "<thought>" not in json.dumps(res)
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_codeblock_stripping():
+    """Interactions adapter must strip markdown code fences."""
+    adapter = GeminiInteractionsAdapter(api_key="test-key-123")
+
+    mock_interaction = MagicMock()
+    mock_interaction.output_text = '```json\n{"schema_version": "1.0", "title": "Fenced Game"}\n```'
+    mock_interaction.id = "int-456"
+
+    with patch("google.genai.Client") as MockClient:
+        mock_instance = MagicMock()
+        mock_instance.aio.interactions.create = AsyncMock(return_value=mock_interaction)
+        MockClient.return_value = mock_instance
+
+        res = await adapter.generate_structured("System", "User")
+
+    assert res["title"] == "Fenced Game"
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_previous_interaction_id_forwarding():
+    """Interactions adapter must forward previous_interaction_id when provided."""
+    adapter = GeminiInteractionsAdapter(api_key="test-key-123")
+
+    mock_interaction = MagicMock()
+    mock_interaction.output_text = '{"title": "Remix Game"}'
+    mock_interaction.id = "int-789"
+
+    with patch("google.genai.Client") as MockClient:
+        mock_instance = MagicMock()
+        mock_create = AsyncMock(return_value=mock_interaction)
+        mock_instance.aio.interactions.create = mock_create
+        MockClient.return_value = mock_instance
+
+        await adapter.generate_structured(
+            "System", "Remix Prompt", previous_interaction_id="int-parent-001"
+        )
+
+    call_kwargs = mock_create.call_args.kwargs
+    assert call_kwargs.get("previous_interaction_id") == "int-parent-001"
+
+
+@pytest.mark.asyncio
+async def test_interactions_adapter_model_access_denied_403_raises_model_unavailable():
+    """403 with model-level access denied must classify as MODEL_UNAVAILABLE (not KEY_AUTH_FAILURE)."""
+    adapter = GeminiInteractionsAdapter(api_key="test-key-123", model="gemini-3.7-flash")
+
+    error = Exception("HTTP 403: model access_denied location not supported")
+    error.status_code = 403
+
+    with patch("google.genai.Client") as MockClient:
+        mock_instance = MagicMock()
+        mock_instance.aio.interactions.create = AsyncMock(side_effect=error)
+        MockClient.return_value = mock_instance
+
+        with pytest.raises(ModelUnavailableError) as exc_info:
+            await adapter.generate_structured("System", "User")
+
+    assert exc_info.value.code == "MODEL_ACCESS_DENIED"
+    assert exc_info.value.error_class == ProviderErrorClass.MODEL_UNAVAILABLE
+

@@ -8,7 +8,7 @@
  * regardless of whether API_BASE_URL has a trailing slash.
  */
 
-import { joinApiUrl } from '../urlUtils';
+import { joinApiUrl, getSwaggerDocsUrl } from '../urlUtils';
 
 let passed = 0;
 let failed = 0;
@@ -81,22 +81,60 @@ assert(
   `/api/builds/abc-123/events${tokenParam}`
 );
 
-// --- Swagger Docs URL derivation tests ---
+// --- Swagger Docs URL derivation tests (DEF-001 regression coverage) ---
+console.log('\n=== getSwaggerDocsUrl — DEF-001 Swagger resolution tests ===\n');
+
 assert(
-  'relative default produces clean /docs',
-  joinApiUrl('/docs', ''),
-  '/docs/'
+  'getSwaggerDocsUrl: undefined VITE_API_URL returns relative /docs for Vite dev proxy',
+  getSwaggerDocsUrl(undefined),
+  '/docs'
 );
 
 assert(
-  'root origin joining for Swagger UI',
-  joinApiUrl('http://127.0.0.1:8000', '/docs'),
+  'getSwaggerDocsUrl: empty string returns relative /docs',
+  getSwaggerDocsUrl(''),
+  '/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: relative /api returns relative /docs',
+  getSwaggerDocsUrl('/api'),
+  '/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: root origin without /api resolves to /docs',
+  getSwaggerDocsUrl('http://127.0.0.1:8000'),
   'http://127.0.0.1:8000/docs'
 );
 
 assert(
-  'deployed origin joining for Swagger UI',
-  joinApiUrl('https://api.gameforge.ai', '/docs'),
+  'getSwaggerDocsUrl: root origin with /api resolves to /docs',
+  getSwaggerDocsUrl('http://127.0.0.1:8000/api'),
+  'http://127.0.0.1:8000/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: root origin with /api/ trailing slash resolves to /docs',
+  getSwaggerDocsUrl('http://127.0.0.1:8000/api/'),
+  'http://127.0.0.1:8000/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: production origin resolves to /docs',
+  getSwaggerDocsUrl('https://api.gameforge.ai'),
+  'https://api.gameforge.ai/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: production origin with /api resolves to /docs',
+  getSwaggerDocsUrl('https://api.gameforge.ai/api'),
+  'https://api.gameforge.ai/docs'
+);
+
+assert(
+  'getSwaggerDocsUrl: production origin with /api/ trailing slash resolves to /docs',
+  getSwaggerDocsUrl('https://api.gameforge.ai/api/'),
   'https://api.gameforge.ai/docs'
 );
 
@@ -108,3 +146,4 @@ if (failed > 0) {
     throw new Error(`${failed} tests failed`);
   }
 }
+

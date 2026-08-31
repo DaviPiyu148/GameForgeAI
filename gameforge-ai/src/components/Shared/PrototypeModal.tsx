@@ -8,8 +8,9 @@ import {
   PLATFORMER_FIXTURE,
   COLLECTOR_FIXTURE,
 } from '../../runtime/fixtures';
-import { PhaserCanvas } from '../../runtime/PhaserCanvas';
 import { apiClient, ApiError } from '../../services/api';
+
+const PhaserCanvas = React.lazy(() => import('../../runtime/PhaserCanvas').then(m => ({ default: m.PhaserCanvas })));
 import { projectService } from '../../services/projects';
 import { GameBlueprintPanel } from './GameBlueprintPanel';
 import { RemixPanel } from './RemixPanel';
@@ -34,16 +35,16 @@ const ARCHETYPE_FIXTURES: Record<Archetype, GameDSL> = {
   runner: PLATFORMER_FIXTURE,
 };
 
+import { useModalDialog } from '../../hooks/useModalDialog';
+
 export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   onClose,
   project,
   gameDsl,
   onProjectUpdated,
 }) => {
-  const [isClosing, setIsClosing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenPulse, setFullscreenPulse] = useState(false);
-  const modalContainerRef = useRef<HTMLDivElement>(null);
   const [currentDsl, setCurrentDsl] = useState<GameDSL>(
     project?.gameDsl || gameDsl || SURVIVAL_FIXTURE
   );
@@ -53,7 +54,15 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [activeArchetype, setActiveArchetype] = useState<Archetype>(
     currentDsl.metadata.archetype || 'survival'
   );
+  const modalContainerRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen: true,
+    onClose,
+    initialFocusRef: closeBtnRef,
+    closeDelayMs: 200,
+  });
 
   // Playtest state
   const [playtestSummary, setPlaytestSummary] = useState<PlaytestSummary | null>(null);
@@ -96,13 +105,6 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     // so the blueprint always reflects the currently playable DSL/design spec.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, currentVersion]);
-
-  const handleClose = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 250);
-  }, [onClose]);
 
   // Fullscreen toggle — targets the modal outer container so the entire dialog
   // including header, canvas, and AI panel enters fullscreen (not just the canvas).
@@ -147,33 +149,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     };
   }, []);
 
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const fsElem = document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
-      // When fullscreen is active, the browser intercepts ESC to exit fullscreen.
-      // Do not also close the modal in that case — let fullscreenchange update state.
-      if (e.key === 'Escape' && !isClosing && !fsElem) {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosing, handleClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && !isClosing) {
-      handleClose();
-    }
-  };
+  // Handlers for playtesting and remixing
 
   const handlePlaytestComplete = async (summary: PlaytestSummary) => {
     setPlaytestSummary(summary);
@@ -376,6 +352,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
       aria-label="Playable 2D Prototype (Phaser Runtime)"
     >
       <div
+        ref={dialogRef}
         className={`w-full ${
           isFullscreen
             ? 'h-full max-h-screen max-w-none rounded-none border-0'
@@ -429,7 +406,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
           <div className="flex items-center gap-1 ml-auto">
             <button
               onClick={handleToggleFullscreen}
-              className="text-on-surface-variant icon-interactive hover:text-primary transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              className="text-on-surface-variant icon-interactive hover:text-primary transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
               title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
             >
@@ -441,7 +418,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
             <button
               ref={closeBtnRef}
               onClick={handleClose}
-              className="text-on-surface-variant icon-interactive hover:text-error transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              className="text-on-surface-variant icon-interactive hover:text-error transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               aria-label="Close prototype preview"
             >
               <span className="material-symbols-outlined" aria-hidden="true">
@@ -493,15 +470,27 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
         )}
 
         {/* Live Phaser Canvas Container */}
-        <div className="w-full bg-terminal-bg flex flex-col items-center justify-center p-2 relative">
+        <div className="w-full bg-terminal-bg flex flex-col items-center justify-center p-2 relative min-h-[420px]">
           <div className="w-full max-w-4xl flex justify-center">
-            <PhaserCanvas
-              key={`phaser-${currentVersion}-${resolvedSeed}`}
-              gameDsl={currentDsl}
-              seed={resolvedSeed}
-              onClose={handleClose}
-              onPlaytestComplete={handlePlaytestComplete}
-            />
+            <React.Suspense
+              fallback={
+                <div className="w-full min-h-[420px] max-h-[500px] flex flex-col items-center justify-center gap-3 bg-[#070810] border border-primary/30 font-mono text-xs text-primary">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined animate-spin text-secondary">sync</span>
+                    <span className="tracking-widest">[SYS] INITIALIZING PHASER RUNTIME ENGINE...</span>
+                  </div>
+                  <div className="text-[10px] text-on-surface-variant uppercase">Loading physics subsystems & texture synthesizers</div>
+                </div>
+              }
+            >
+              <PhaserCanvas
+                key={`phaser-${currentVersion}-${resolvedSeed}`}
+                gameDsl={currentDsl}
+                seed={resolvedSeed}
+                onClose={handleClose}
+                onPlaytestComplete={handlePlaytestComplete}
+              />
+            </React.Suspense>
           </div>
         </div>
 

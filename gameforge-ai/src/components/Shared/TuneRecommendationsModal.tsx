@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { DiscoverySessionContext } from '../../types';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 interface TuneRecommendationsModalProps {
   isOpen: boolean;
@@ -26,33 +27,19 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
   const [localAvoidTags, setLocalAvoidTags] = useState<string[]>(
     sessionContext.temporary_avoid_tags || []
   );
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: closeBtnRef,
+    closeDelayMs: 200,
+  });
 
   useEffect(() => {
     setLocalRefinements(sessionContext.refinements || []);
     setLocalAvoidTags(sessionContext.temporary_avoid_tags || []);
   }, [sessionContext]);
-
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -75,28 +62,31 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
       refinements: localRefinements,
       temporary_avoid_tags: localAvoidTags,
     });
-    onClose();
+    handleClose();
   };
 
   const handleReset = () => {
     setLocalRefinements([]);
     setLocalAvoidTags([]);
     onReset();
-    onClose();
+    handleClose();
   };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${
+        isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="Tune recommendations dialog"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={handleBackdropClick}
     >
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] flex flex-col rounded-sm modal-enter relative z-10 p-6 space-y-6"
+        ref={dialogRef}
+        className={`w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] flex flex-col rounded-sm relative z-10 p-6 space-y-6 ${
+          isClosing ? 'modal-exit' : 'modal-enter'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -108,8 +98,9 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
             </h2>
           </div>
           <button
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            ref={closeBtnRef}
+            onClick={handleClose}
+            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
             aria-label="Close tune dialog"
           >
             <span className="material-symbols-outlined text-base">close</span>
@@ -132,6 +123,8 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
                 <button
                   key={opt}
                   type="button"
+                  aria-pressed={isSelected}
+                  aria-label={`Toggle preference for ${opt}`}
                   onClick={() => toggleRefinement(opt)}
                   className={`px-3 py-1.5 text-xs font-mono rounded border transition-all cursor-pointer ${
                     isSelected
@@ -159,6 +152,8 @@ export const TuneRecommendationsModal: React.FC<TuneRecommendationsModalProps> =
                 <button
                   key={tag}
                   type="button"
+                  aria-pressed={isSelected}
+                  aria-label={`Toggle avoidance for ${tag}`}
                   onClick={() => toggleAvoidTag(tag)}
                   className={`px-3 py-1.5 text-xs font-mono rounded border transition-all cursor-pointer ${
                     isSelected

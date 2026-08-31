@@ -7,37 +7,32 @@ For each request, the executor iterates:
 
   Model chain (task-specific)
     └─ Eligible credentials (configured order, skipping cooldown)
-         └─ Attempt → classify error → record health → decision
+         └─ Attempt -> classify error -> record health -> decision
 
 Decision table:
-  KEY_AUTH_FAILURE  → record failure → try next credential
-  RATE_LIMIT        → record failure → try next credential
-  TRANSIENT_PROVIDER → record failure → try next credential
-  NETWORK_ERROR     → record failure → try next credential
-  UNKNOWN           → record failure → try next credential (once per key)
-  MODEL_UNAVAILABLE → do NOT charge credential; try next MODEL (not next key)
-  INVALID_REQUEST   → raise immediately; no credential/model cycling
-  CONTENT_SAFETY    → raise immediately; no cycling
-  SCHEMA_PARSING    → raise immediately; no cycling
+  KEY_AUTH_FAILURE  -> record failure -> try next credential
+  RATE_LIMIT        -> record failure -> try next credential
+  TRANSIENT_PROVIDER -> record failure -> try next credential
+  NETWORK_ERROR     -> record failure -> try next credential
+  UNKNOWN           -> record failure -> try next credential (once per key)
+  MODEL_UNAVAILABLE -> do NOT charge credential; try next MODEL (not next key)
+  INVALID_REQUEST   -> raise immediately; no credential/model cycling
+  CONTENT_SAFETY    -> raise immediately; no cycling
+  SCHEMA_PARSING    -> raise immediately; no cycling
 
-Outer loop (models): exhausting all credentials for model N triggers model N+1.
-Inner loop (keys): try Key 1, then Key 2, ... until success or all exhausted.
-
-STOP immediately on first success.
-
-Key behavior
-============
-- Key 1 is ALWAYS tried first.
-- Key 1 is used for EVERY request when healthy (no proactive rotation).
-- The next key is tried ONLY on an eligible failure.
-- There is NO round-robin, NO random selection, NO cycling on success.
-
-Safety invariants
-=================
-- Raw API key strings are NEVER written to logs, stored in the database, or
-  returned in API responses.  Only key_index (1-based for display) and
-  masked_key (last 4 chars) appear in logs.
-- No credential details are included in FailoverResult metadata.
+Budgeting & Limits (Approved V1 Rules):
+=======================================
+1. Dynamic Remaining-Deadline:
+   overall_deadline = 60.0s (single wall-clock clock).
+   attempt_timeout = min(task_cap, overall_deadline - elapsed).
+   If remaining < 3.0s -> abort immediately.
+2. Global Interaction Ceiling:
+   Hard ceiling of at most 5 total Gemini API calls across all keys, models, and repairs.
+3. Pluggable Transport:
+   Uses GeminiInteractionsAdapter when AI_TRANSPORT="interactions" (default),
+   falling back to GeminiProvider (httpx OpenAI proxy) when AI_TRANSPORT="legacy_http".
+4. Safe Logging:
+   Raw API key strings are NEVER logged. Only key_index and masked identifiers appear.
 """
 import asyncio
 import logging
@@ -62,6 +57,9 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 
+# Hard global limit on total Gemini API calls per request lifecycle
+MAX_GLOBAL_ATTEMPTS = 5
+
 
 @dataclass
 class FailoverResult:
@@ -74,6 +72,7 @@ class FailoverResult:
     model_fallbacks_used: int
     duration_ms: float
     error_class_on_fallback: Optional[List[str]] = field(default_factory=list)
+    interaction_id: Optional[str] = None
 
     def to_provider_meta(self) -> Dict[str, Any]:
         """Return safe, non-credential metadata suitable for service layer / SSE logs."""
@@ -82,6 +81,7 @@ class FailoverResult:
             "model": self.model_used,
             "provider_display_name": "Google Gemini",
             "model_display_name": self.model_used,
+            "interaction_id": self.interaction_id,
             "fallback_used": (self.key_fallbacks_used + self.model_fallbacks_used) > 0,
             "fallback_reason": (
                 self.error_class_on_fallback[-1] if self.error_class_on_fallback else None
@@ -89,6 +89,19 @@ class FailoverResult:
             "key_fallbacks": self.key_fallbacks_used,
             "model_fallbacks": self.model_fallbacks_used,
         }
+
+
+def _get_task_attempt_cap(task_type: TaskType, explicit_timeout: Optional[float] = None) -> float:
+    """Return task-specific attempt timeout cap."""
+    if explicit_timeout is not None:
+        return explicit_timeout
+    if task_type in (TaskType.GAME_GENERATION, TaskType.REMIX, TaskType.BLUEPRINT):
+        return 25.0
+    if task_type == TaskType.DSL_PATCH:
+        return 15.0
+    if task_type == TaskType.PLAYTEST_ANALYSIS:
+        return 12.0
+    return float(settings.AI_TIMEOUT_SECONDS)
 
 
 async def execute_with_failover(
@@ -99,44 +112,22 @@ async def execute_with_failover(
     timeout: Optional[float] = None,
     overall_deadline: Optional[float] = None,
     registry: Optional[GeminiKeyRegistry] = None,
+    previous_interaction_id: Optional[str] = None,
 ) -> FailoverResult:
     """
-    Execute a structured AI request using sequential credential failover and
-    task-based model routing.
-
-    Parameters
-    ----------
-    task_type:
-        The TaskType enum value — determines the model chain.
-    system_prompt:
-        System instruction prompt (not logged by this layer).
-    user_prompt:
-        User/generation prompt (not logged by this layer).
-    json_schema:
-        Optional JSON schema hint; passed through to GeminiProvider.
-    timeout:
-        Per-attempt HTTP timeout in seconds.  Defaults to settings.AI_TIMEOUT_SECONDS.
-    overall_deadline:
-        Maximum total wall-clock seconds across ALL attempts.
-        Defaults to settings.AI_OVERALL_DEADLINE_SECONDS.
-    registry:
-        Credential registry to use; defaults to the global singleton.
-
-    Returns
-    -------
-    FailoverResult
-
-    Raises
-    ------
-    AIError or subclass on terminal failures.
+    Execute a structured AI request using sequential credential failover,
+    task-based model routing, dynamic remaining-deadline budgeting, and
+    global request bounding.
     """
-    # Import here to avoid circular import at module load time
+    # Import transport adapters dynamically to prevent circular imports
+    from app.ai.gemini_interactions_adapter import GeminiInteractionsAdapter
     from app.ai.hosted_provider import GeminiProvider
 
     reg = registry if registry is not None else gemini_key_registry
-    per_attempt_timeout = timeout or settings.AI_TIMEOUT_SECONDS
-    deadline_secs = overall_deadline or settings.AI_OVERALL_DEADLINE_SECONDS
+    deadline_secs = overall_deadline or float(settings.AI_OVERALL_DEADLINE_SECONDS)
     model_chain = resolve_model_chain(task_type)
+    task_cap = _get_task_attempt_cap(task_type, timeout)
+    use_interactions = getattr(settings, "AI_TRANSPORT", "interactions") == "interactions"
 
     if not reg or reg.pool_size == 0:
         raise AIConfigurationError(
@@ -155,6 +146,14 @@ async def execute_with_failover(
     last_error: Optional[Exception] = None
 
     for model_idx, model in enumerate(model_chain):
+        # Global interaction limit check
+        if attempts_total >= MAX_GLOBAL_ATTEMPTS:
+            log.warning(
+                "[AI] TASK: %s | Global interaction budget of %d reached — aborting model chain.",
+                task_type.value, MAX_GLOBAL_ATTEMPTS,
+            )
+            break
+
         eligible_keys = reg.get_eligible_keys()
 
         if not eligible_keys:
@@ -166,41 +165,78 @@ async def execute_with_failover(
             model_fallbacks += 1
             continue
 
-        model_had_eligible_error = False  # Did any key give us a key-failover-eligible error?
-
         for key_idx, key in eligible_keys:
-            # Deadline check before each attempt
-            elapsed = time.monotonic() - start_ts
-            if elapsed >= deadline_secs:
+            # 1. Global interaction limit check
+            if attempts_total >= MAX_GLOBAL_ATTEMPTS:
                 log.warning(
-                    "[AI] TASK: %s | Overall deadline of %.0fs exceeded after %.1fs — aborting.",
-                    task_type.value, deadline_secs, elapsed,
+                    "[AI] TASK: %s | Global interaction budget of %d reached — aborting attempts.",
+                    task_type.value, MAX_GLOBAL_ATTEMPTS,
+                )
+                break
+
+            # 2. Dynamic Remaining-Deadline Check
+            elapsed = time.monotonic() - start_ts
+            remaining = deadline_secs - elapsed
+
+            if remaining < 3.0:
+                log.warning(
+                    "[AI] TASK: %s | Insufficient deadline remaining (%.1fs < 3.0s) — aborting.",
+                    task_type.value, remaining,
                 )
                 raise ModelUnavailableError(
-                    f"AI generation exceeded overall deadline of {deadline_secs:.0f}s after {elapsed:.1f}s."
+                    f"AI generation exceeded remaining deadline ({remaining:.1f}s remaining of {deadline_secs:.0f}s total)."
                 )
 
-            remaining = deadline_secs - elapsed
-            attempt_timeout = min(per_attempt_timeout, remaining)
+            # Allocate dynamic attempt timeout capped at the task cap and remaining time
+            attempt_timeout = min(task_cap, remaining)
             attempts_total += 1
 
             log.info(
-                "[AI] TASK: %s | MODEL: %s | KEY: #%d | ATTEMPT: %d",
-                task_type.value, model, key_idx + 1, attempts_total,
+                "[AI] TASK: %s | MODEL: %s | KEY: #%d | ATTEMPT: %d (Budget: %.1fs remaining)",
+                task_type.value, model, key_idx + 1, attempts_total, remaining,
             )
 
             try:
-                provider = GeminiProvider(
-                    api_key=key,
-                    model=model,
-                    timeout=attempt_timeout,
-                )
-                result_dict, _meta = await provider.generate_structured_with_meta(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    json_schema=json_schema,
-                    timeout=attempt_timeout,
-                )
+                # Select transport based on AI_TRANSPORT configuration
+                if use_interactions:
+                    provider = GeminiInteractionsAdapter(
+                        api_key=key,
+                        model=model,
+                        timeout=attempt_timeout,
+                    )
+                else:
+                    provider = GeminiProvider(
+                        api_key=key,
+                        model=model,
+                        timeout=attempt_timeout,
+                    )
+
+                if hasattr(provider, "generate_structured_with_meta"):
+                    # Check if previous_interaction_id is accepted
+                    try:
+                        result_dict, meta = await provider.generate_structured_with_meta(
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            json_schema=json_schema,
+                            timeout=attempt_timeout,
+                            previous_interaction_id=previous_interaction_id,
+                        )
+                    except TypeError:
+                        result_dict, meta = await provider.generate_structured_with_meta(
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            json_schema=json_schema,
+                            timeout=attempt_timeout,
+                        )
+                else:
+                    result_dict = await provider.generate_structured(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        json_schema=json_schema,
+                        timeout=attempt_timeout,
+                    )
+                    meta = {}
+
                 duration_ms = (time.monotonic() - start_ts) * 1000
                 await reg.record_success(key_idx)
 
@@ -218,6 +254,7 @@ async def execute_with_failover(
                     model_fallbacks_used=model_fallbacks,
                     duration_ms=duration_ms,
                     error_class_on_fallback=fallback_reasons,
+                    interaction_id=meta.get("interaction_id"),
                 )
 
             except Exception as exc:
@@ -253,23 +290,21 @@ async def execute_with_failover(
                     )
                     raise
 
-                # MODEL_UNAVAILABLE — charge the model, not the credential
+                # MODEL_UNAVAILABLE / Model Policy 403 — charge the model, not the credential
                 if error_class == ProviderErrorClass.MODEL_UNAVAILABLE:
                     log.warning(
                         "[AI] TASK: %s | MODEL: %s | MODEL_UNAVAILABLE — "
-                        "will try next model (credential #%d NOT penalised).",
+                        "will try next model (credential #%d NOT penalized).",
                         task_type.value, model, key_idx + 1,
                     )
-                    model_had_eligible_error = True
                     fallback_reasons.append(error_class.value)
                     model_fallbacks += 1
-                    break  # Break inner key loop → next model
+                    break  # Break inner key loop -> advance to next model
 
                 # Credential-eligible failures: record health + try next key
                 if is_credential_failover_eligible(error_class):
                     await reg.record_failure(key_idx, error_class)
                     key_fallbacks += 1
-                    model_had_eligible_error = True
                     fallback_reasons.append(error_class.value)
                     # Log failover intent
                     eligible_remaining = [
@@ -278,7 +313,7 @@ async def execute_with_failover(
                     if eligible_remaining:
                         next_key_idx = eligible_remaining[0][0]
                         log.info(
-                            "[AI] FAILOVER: KEY #%d → KEY #%d (reason: %s)",
+                            "[AI] FAILOVER: KEY #%d -> KEY #%d (reason: %s)",
                             key_idx + 1, next_key_idx + 1, error_class.value,
                         )
                     else:
@@ -294,13 +329,13 @@ async def execute_with_failover(
                 fallback_reasons.append(error_class.value)
                 continue
 
-        # All eligible keys exhausted for this model → log and advance to next model
+        # All eligible keys exhausted for this model -> log and advance to next model
         if model_idx < len(model_chain) - 1:
             next_model = model_chain[model_idx + 1]
             model_fallbacks += 1
             log.warning(
                 "[AI] TASK: %s | MODEL: %s credentials exhausted — "
-                "FALLBACK → MODEL: %s | KEY: #1",
+                "FALLBACK -> MODEL: %s | KEY: #1",
                 task_type.value, model, next_model,
             )
             fallback_reasons.append(f"CREDENTIALS_EXHAUSTED_ON_{model}")

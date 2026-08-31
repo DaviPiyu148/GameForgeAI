@@ -51,19 +51,23 @@ function RenameInput({ initialTitle, onSave, onCancel }: RenameInputProps) {
         aria-label="Rename project"
       />
       <button
+        type="button"
         onClick={handleSave}
         disabled={saving || !value.trim()}
         className="text-primary hover:text-on-primary hover:bg-primary p-1 transition-colors cursor-pointer rounded-sm"
+        aria-label="Save project title"
         title="Save name (Enter)"
       >
-        <span className="material-symbols-outlined text-[14px]">check</span>
+        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">check</span>
       </button>
       <button
+        type="button"
         onClick={onCancel}
         className="text-on-surface-variant hover:text-error p-1 transition-colors cursor-pointer rounded-sm"
+        aria-label="Cancel title rename"
         title="Cancel (Esc)"
       >
-        <span className="material-symbols-outlined text-[14px]">close</span>
+        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>
       </button>
     </div>
   );
@@ -185,7 +189,11 @@ const DashboardPage = () => {
   return (
     <div className="flex-1 flex flex-col gap-8">
       {/* Header */}
-      <header className="flex flex-col gap-1 border-l-4 border-primary pl-4 py-1">
+      <header className="flex flex-col gap-1 border-b border-primary/30 pb-3">
+        <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-widest">
+          <span className="material-symbols-outlined text-sm">terminal</span>
+          <span>SYSTEM_STORAGE // REPOSITORY_INDEX</span>
+        </div>
         <h1 className="font-display text-base md:text-2xl text-on-surface uppercase tracking-tight">
           MY GAMES DASHBOARD
         </h1>
@@ -246,12 +254,16 @@ const DashboardPage = () => {
                         onCancel={() => setRenamingId(null)}
                       />
                     ) : (
-                      <h3
-                        className="font-display text-base md:text-lg text-primary uppercase truncate max-w-[200px] cursor-pointer hover:text-primary/80 transition-colors"
-                        title={`${game.title} (click to rename)`}
-                        onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
-                      >
-                        {game.title}
+                      <h3 className="font-display text-base md:text-lg text-primary uppercase truncate max-w-[200px]">
+                        <button
+                          type="button"
+                          onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
+                          className="truncate max-w-full text-left cursor-pointer hover:text-primary/80 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-xs"
+                          aria-label={`Rename project ${game.title}`}
+                          title={`${game.title} (click to rename)`}
+                        >
+                          {game.title}
+                        </button>
                       </h3>
                     )}
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -326,55 +338,65 @@ const DashboardPage = () => {
                     <div className="relative">
                       <button
                         id={`menu-btn-${game.id}`}
+                        type="button"
                         onClick={() => setOpenMenuId(openMenuId === game.id ? null : game.id)}
                         className="border border-outline-variant text-on-surface-variant px-2 py-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center"
                         title="More actions"
-                        aria-haspopup="true"
+                        aria-label={`More actions for ${game.title}`}
                         aria-expanded={openMenuId === game.id}
+                        aria-controls={`actions-dropdown-${game.id}`}
                       >
-                        <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">more_vert</span>
                       </button>
 
                       {openMenuId === game.id && (
                         <>
                           {/* Click-away backdrop */}
                           <div className="fixed inset-0 z-20" onClick={() => setOpenMenuId(null)} />
-                          <div className="absolute right-0 bottom-full mb-1 w-44 bg-surface-container border border-primary/40 shadow-xl z-30 flex flex-col modal-enter rounded-sm overflow-hidden">
+                          <div
+                            id={`actions-dropdown-${game.id}`}
+                            className="absolute right-0 bottom-full mb-1 w-44 bg-surface-container border border-primary/40 shadow-xl z-30 flex flex-col modal-enter rounded-sm overflow-hidden"
+                          >
                             <button
+                              type="button"
                               onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
                             >
-                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
                               Rename
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleRemix(game)}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
                             >
-                              <span className="material-symbols-outlined text-[14px]">shuffle</span>
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">shuffle</span>
                               Remix
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDuplicate(game.id)}
                               disabled={duplicatingId === game.id}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left disabled:opacity-50"
                             >
-                              <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">content_copy</span>
                               {duplicatingId === game.id ? 'Duplicating…' : 'Duplicate'}
                             </button>
                             <button
+                              type="button"
                               onClick={() => { setDetailsProject(game); setOpenMenuId(null); }}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
                             >
-                              <span className="material-symbols-outlined text-[14px]">info</span>
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">info</span>
                               Details
                             </button>
                             <div className="border-t border-outline-variant/50 my-0.5" />
                             <button
+                              type="button"
                               onClick={() => { setDeleteConfirmId(game.id); setOpenMenuId(null); }}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-error/80 hover:bg-error/10 hover:text-error transition-colors cursor-pointer text-left"
                             >
-                              <span className="material-symbols-outlined text-[14px]">delete</span>
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>
                               Delete
                             </button>
                           </div>

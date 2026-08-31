@@ -1454,11 +1454,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Complete lifecycle cleanup ensuring zero lingering Phaser objects or tweens.
+   * Complete lifecycle cleanup ensuring zero lingering Phaser objects, behaviors, or tweens.
    */
   public cleanupGameScene(): void {
     this.vfxSystem?.destroy();
     this.environmentSystem?.destroy();
+    this.behaviorSystem?.clear();
+  }
+
+  /**
+   * Automatically called by Phaser when scene stops or restarts.
+   */
+  public shutdown(): void {
+    this.cleanupGameScene();
+    this.events.removeAllListeners();
+    this.time.removeAllEvents();
+    this.tweens.killAll();
   }
 }
 

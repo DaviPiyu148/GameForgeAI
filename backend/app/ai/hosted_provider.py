@@ -323,6 +323,7 @@ class AIProviderRouter(AIProvider):
         json_schema: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
         task_type: Optional[Any] = None,
+        previous_interaction_id: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Execute with failover routing.
@@ -336,9 +337,14 @@ class AIProviderRouter(AIProvider):
         # Test-mock compatibility: if a mock primary was injected, use it directly
         if self.primary is not None:
             if hasattr(self.primary, "generate_structured_with_meta"):
-                return await self.primary.generate_structured_with_meta(
-                    system_prompt, user_prompt, json_schema, timeout=timeout
-                )
+                try:
+                    return await self.primary.generate_structured_with_meta(
+                        system_prompt, user_prompt, json_schema, timeout=timeout, previous_interaction_id=previous_interaction_id
+                    )
+                except TypeError:
+                    return await self.primary.generate_structured_with_meta(
+                        system_prompt, user_prompt, json_schema, timeout=timeout
+                    )
             res = await self.primary.generate_structured(system_prompt, user_prompt, json_schema, timeout=timeout)
             return res, {
                 "provider": getattr(self.primary, "provider_name", "primary"),
@@ -359,5 +365,6 @@ class AIProviderRouter(AIProvider):
             user_prompt=user_prompt,
             json_schema=json_schema,
             timeout=timeout,
+            previous_interaction_id=previous_interaction_id,
         )
         return failover_result.result, failover_result.to_provider_meta()

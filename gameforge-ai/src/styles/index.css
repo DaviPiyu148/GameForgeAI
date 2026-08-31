@@ -263,10 +263,78 @@
   .fullscreen-transition {
     animation: fullscreenPulse var(--motion-medium) var(--ease-cyber) 1;
   }
+
+  /* Horizontal Scroll Gradient Mask Fade */
+  .scroll-fade-x {
+    overflow-x: auto;
+    -webkit-mask-image: linear-gradient(to right, black 0%, black calc(100% - 32px), transparent 100%);
+    mask-image: linear-gradient(to right, black 0%, black calc(100% - 32px), transparent 100%);
+  }
+
+  /* Shared Cyberpunk Shapes (Disciplined Set) */
+  .cyber-chamfer {
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+
+  .cyber-notch-header {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  }
+
+  .cyber-hud-bracket {
+    position: relative;
+  }
+  .cyber-hud-bracket::before,
+  .cyber-hud-bracket::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    pointer-events: none;
+    border-color: #4ce0d2;
+  }
+  .cyber-hud-bracket::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+  }
+  .cyber-hud-bracket::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+  }
 }
 
 /* ─── Base Styles ─── */
 @layer base {
+  :root,
+  html,
+  body {
+    color-scheme: dark;
+  }
+
+  /* Standard Cross-Browser Scrollbar */
+  * {
+    scrollbar-color: #32353d #10131a;
+    scrollbar-width: thin;
+  }
+
+  @media (forced-colors: active) {
+    * {
+      scrollbar-color: auto;
+    }
+  }
+
+  /* Typography Balance and Orphan Prevention */
+  h1, h2, h3, h4, h5, h6, .font-display {
+    text-wrap: balance;
+  }
+
+  p, .prose {
+    text-wrap: pretty;
+  }
+
   body {
     background-color: #0a0d14;
     color: #e1e2ec;
@@ -282,6 +350,16 @@
     color: #003733;
   }
 
+  /* Additive Fallback Focus Ring for Interactive Elements */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--color-primary, #4ce0d2);
+    outline-offset: 2px;
+  }
+
   .scanline-effect {
     position: fixed;
     top: 0;
@@ -295,7 +373,7 @@
     opacity: 0.8;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar (WebKit fallback) */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #10131a; border-left: 1px solid #3c4947; }
   ::-webkit-scrollbar-thumb { background: #32353d; border-radius: 2px; }
@@ -453,20 +531,42 @@
 
 /* ─── Reduced Motion ─── */
 @media (prefers-reduced-motion: reduce) {
-  .btn-interactive, .icon-interactive, .page-enter, .stagger-enter, .modal-enter, .modal-exit, .modal-backdrop-enter, .modal-backdrop-exit, .energy-sweep::after, .mic-listening {
-    animation: none !important;
-    transition-duration: 0.01ms !important;
-    transform: none !important;
-  }
-
-  /* Comprehensive fallback: instantly resolve every animation/transition
-     (including Tailwind's built-in animate-spin/pulse/bounce and any custom
-     keyframe added above) rather than maintaining an ever-growing selector
-     list. Content/state changes still occur; only the motion is removed. */
+  /* Disable translation/scaling keyframe animations and rapid loops while keeping state feedback */
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Preserve gentle opacity and color transitions on interactive controls so state feedback remains clear */
+  .btn-interactive,
+  .icon-interactive,
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    transition-property: color, background-color, border-color, opacity, box-shadow !important;
+    transition-duration: var(--motion-normal) !important;
+    transform: none !important;
+  }
+
+  .energy-sweep::after,
+  .mic-listening,
+  .crt-flicker,
+  .scan-sweep::before,
+  .terminal-cursor {
+    animation: none !important;
+  }
+
+  .page-enter,
+  .stagger-enter,
+  .modal-enter,
+  .modal-backdrop-enter,
+  .toast-enter,
+  .toast-enter-emphasis {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

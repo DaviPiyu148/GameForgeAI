@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { DiscoverySearchResult, StorefrontItem } from '../../types';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 interface GameDetailsModalProps {
   result: DiscoverySearchResult;
@@ -21,11 +22,17 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
   onMoreLikeThis,
   isActionLoading = false,
 }) => {
-  const [isClosing, setIsClosing] = useState(false);
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
   const [heroImageError, setHeroImageError] = useState(false);
   const [screenshotErrors, setScreenshotErrors] = useState<Record<number, boolean>>({});
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen: true,
+    onClose,
+    initialFocusRef: closeBtnRef,
+    closeDelayMs: 200,
+  });
 
   // Reset internal state whenever the selected game changes
   useEffect(() => {
@@ -33,39 +40,6 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
     setHeroImageError(false);
     setScreenshotErrors({});
   }, [result.game.id, result.game.external_id]);
-
-  const handleClose = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 250);
-  }, [onClose]);
-
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    closeBtnRef.current?.focus();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isClosing) {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosing, handleClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && !isClosing) {
-      handleClose();
-    }
-  };
 
   const game = result.game;
   const matchPct = Math.round(result.score * 100);
@@ -145,6 +119,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
       aria-label={`Details for ${game.display_title || game.title}`}
     >
       <div
+        ref={dialogRef}
         className={`w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-surface border border-primary/50 rounded-lg flex flex-col shadow-[0_0_40px_rgba(76,224,210,0.2)] glow-cyan ${
           isClosing ? 'modal-exit' : 'modal-enter'
         }`}
@@ -161,7 +136,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
           <button
             ref={closeBtnRef}
             onClick={handleClose}
-            className="text-on-surface-variant icon-interactive hover:text-primary transition-colors p-1 focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
+            className="text-on-surface-variant icon-interactive hover:text-primary transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
             aria-label="Close game details"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -176,6 +151,9 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
               <img
                 src={heroArtUrl}
                 alt={game.display_title || game.title}
+                fetchPriority="high"
+                loading="eager"
+                decoding="async"
                 className="w-full h-full object-cover object-center transition-all duration-500"
                 onError={() => setHeroImageError(true)}
               />
@@ -353,6 +331,8 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                       <button
                         type="button"
                         key={url}
+                        aria-label={`View screenshot ${idx + 1} of ${validScreenshots.length}`}
+                        aria-current={idx === activeScreenshotIndex ? 'true' : undefined}
                         onClick={() => setActiveScreenshotIndex(idx)}
                         className={`relative w-20 h-14 shrink-0 rounded overflow-hidden border transition-all cursor-pointer ${
                           idx === activeScreenshotIndex
@@ -362,7 +342,8 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                       >
                         <img
                           src={url}
-                          alt={`Thumbnail ${idx + 1}`}
+                          alt=""
+                          aria-hidden="true"
                           className="w-full h-full object-cover"
                           onError={() =>
                             setScreenshotErrors((prev) => ({ ...prev, [idx]: true }))

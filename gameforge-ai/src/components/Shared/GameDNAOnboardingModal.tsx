@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { discoveryService } from '../../services/discovery';
 import { useAppContext } from '../../context/AppContext';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 interface GameDNAOnboardingModalProps {
   isOpen: boolean;
@@ -57,27 +58,11 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
 
   const { refreshPreferences, state } = useAppContext();
 
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen,
+    onClose,
+    closeDelayMs: 200,
+  });
 
   if (!isOpen) return null;
 
@@ -121,16 +106,19 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${
+        isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="Game DNA Onboarding Modal"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={handleBackdropClick}
     >
       <div
-        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-sm p-6 space-y-6 modal-enter z-10"
+        ref={dialogRef}
+        className={`relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-sm p-6 space-y-6 z-10 ${
+          isClosing ? 'modal-exit' : 'modal-enter'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -147,8 +135,8 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-primary text-sm font-mono cursor-pointer transition-colors"
+            onClick={handleClose}
+            className="text-on-surface-variant hover:text-primary text-sm font-mono cursor-pointer transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
             aria-label="Skip DNA setup"
           >
             SKIP
@@ -173,6 +161,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                   <button
                     key={genre}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleGenre(genre)}
                     className={`px-3 py-2 text-xs font-mono rounded border transition-all text-left flex items-center justify-between cursor-pointer ${
                       isSelected
@@ -181,7 +170,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                     }`}
                   >
                     <span>{genre}</span>
-                    {isSelected && <span className="material-symbols-outlined text-xs">check</span>}
+                    {isSelected && <span className="material-symbols-outlined text-xs" aria-hidden="true">check</span>}
                   </button>
                 );
               })}
@@ -220,6 +209,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                   <button
                     key={item}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleEnjoyment(item)}
                     className={`px-3 py-2 text-xs font-mono rounded border transition-all text-left flex items-center justify-between cursor-pointer ${
                       isSelected
@@ -228,7 +218,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                     }`}
                   >
                     <span>{item}</span>
-                    {isSelected && <span className="material-symbols-outlined text-xs">check</span>}
+                    {isSelected && <span className="material-symbols-outlined text-xs" aria-hidden="true">check</span>}
                   </button>
                 );
               })}
@@ -270,6 +260,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                   <button
                     key={item}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleAvoidance(item)}
                     className={`px-3 py-2 text-xs font-mono rounded border transition-all text-left flex items-center justify-between cursor-pointer ${
                       isSelected
@@ -278,7 +269,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
                     }`}
                   >
                     <span>{item}</span>
-                    {isSelected && <span className="material-symbols-outlined text-xs">block</span>}
+                    {isSelected && <span className="material-symbols-outlined text-xs" aria-hidden="true">block</span>}
                   </button>
                 );
               })}
@@ -307,7 +298,7 @@ export const GameDNAOnboardingModal: React.FC<GameDNAOnboardingModalProps> = ({
         {step === 4 && (
           <div className="text-center py-6 space-y-4 animate-fade-in">
             <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-400 text-2xl">check</span>
+              <span className="material-symbols-outlined text-emerald-400 text-2xl" aria-hidden="true">check</span>
             </div>
             <div className="space-y-1">
               <h3 className="font-display text-xl text-white uppercase tracking-wider">

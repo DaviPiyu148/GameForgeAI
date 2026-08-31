@@ -130,7 +130,13 @@ def classify_ai_error(exc: Exception) -> ProviderErrorClass:
 
         # Fall through to status_code inspection for plain AIError(code, msg, status_code=...)
         sc = exc.status_code
-        if sc in (401, 403):
+        if sc == 401:
+            return ProviderErrorClass.KEY_AUTH_FAILURE
+        if sc == 403:
+            msg_lower = (exc.message or "").lower()
+            code_upper = (exc.code or "").upper()
+            if "MODEL_ACCESS_DENIED" in code_upper or any(w in msg_lower for w in ["model", "location", "region", "not supported"]):
+                return ProviderErrorClass.MODEL_UNAVAILABLE
             return ProviderErrorClass.KEY_AUTH_FAILURE
         if sc == 429:
             return ProviderErrorClass.RATE_LIMIT
@@ -142,10 +148,11 @@ def classify_ai_error(exc: Exception) -> ProviderErrorClass:
             return ProviderErrorClass.TRANSIENT_PROVIDER
         return ProviderErrorClass.UNKNOWN
 
-    # httpx network-level errors (import-time check avoids hard dependency here)
+    # httpx and standard network/timeout errors
     exc_type = type(exc).__name__
     if exc_type in ("TimeoutException", "ConnectTimeout", "ReadTimeout", "WriteTimeout",
-                    "PoolTimeout", "NetworkError", "ConnectError", "RemoteProtocolError"):
+                    "PoolTimeout", "NetworkError", "ConnectError", "RemoteProtocolError",
+                    "TimeoutError"):
         return ProviderErrorClass.NETWORK_ERROR
 
     return ProviderErrorClass.UNKNOWN

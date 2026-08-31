@@ -253,6 +253,7 @@ const HomePage = () => {
               <button
                 key={m.id}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => handleModeChange(m.id)}
                 className={`px-3.5 py-1.5 rounded-full font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
                   isSelected
@@ -260,7 +261,7 @@ const HomePage = () => {
                     : 'border border-outline-variant bg-terminal-bg text-on-surface-variant hover:border-primary/50 hover:text-white'
                 }`}
               >
-                <span className="material-symbols-outlined text-sm">{m.icon}</span>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">{m.icon}</span>
                 <span>{m.label}</span>
               </button>
             );
@@ -270,26 +271,29 @@ const HomePage = () => {
         {/* Search Input Bar */}
         <form onSubmit={handleSubmit} className="w-full">
           <div className="relative bg-terminal-bg border-2 border-primary/60 rounded-xl p-2 sm:p-3 shadow-2xl glow-box-cyan flex items-center gap-2 sm:gap-3 transition-all focus-within:border-primary focus-within:glow-box-cyan-intense">
-            <span className="material-symbols-outlined text-primary text-2xl pl-2 hidden sm:inline">search</span>
+            <span className="material-symbols-outlined text-primary text-2xl pl-2 hidden sm:inline" aria-hidden="true">search</span>
             <input
               type="text"
+              id="discovery-search-input"
+              aria-label="Natural language game search prompt"
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="e.g. relaxing farming game without horror, or games like Cyberpunk but less combat..."
-              className="flex-1 bg-transparent text-white font-mono text-xs sm:text-sm md:text-base outline-none placeholder:text-on-surface-variant/50 px-2"
+              className="flex-1 bg-transparent text-white font-mono text-xs sm:text-sm md:text-base outline-none placeholder:text-on-surface-variant/80 px-2"
             />
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={toggleMic}
-                title="Toggle Voice Input"
-                aria-label="Toggle voice input"
+                aria-pressed={isListening}
+                title={isListening ? 'Stop voice input' : 'Start voice search'}
+                aria-label={isListening ? 'Stop listening to voice input' : 'Start voice search'}
                 className={`p-2 transition-colors flex items-center justify-center rounded cursor-pointer icon-interactive ${
                   isListening ? 'text-secondary text-glow-magenta mic-listening' : 'text-on-surface-variant hover:text-primary'
                 }`}
               >
-                <span className="material-symbols-outlined text-xl">mic</span>
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">mic</span>
               </button>
 
               <button
@@ -316,26 +320,32 @@ const HomePage = () => {
         <section className="flex flex-wrap items-center justify-center gap-3 w-full max-w-3xl mx-auto mb-16 sm:mb-20 stagger-enter stagger-3">
           <button
             type="button"
+            aria-label="Search prompt: Cozy farming without horror"
             onClick={() => handleChipClick('Cozy farming without horror')}
             className="border border-secondary text-secondary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
-            <span>&gt; Cozy farming without horror</span>
+            <span aria-hidden="true" className="font-bold">&gt;</span>
+            <span>Cozy farming without horror</span>
           </button>
 
           <button
             type="button"
+            aria-label="Search prompt: Cyberpunk co-op shooter"
             onClick={() => handleChipClick('Cyberpunk co-op shooter')}
             className="border border-tertiary text-tertiary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-tertiary/10 hover:shadow-[0_0_10px_rgba(255,194,76,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
-            <span>&gt; Cyberpunk co-op shooter</span>
+            <span aria-hidden="true" className="font-bold">&gt;</span>
+            <span>Cyberpunk co-op shooter</span>
           </button>
 
           <button
             type="button"
+            aria-label="Search prompt: Space exploration no pvp"
             onClick={() => handleChipClick('Space exploration no pvp')}
             className="border border-primary text-primary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
-            <span>&gt; Space exploration no pvp</span>
+            <span aria-hidden="true" className="font-bold">&gt;</span>
+            <span>Space exploration no pvp</span>
           </button>
 
           <button
@@ -343,7 +353,7 @@ const HomePage = () => {
             onClick={() => setIsOnboardingModalOpen(true)}
             className="bg-primary/20 border border-primary text-primary-bright font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/30 hover:shadow-[0_0_12px_rgba(76,224,210,0.4)] transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold"
           >
-            <span className="material-symbols-outlined text-xs">dna</span>
+            <span className="material-symbols-outlined text-xs" aria-hidden="true">dna</span>
             <span>Build Game DNA</span>
           </button>
         </section>
@@ -435,7 +445,7 @@ const HomePage = () => {
                 <button
                   type="button"
                   onClick={() => setIsCompareModalOpen(true)}
-                  className="px-3.5 py-2 bg-gradient-to-r from-primary to-primary-bright text-on-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_12px_rgba(76,224,210,0.4)] animate-bounce"
+                  className="px-3.5 py-2 bg-gradient-to-r from-primary to-primary-bright text-on-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.4)] btn-interactive glow-cyan"
                 >
                   <span className="material-symbols-outlined text-sm">compare_arrows</span>
                   <span>Compare ({comparedGameIds.length})</span>
@@ -479,7 +489,7 @@ const HomePage = () => {
 
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayedResults.map((result) => {
+            {displayedResults.map((result, idx) => {
               const gameKey = result.game.id || result.game.external_id;
               const matchPct = Math.round(result.score * 100);
               const isSaved = state.savedDiscoveries.some(
@@ -502,6 +512,7 @@ const HomePage = () => {
               return (
                 <div
                   key={gameKey}
+                  style={idx >= 6 ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 360px' } : undefined}
                   className="bg-terminal-bg rounded-lg border border-outline-variant/60 hover:border-primary transition-all p-5 flex flex-col justify-between shadow-xl group hover:shadow-[0_0_20px_rgba(76,224,210,0.2)] overflow-hidden"
                 >
                   {/* Fixed Aspect Ratio Artwork Header */}
@@ -510,7 +521,9 @@ const HomePage = () => {
                       <img
                         src={coverUrl}
                         alt={result.game.display_title || result.game.title}
-                        loading="lazy"
+                        fetchPriority={idx === 0 ? 'high' : undefined}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                        decoding="async"
                         className="w-full h-full object-cover opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
                         onError={() =>
                           setFailedCardImages((prev) => ({ ...prev, [gameKey]: true }))

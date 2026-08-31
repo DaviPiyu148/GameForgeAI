@@ -20,6 +20,28 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      '/docs': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/openapi.json': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/phaser') || id.includes('src/runtime/PhaserCanvas') || id.includes('src/runtime/GameScene') || id.includes('src/runtime/behaviors') || id.includes('src/runtime/environmentSystem') || id.includes('src/runtime/vfxSystem') || id.includes('src/runtime/VehicleManager')) {
+            return 'phaser-runtime';
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router') || id.includes('node_modules/react-router-dom/')) {
+            return 'vendor-react';
+          }
+        },
+      },
     },
   },
 });

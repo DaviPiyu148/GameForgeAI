@@ -899,30 +899,43 @@ class GameGenerationService:
             intents = filtered
 
         prompt = build_remix_prompt(dsl_copy, spec_copy, intents, personalization=personalization)
+        prev_interaction_id = kwargs.get("previous_interaction_id")
 
-        def _result(dsl: GameDSL, cand_spec: Optional[Dict[str, Any]], attempts: int) -> GenerationResult:
+        def _result(dsl: GameDSL, cand_spec: Optional[Dict[str, Any]], attempts: int, meta: Optional[Dict[str, Any]] = None) -> GenerationResult:
             parsed_spec = None
             if cand_spec:
                 try:
                     parsed_spec = GameDesignSpec.model_validate(cand_spec)
                 except Exception:
                     parsed_spec = None
+            res_meta = dict(meta or {})
+            if clamp_note:
+                res_meta["remix_clamped_note"] = clamp_note
             return GenerationResult(
                 success=True,
                 dsl=dsl,
                 design_spec=parsed_spec,
                 attempts_used=attempts,
-                provider_meta={"remix_clamped_note": clamp_note} if clamp_note else {},
+                provider_meta=res_meta,
             )
 
         current_errors: List[str] = []
+        provider_meta: Dict[str, Any] = {}
         try:
             if hasattr(self.provider, "generate_structured_with_meta"):
-                raw_output, _ = await self.provider.generate_structured_with_meta(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=prompt,
-                    task_type=TaskType.REMIX,
-                )
+                try:
+                    raw_output, provider_meta = await self.provider.generate_structured_with_meta(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=prompt,
+                        task_type=TaskType.REMIX,
+                        previous_interaction_id=prev_interaction_id,
+                    )
+                except TypeError:
+                    raw_output, provider_meta = await self.provider.generate_structured_with_meta(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=prompt,
+                        task_type=TaskType.REMIX,
+                    )
             else:
                 raw_output = await self.provider.generate_structured(
                     system_prompt=SYSTEM_PROMPT,
@@ -930,7 +943,7 @@ class GameGenerationService:
                 )
             dsl, cand_spec, errors = self._validate_remix_candidate(raw_output)
             if dsl is not None:
-                return _result(dsl, cand_spec, 1)
+                return _result(dsl, cand_spec, 1, meta=provider_meta)
             current_errors = errors
             last_candidate: Any = raw_output
         except Exception as exc:

@@ -23,35 +23,28 @@ class Settings(BaseSettings):
 
     # ── AI Hosted Provider Settings ────────────────────────────────────────
     AI_PROVIDER: str = "gemini"
-    AI_TIMEOUT_SECONDS: float = 150.0
-    AI_REPAIR_TIMEOUT_SECONDS: float = 45.0
+    AI_TRANSPORT: str = "interactions"  # "interactions" (google-genai) or "legacy_http" (httpx OpenAI proxy)
+    AI_TIMEOUT_SECONDS: float = 60.0
+    AI_REPAIR_TIMEOUT_SECONDS: float = 25.0
     AI_REPAIR_MAX_ATTEMPTS: int = 1
     AI_MAX_RETRIES: int = 2
 
     # Overall deadline across ALL failover attempts (key + model fallback combined).
-    # Worst-case calculation: 3 models × 3 keys × 150s ≈ 1350s, but fast-fail errors
-    # (401, 429, 5xx) classify within milliseconds and don't consume the full timeout.
-    # True connection timeouts may consume AI_TIMEOUT_SECONDS each.
-    # This is a wall-clock guard, not a per-attempt timeout.
-    AI_OVERALL_DEADLINE_SECONDS: float = 420.0
+    # Enforces dynamic remaining-deadline budgeting: attempt_timeout = min(cap, remaining_deadline).
+    AI_OVERALL_DEADLINE_SECONDS: float = 60.0
 
     # ── Primary Generative Provider: Google Gemini ─────────────────────────
     # GEMINI_API_KEY / GEMINI_API_KEYS support comma-separated credentials
     # representing INDEPENDENTLY configured Google API credentials/projects.
-    # Each credential should ideally belong to a separate Google API project for
-    # independent quota.  Multiple credentials from the same project share
+    # Each credential belongs to a separate Google API project for
+    # independent quota. Multiple credentials from the same project share
     # project-level quota and do NOT provide independent quota isolation.
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_API_KEYS: Optional[str] = None
 
-    # LEGACY: GEMINI_MODEL is retained for backward compatibility only.
-    # It is SUPERSEDED by the task-specific GEMINI_*_MODELS settings below.
-    # Task-specific model chains take precedence.  Do NOT rely on this for
-    # new model configuration — it exists only so that existing .env files
-    # without task-specific chains continue to function during migration.
-    # The old "gemini-3-flash-preview" value is suppressed from being used
-    # as a fallback chain entry by model_router.py.
-    GEMINI_MODEL: str = "gemini-3-flash-preview"  # LEGACY — superseded by task chains
+    # Default production Gemini model and thinking budget
+    GEMINI_MODEL: str = "gemini-3.7-flash"
+    GEMINI_THINKING_LEVEL: str = "medium"  # "low", "medium", "high"
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
 
     # ── Task-Specific Model Chains (Gemini 3 stable family) ───────────────
@@ -80,7 +73,7 @@ class Settings(BaseSettings):
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
     # Generic AI settings (mapped dynamically — legacy compatibility)
-    AI_MODEL: str = "gemini-3-flash-preview"
+    AI_MODEL: str = "gemini-3.7-flash"
     AI_API_KEY: Union[str, None] = None
     AI_BASE_URL: Union[str, None] = None
 

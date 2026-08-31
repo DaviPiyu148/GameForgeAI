@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameProject } from '../../types';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 interface ProjectDetailsModalProps {
   project: GameProject;
@@ -8,41 +9,14 @@ interface ProjectDetailsModalProps {
 }
 
 export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalProps) => {
-  const [isClosing, setIsClosing] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
-  const handleClose = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 250);
-  }, [onClose]);
-
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    closeBtnRef.current?.focus();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isClosing) {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosing, handleClose]);
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && !isClosing) {
-      handleClose();
-    }
-  };
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen: true,
+    onClose,
+    initialFocusRef: closeBtnRef,
+    closeDelayMs: 200,
+  });
 
   return createPortal(
     <div 
@@ -53,6 +27,7 @@ export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalPro
       aria-label={`Details for ${project.title}`}
     >
       <div 
+        ref={dialogRef}
         className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-surface border border-primary/50 rounded-sm flex flex-col shadow-[0_0_30px_rgba(76,224,210,0.15)] glow-cyan ${isClosing ? 'modal-exit' : 'modal-enter'}`}
         onClick={e => e.stopPropagation()}
       >
@@ -65,7 +40,7 @@ export const ProjectDetailsModal = ({ project, onClose }: ProjectDetailsModalPro
           <button 
             ref={closeBtnRef}
             onClick={handleClose}
-            className="text-on-surface-variant icon-interactive hover:text-primary transition-colors p-1 focus:outline-none focus:ring-1 focus:ring-primary"
+            className="text-on-surface-variant icon-interactive hover:text-primary transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
             aria-label="Close details"
           >
             <span className="material-symbols-outlined" aria-hidden="true">close</span>

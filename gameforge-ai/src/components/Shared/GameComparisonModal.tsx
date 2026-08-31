@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { discoveryService } from '../../services/discovery';
 import type { CompareGamesResponse } from '../../types';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 interface GameComparisonModalProps {
   isOpen: boolean;
@@ -18,6 +19,14 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
 }) => {
   const [data, setData] = useState<CompareGamesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: closeBtnRef,
+    closeDelayMs: 200,
+  });
 
   useEffect(() => {
     if (!isOpen || selectedGameIds.length < 2) {
@@ -40,42 +49,23 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
     fetchComparison();
   }, [isOpen, selectedGameIds]);
 
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${
+        isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="Game comparison modal"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={handleBackdropClick}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-sm p-6 flex flex-col space-y-4 overflow-hidden modal-enter z-10"
+        ref={dialogRef}
+        className={`relative w-full max-w-4xl max-h-[90vh] bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-sm p-6 flex flex-col space-y-4 overflow-hidden z-10 ${
+          isClosing ? 'modal-exit' : 'modal-enter'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -87,8 +77,9 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
             </h2>
           </div>
           <button
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            ref={closeBtnRef}
+            onClick={handleClose}
+            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
             aria-label="Close comparison dialog"
           >
             <span className="material-symbols-outlined text-base">close</span>
@@ -126,9 +117,9 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
                   </button>
 
                   <div className="space-y-1">
-                    <h4 className="font-bold text-white text-sm font-display truncate">
+                    <h3 className="font-bold text-white text-sm font-display truncate">
                       {g.title}
-                    </h4>
+                    </h3>
                     <p className="text-[10px] font-mono text-on-surface-variant">
                       {g.release_year > 0 ? g.release_year : 'Classic'} // {g.is_free ? 'FREE' : 'PAID'}
                     </p>
@@ -136,7 +127,7 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
 
                   {/* Rating Badge */}
                   <div className="text-[11px] font-mono flex items-center gap-1 text-emerald-400">
-                    <span className="material-symbols-outlined text-xs">thumb_up</span>
+                    <span className="material-symbols-outlined text-xs" aria-hidden="true">thumb_up</span>
                     <span>{g.positive_percent}% positive</span>
                     <span className="text-on-surface-variant text-[9px]">({g.total_reviews} reviews)</span>
                   </div>
@@ -177,9 +168,9 @@ export const GameComparisonModal: React.FC<GameComparisonModalProps> = ({
 
             {/* Overlap Summary */}
             <div className="bg-surface-container-low border border-primary/20 rounded p-4 space-y-3">
-              <h4 className="font-mono text-xs text-primary font-bold uppercase tracking-wider">
+              <h3 className="font-mono text-xs text-primary font-bold uppercase tracking-wider">
                 Common Ground & Differentiators
-              </h4>
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
                 <div>
                   <span className="text-on-surface-variant block mb-1">SHARED ATTRIBUTES:</span>

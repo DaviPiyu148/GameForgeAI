@@ -884,11 +884,13 @@ export default function ProfilePage() {
 
                     <form onSubmit={handleSaveUsername} className="space-y-3">
                       <div>
-                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                        <label htmlFor="profile-username" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
                           Username
                         </label>
                         <input
+                          id="profile-username"
                           type="text"
+                          autoComplete="username"
                           value={newUsername}
                           onChange={(e) => {
                             setNewUsername(e.target.value);
@@ -899,7 +901,7 @@ export default function ProfilePage() {
                           disabled={isUpdatingUsername}
                         />
                         {usernameError && (
-                          <p className="font-mono text-[10px] text-error mt-1">{usernameError}</p>
+                          <p role="alert" className="font-mono text-[10px] text-error mt-1">{usernameError}</p>
                         )}
                       </div>
 
@@ -910,12 +912,12 @@ export default function ProfilePage() {
                       >
                         {isUpdatingUsername ? (
                           <>
-                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                            <span className="material-symbols-outlined text-sm animate-spin" aria-hidden="true">refresh</span>
                             SAVING...
                           </>
                         ) : (
                           <>
-                            <span className="material-symbols-outlined text-sm">save</span>
+                            <span className="material-symbols-outlined text-sm" aria-hidden="true">save</span>
                             SAVE USERNAME
                           </>
                         )}
@@ -928,7 +930,7 @@ export default function ProfilePage() {
                 <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between">
                   <div>
                     <h3 className="font-mono text-xs text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">lock</span>
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">lock</span>
                       Security & Password
                     </h3>
                     <p className="text-[11px] text-on-surface-variant mb-4">
@@ -937,11 +939,13 @@ export default function ProfilePage() {
 
                     <form onSubmit={handleChangePassword} className="space-y-3">
                       <div>
-                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                        <label htmlFor="profile-current-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
                           Current Password
                         </label>
                         <input
+                          id="profile-current-password"
                           type="password"
+                          autoComplete="current-password"
                           value={currentPassword}
                           onChange={(e) => {
                             setCurrentPassword(e.target.value);
@@ -954,11 +958,13 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                        <label htmlFor="profile-new-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
                           New Password
                         </label>
                         <input
+                          id="profile-new-password"
                           type="password"
+                          autoComplete="new-password"
                           value={newPassword}
                           onChange={(e) => {
                             setNewPassword(e.target.value);
@@ -971,11 +977,13 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <label className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                        <label htmlFor="profile-confirm-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
                           Confirm New Password
                         </label>
                         <input
+                          id="profile-confirm-password"
                           type="password"
+                          autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(e) => {
                             setConfirmPassword(e.target.value);
@@ -985,10 +993,11 @@ export default function ProfilePage() {
                           placeholder="••••••••"
                           disabled={isChangingPassword}
                         />
-                        {passwordError && (
-                          <p className="font-mono text-[10px] text-error mt-1">{passwordError}</p>
-                        )}
                       </div>
+
+                      {passwordError && (
+                        <p role="alert" className="font-mono text-[10px] text-error mt-1">{passwordError}</p>
+                      )}
 
                       <button
                         type="submit"

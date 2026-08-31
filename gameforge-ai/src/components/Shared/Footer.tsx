@@ -11,31 +11,31 @@ export const Footer: React.FC = () => {
         <div className="flex flex-wrap justify-center gap-4">
           <Link
             to="/documentation"
-            className="font-mono text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors uppercase"
+            className="font-mono text-[10px] text-on-surface-variant hover:text-primary transition-colors uppercase"
           >
             Documentation
           </Link>
           <Link
             to="/api-access"
-            className="font-mono text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors uppercase"
+            className="font-mono text-[10px] text-on-surface-variant hover:text-primary transition-colors uppercase"
           >
             API Access
           </Link>
           <Link
             to="/community"
-            className="font-mono text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors uppercase"
+            className="font-mono text-[10px] text-on-surface-variant hover:text-primary transition-colors uppercase"
           >
             Community
           </Link>
           <Link
             to="/support"
-            className="font-mono text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors uppercase"
+            className="font-mono text-[10px] text-on-surface-variant hover:text-primary transition-colors uppercase"
           >
             Support
           </Link>
           <Link
             to="/privacy"
-            className="font-mono text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors uppercase"
+            className="font-mono text-[10px] text-on-surface-variant hover:text-primary transition-colors uppercase"
           >
             Privacy Policy
           </Link>

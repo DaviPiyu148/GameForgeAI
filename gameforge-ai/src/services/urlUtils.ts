@@ -14,11 +14,21 @@
  */
 
 /**
+ * Helper to safely extract VITE_API_URL in browser or Node test runner environments.
+ */
+function getEnvApiUrl(): string | undefined {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_API_URL as string | undefined;
+  }
+  return undefined;
+}
+
+/**
  * Resolves the canonical API base URL from the environment or falls back to relative "/api".
  * If VITE_API_URL is provided as a host origin (e.g. "http://127.0.0.1:8000"), normalizes to ".../api".
  */
-export function getApiBaseUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+export function getApiBaseUrl(envOverride?: string): string {
+  const envUrl = (envOverride !== undefined ? envOverride : getEnvApiUrl())?.trim();
   if (!envUrl) {
     return '/api';
   }
@@ -49,14 +59,21 @@ export function joinApiUrl(base: string, path: string): string {
  * Resolves the canonical Swagger / OpenAPI interactive documentation URL.
  * FastAPI serves Swagger at `/docs` relative to the root backend origin.
  *
+ * In local development with Vite proxy (no VITE_API_URL or relative "/api"),
+ * returns relative "/docs" which routes through the Vite proxy to FastAPI backend.
+ *
+ * In configured environments with an absolute origin, resolves to the backend root + "/docs".
+ *
  * Examples:
  * - Direct host origin "http://127.0.0.1:8000" -> "http://127.0.0.1:8000/docs"
  * - API path "http://127.0.0.1:8000/api" -> "http://127.0.0.1:8000/docs"
  * - Deployed API "https://api.example.com/api" -> "https://api.example.com/docs"
- * - Relative default "" or "/api" -> "/docs"
+ * - Relative default "" or "/api" -> "/docs" (handled via proxy in dev / reverse proxy in prod)
+ *
+ * @param envOverride - Optional string to override import.meta.env.VITE_API_URL for unit testing.
  */
-export function getSwaggerDocsUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+export function getSwaggerDocsUrl(envOverride?: string): string {
+  const envUrl = (envOverride !== undefined ? envOverride : getEnvApiUrl())?.trim();
   if (!envUrl || envUrl.startsWith('/')) {
     return '/docs';
   }

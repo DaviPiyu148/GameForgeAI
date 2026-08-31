@@ -96,6 +96,13 @@ export class EntityBehaviorSystem {
   }
 
   /**
+   * Clear all tracked sprite references.
+   */
+  public clear(): void {
+    this.entityStates.clear();
+  }
+
+  /**
    * Update all registered entities according to their configured behavior.
    */
   public update(ctx: BehaviorContext): void {

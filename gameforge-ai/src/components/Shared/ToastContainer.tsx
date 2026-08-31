@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { subscribeToasts, type ToastMessage } from '../../services/toastBus';
 
@@ -25,27 +25,44 @@ const VARIANT_STYLES: Record<
 
 interface ActiveToast extends ToastMessage {
   exiting: boolean;
+  remainingMs: number;
+  startedAt: number;
 }
 
 export const ToastContainer = () => {
   const [toasts, setToasts] = useState<ActiveToast[]>([]);
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const isPaused = useRef(false);
+
+  const startDismissTimer = useCallback((id: string, delay: number) => {
+    const exitTimer = setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+
+      const removeTimer = setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+        timers.current.delete(id);
+      }, 200);
+      timers.current.set(id, removeTimer);
+    }, delay);
+
+    timers.current.set(id, exitTimer);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToasts((toast) => {
-      setToasts((prev) => [...prev, { ...toast, exiting: false }]);
-
       const dismissDelay = AUTO_DISMISS_MS[toast.variant] ?? 3500;
-      const exitTimer = setTimeout(() => {
-        setToasts((prev) => prev.map((t) => (t.id === toast.id ? { ...t, exiting: true } : t)));
+      const newToast: ActiveToast = {
+        ...toast,
+        exiting: false,
+        remainingMs: dismissDelay,
+        startedAt: Date.now(),
+      };
 
-        const removeTimer = setTimeout(() => {
-          setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-          timers.current.delete(toast.id);
-        }, 200);
-        timers.current.set(toast.id, removeTimer);
-      }, dismissDelay);
-      timers.current.set(toast.id, exitTimer);
+      setToasts((prev) => [...prev, newToast]);
+
+      if (!isPaused.current) {
+        startDismissTimer(toast.id, dismissDelay);
+      }
     });
 
     const activeTimers = timers.current;
@@ -54,12 +71,44 @@ export const ToastContainer = () => {
       activeTimers.forEach((timer) => clearTimeout(timer));
       activeTimers.clear();
     };
-  }, []);
+  }, [startDismissTimer]);
+
+  const handleMouseEnter = () => {
+    isPaused.current = true;
+    // Clear active timeouts and record remaining time
+    const now = Date.now();
+    timers.current.forEach((timer) => clearTimeout(timer));
+    timers.current.clear();
+
+    setToasts((prev) =>
+      prev.map((t) => {
+        const elapsed = now - t.startedAt;
+        const remaining = Math.max(1000, t.remainingMs - elapsed);
+        return { ...t, remainingMs: remaining };
+      })
+    );
+  };
+
+  const handleMouseLeave = () => {
+    isPaused.current = false;
+    const now = Date.now();
+    setToasts((prev) =>
+      prev.map((t) => {
+        const updated = { ...t, startedAt: now };
+        startDismissTimer(t.id, t.remainingMs);
+        return updated;
+      })
+    );
+  };
 
   const handleDismiss = (id: string) => {
+    const existing = timers.current.get(id);
+    if (existing) clearTimeout(existing);
+
     setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
+      timers.current.delete(id);
     }, 200);
   };
 
@@ -67,17 +116,21 @@ export const ToastContainer = () => {
 
   return createPortal(
     <div
-      className="fixed top-20 right-4 z-[60] flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none"
-      aria-live="polite"
-      aria-atomic="false"
+      className="fixed top-4 right-4 sm:top-20 sm:right-6 z-[60] flex flex-col gap-2 w-[min(380px,calc(100vw-2rem))] pointer-events-none"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
     >
       {toasts.map((toast) => {
         const style = VARIANT_STYLES[toast.variant];
         const isEmphasis = toast.variant === 'levelup' || toast.variant === 'milestone';
+        const isError = toast.variant === 'error';
         return (
           <div
             key={toast.id}
-            role="status"
+            role={isError ? 'alert' : 'status'}
+            aria-live={isError ? 'assertive' : 'polite'}
             className={`pointer-events-auto bg-surface border ${style.border} ${style.glow} rounded-sm shadow-2xl px-3.5 py-3 flex items-start gap-2.5 ${
               toast.exiting ? 'toast-exit' : isEmphasis ? 'toast-enter-emphasis' : 'toast-enter'
             }`}
@@ -98,7 +151,7 @@ export const ToastContainer = () => {
             <button
               type="button"
               onClick={() => handleDismiss(toast.id)}
-              className="text-on-surface-variant hover:text-on-surface shrink-0 cursor-pointer"
+              className="text-on-surface-variant hover:text-on-surface shrink-0 cursor-pointer min-w-[28px] min-h-[28px] flex items-center justify-center rounded"
               aria-label="Dismiss notification"
             >
               <span className="material-symbols-outlined text-sm">close</span>
@@ -110,3 +163,4 @@ export const ToastContainer = () => {
     document.body
   );
 };
+

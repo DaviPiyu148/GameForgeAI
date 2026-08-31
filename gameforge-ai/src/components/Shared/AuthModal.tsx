@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
+import { useModalDialog } from '../../hooks/useModalDialog';
 
 export const AuthModal = () => {
   const { state, closeAuthModal, login, register } = useAppContext();
@@ -12,34 +13,17 @@ export const AuthModal = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
+    isOpen: state.isAuthModalOpen,
+    onClose: closeAuthModal,
+  });
+
   useEffect(() => {
     if (state.authModalMode) {
       setMode(state.authModalMode);
     }
     setError(null);
   }, [state.authModalMode, state.isAuthModalOpen]);
-
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    if (state.isAuthModalOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [state.isAuthModalOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && state.isAuthModalOpen) {
-        closeAuthModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.isAuthModalOpen, closeAuthModal]);
 
   if (!state.isAuthModalOpen) return null;
 
@@ -86,16 +70,19 @@ export const AuthModal = () => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm modal-backdrop-enter"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm ${
+        isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="Authentication modal"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeAuthModal();
-      }}
+      onClick={handleBackdropClick}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] flex flex-col rounded-sm modal-enter relative z-10"
+        ref={dialogRef}
+        className={`w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] flex flex-col rounded-sm relative z-10 ${
+          isClosing ? 'modal-exit' : 'modal-enter'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Terminal Header */}
@@ -107,8 +94,8 @@ export const AuthModal = () => {
             </span>
           </div>
           <button
-            onClick={closeAuthModal}
-            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            onClick={handleClose}
+            className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
             aria-label="Close authentication dialog"
           >
             <span className="material-symbols-outlined text-base">close</span>
@@ -125,9 +112,11 @@ export const AuthModal = () => {
           )}
 
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 gap-2 border-b border-primary/20 pb-2">
+          <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-2 border-b border-primary/20 pb-2">
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'login'}
               onClick={() => {
                 setMode('login');
                 setError(null);
@@ -142,6 +131,8 @@ export const AuthModal = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'register'}
               onClick={() => {
                 setMode('register');
                 setError(null);
@@ -158,8 +149,8 @@ export const AuthModal = () => {
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 bg-error/10 border border-error text-error font-mono text-xs flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm shrink-0">error</span>
+            <div role="alert" className="p-3 bg-error/10 border border-error text-error font-mono text-xs flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm shrink-0" aria-hidden="true">error</span>
               <span>{error}</span>
             </div>
           )}
@@ -168,47 +159,53 @@ export const AuthModal = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div>
-                <label className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
+                <label htmlFor="auth-username" className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
                   Username
                 </label>
                 <input
+                  id="auth-username"
                   type="text"
                   required
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. CyberArchitect"
-                  className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none"
+                  className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
                   disabled={isSubmitting}
                 />
               </div>
             )}
 
             <div>
-              <label className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
+              <label htmlFor="auth-email" className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
                 Email Address
               </label>
               <input
+                id="auth-email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none"
+                className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
                 disabled={isSubmitting}
               />
             </div>
 
             <div>
-              <label className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
+              <label htmlFor="auth-password" className="block font-mono text-[10px] text-on-surface-variant mb-1 uppercase">
                 Password {mode === 'register' && <span className="text-on-surface-variant/70">(min 8 characters)</span>}
               </label>
               <input
+                id="auth-password"
                 type="password"
                 required
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none"
+                className="w-full bg-surface-container border border-primary/40 focus:border-primary text-primary font-mono text-xs p-2.5 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
                 disabled={isSubmitting}
               />
             </div>

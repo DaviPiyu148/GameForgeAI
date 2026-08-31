@@ -58,23 +58,21 @@ _DEFAULT_CHAINS: dict[TaskType, List[str]] = {
         "gemini-3.5-flash",
     ],
     TaskType.REMIX: [
-        "gemini-3.6-flash",
         "gemini-3.7-flash",
+        "gemini-3.6-flash",
         "gemini-3.5-flash",
     ],
-    TaskType.DSL_PATCH: [
-        "gemini-3.6-flash",
+    TaskType.BLUEPRINT: [
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
     ],
-    TaskType.BLUEPRINT: [
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
+    TaskType.DSL_PATCH: [
         "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
     ],
     TaskType.PLAYTEST_ANALYSIS: [
         "gemini-3.5-flash-lite",
-        "gemini-3.6-flash",
         "gemini-3.1-flash-lite",
     ],
     TaskType.DIRECTOR: [
