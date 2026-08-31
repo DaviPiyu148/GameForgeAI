@@ -106,3 +106,136 @@ def get_required_interactions_for_contract(
     if has_events and has_threat:
         required.append(SUPPORTED_INTERACTIONS["WORLD_EVENT_TO_THREAT"])
     return required
+
+
+from enum import Enum
+
+class UsageTier(str, Enum):
+    FULL = "FULL"
+    PARTIAL = "PARTIAL"
+    PASSIVE = "PASSIVE"
+    DEAD = "DEAD"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+@dataclass(frozen=True)
+class SystemUsageDefinition:
+    """Canonical contract defining what constitutes real usage for a system."""
+    system: str
+    runtime_owner: str
+    minimum_real_usage: str
+    valid_interactions: List[str]
+    player_facing_consequence: str
+
+
+SYSTEM_USAGE_DEFINITIONS: Dict[str, SystemUsageDefinition] = {
+    "Vehicles": SystemUsageDefinition(
+        system="Vehicles",
+        runtime_owner="VehicleManager",
+        minimum_real_usage="Vehicle provides higher speed than on-foot player across large district dimensions (>= 1000px).",
+        valid_interactions=["VEHICLE_TO_TRAVERSAL", "VEHICLE_ESCAPE"],
+        player_facing_consequence="Player traverses distant POIs or escapes hostile pursuit at speeds unattainable on foot.",
+    ),
+    "Factions": SystemUsageDefinition(
+        system="Factions",
+        runtime_owner="FactionManager",
+        minimum_real_usage="Factions are explicitly named in activities or provide contextual mission objectives.",
+        valid_interactions=["FACTION_TO_ACTIVITY"],
+        player_facing_consequence="Player confronts or aids distinct factions in territorial operations.",
+    ),
+    "Threat": SystemUsageDefinition(
+        system="Threat System",
+        runtime_owner="ThreatManager",
+        minimum_real_usage="Hostile actions escalate alert level and dispatch reinforcement units.",
+        valid_interactions=["THREAT_TO_ACTIVITY", "WORLD_EVENT_TO_THREAT"],
+        player_facing_consequence="Player observes escalating response units and audible/visual tension as alert levels climb.",
+    ),
+    "Activities": SystemUsageDefinition(
+        system="Activities",
+        runtime_owner="ActivityManager",
+        minimum_real_usage="Activities anchor to specific POIs with distinct delivery, combat, or investigation objectives.",
+        valid_interactions=["POI_TO_ACTIVITY", "FACTION_TO_ACTIVITY"],
+        player_facing_consequence="Player accepts and completes localized missions rewarding score and progressing world state.",
+    ),
+    "POIs": SystemUsageDefinition(
+        system="POIs",
+        runtime_owner="RegionManager",
+        minimum_real_usage="POIs anchor activities, serve as garage vehicle spawns, or act as goal extraction terminals.",
+        valid_interactions=["POI_TO_ACTIVITY"],
+        player_facing_consequence="Player navigates toward recognizable stations with interactive gameplay prompts.",
+    ),
+    "World Events": SystemUsageDefinition(
+        system="World Events",
+        runtime_owner="WorldEventManager",
+        minimum_real_usage="Events trigger visible alert banners, environmental state changes, or threat modifications.",
+        valid_interactions=["WORLD_EVENT_TO_THREAT"],
+        player_facing_consequence="Player must adapt to sudden environmental emergencies like city lockdowns or storms.",
+    ),
+    "Boss Finale": SystemUsageDefinition(
+        system="Boss Finale",
+        runtime_owner="GameScene",
+        minimum_real_usage="Final level features an entity with is_boss=True, health >= 150, and multi-phase threshold.",
+        valid_interactions=["COMBAT_TO_PROGRESSION"],
+        player_facing_consequence="Player faces a climax encounter featuring distinct silhouettes, high health, and phase shifts.",
+    ),
+}
+
+
+# Valid runtime trigger emitters supported by GameScene and managers
+SUPPORTED_RUNTIME_TRIGGERS: Set[str] = {
+    "on_collect",
+    "on_collide_enemy",
+    "on_reach_goal",
+    "on_score_target",
+    "on_time_limit",
+    "on_player_death",
+    "on_wave_start",
+    "on_dash",
+    "on_hazard_touch",
+    "on_enemy_defeat",
+    "on_checkpoint",
+    "on_powerup_expire",
+}
+
+# Valid runtime action handlers supported by GameScene
+SUPPORTED_RUNTIME_ACTIONS: Set[str] = {
+    "add_score",
+    "damage_player",
+    "heal_player",
+    "win_game",
+    "lose_game",
+    "spawn_entity",
+    "speed_boost",
+    "trigger_screen_shake",
+    "spawn_wave",
+    "grant_powerup",
+    "activate_checkpoint",
+    "spawn_particles",
+    "knockback_target",
+}
+
+
+def validate_rule_liveness(rule_def: Any) -> Tuple[bool, Optional[str]]:
+    """
+    Validates whether a generated RuleDef is live (emittable and executable).
+    Returns (is_live, dead_reason).
+    """
+    trigger = getattr(rule_def, "trigger", "")
+    action = getattr(rule_def, "action", "")
+
+    if trigger not in SUPPORTED_RUNTIME_TRIGGERS:
+        return False, f"Trigger '{trigger}' is never emitted by runtime."
+
+    if action not in SUPPORTED_RUNTIME_ACTIONS:
+        return False, f"Action '{action}' has no executable runtime handler."
+
+    # Validate target parameters for specific actions
+    params = getattr(rule_def, "params", {}) or {}
+    if action == "grant_powerup" and "type" not in params:
+        return False, "Action 'grant_powerup' missing required 'type' param."
+
+    if action == "activate_checkpoint" and "id" not in params and "checkpoint_id" not in params:
+        return False, "Action 'activate_checkpoint' missing required 'id' param."
+
+    return True, None
+

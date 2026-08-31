@@ -48,6 +48,20 @@ export const SuccessStatusPage = () => {
     return null;
   }, [state.compilerLogs]);
 
+  // Extract verified active systems from logs
+  const verifiedSystems = useMemo(() => {
+    const logs = state.compilerLogs.length > 0 ? state.compilerLogs : [];
+    const systems: string[] = [];
+    for (const line of logs) {
+      if (line.includes('VEHICLE_TO_TRAVERSAL')) systems.push('Vehicles — Traversal');
+      if (line.includes('FACTION_TO_ACTIVITY')) systems.push('Factions — Activities');
+      if (line.includes('THREAT_TO_ACTIVITY')) systems.push('Threat — Escalation');
+      if (line.includes('POI_TO_ACTIVITY')) systems.push('POIs — Missions');
+    }
+    return Array.from(new Set(systems));
+  }, [state.compilerLogs]);
+
+
 
 
   // If we somehow get here without a real SUCCESS state, kick back to builder
@@ -147,7 +161,17 @@ export const SuccessStatusPage = () => {
             <p className="font-body text-xs text-on-surface-variant max-w-lg">
               Deterministic structural and gameplay health indicator evaluating core loop, progression, variety, and runtime capability coverage.
             </p>
+            {verifiedSystems.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {verifiedSystems.map((sys) => (
+                  <span key={sys} className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">
+                    ✓ {sys}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
+
 
           <div className="flex items-center gap-4 shrink-0">
             <div className="text-right">

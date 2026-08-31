@@ -258,3 +258,20 @@ class RequirementCoverageMatrix:
 
         return statuses, interactions
 
+    @classmethod
+    def audit_rule_liveness(cls, dsl: GameDSL) -> List[Tuple[str, str]]:
+        """
+        Audits all rules in the DSL for liveness.
+        Returns a list of (rule_id, dead_reason) for any dead rules found.
+        """
+        from app.generation.composition_matrix import validate_rule_liveness
+
+        all_rules = list(dsl.rules) + [r for lvl in dsl.levels for r in lvl.rules]
+        dead_rules = []
+        for r in all_rules:
+            is_live, reason = validate_rule_liveness(r)
+            if not is_live:
+                dead_rules.append((r.id, reason or "Dead rule detected"))
+        return dead_rules
+
+

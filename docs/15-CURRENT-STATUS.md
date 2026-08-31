@@ -4,7 +4,7 @@
 2026-08-31
 
 ## Current Phase
-Game Runtime Experience V1 (Visual Identity, Game Feel, Environment, Animation, VFX, HUD, Camera, Runtime Polish) complete. Centralized visual profile, procedural texture cache, role-specific silhouettes, procedural backgrounds & environmental props, combat VFX & hit feedback, and thematic HUD active. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
+Generation/Runtime Integration V1 (System Usage Tiers, Canonical Usage Matrix, Rule Liveness, Dead-Rule Detection, Active System Verification) complete. Generation contract, requirement coverage, depth evaluator, and success status UI verified. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
 ---
 
@@ -20,7 +20,9 @@ Game Runtime Experience V1 (Visual Identity, Game Feel, Environment, Animation, 
 | Game Generation Pipeline V2 (Depth, Design Quality, Capability Allowlist, Quality Gates, Evaluator) (`GAME_GENERATION_V2.md`) | COMPLETE |
 | Generated Game Quality V3 (Real Output Improvement: Design Patterns, Composition Matrix, Palettes) (`GENERATION_OUTPUT_QUALITY_V3.md`) | COMPLETE |
 | Game Runtime Experience V1 (Visual Identity, Game Feel, VFX, Props, HUD) (`GAME_RUNTIME_EXPERIENCE_V1.md`) | COMPLETE |
+| Generation/Runtime Integration V1 (System Usage, Dead-Rule Detection, Active Loops) (`GENERATION_RUNTIME_INTEGRATION.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
+
 
 
 

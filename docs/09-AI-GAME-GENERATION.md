@@ -54,6 +54,13 @@ STAGE 10: [SYS] BUILD COMPLETE (Persistence & 0x00_SYS_READY)
 - **Combat Feel & Kinetic Feedback**: Muzzle flashes, hit flashes, micro-sparks, dash ghost trails, collectible halo bursts, and tiered camera rumble (`vfxSystem.ts`).
 - **Thematic HUD**: Contextual border styles, palette matching, and priority information hierarchy (`GameScene.ts`).
 
+## Generation/Runtime Integration V1 (System Usage & Dead-Rule Liveness)
+- **System Usage Tiers**: Distinguishes `FULL`, `PARTIAL`, `PASSIVE`, `DEAD`, and `UNSUPPORTED` system states (`composition_matrix.py`).
+- **Canonical Usage Matrix**: Maps subsystems (Vehicles, Factions, Threat, Activities, POIs, Events, Bosses) to real runtime owners and observable player-facing consequences.
+- **Rule Liveness & Dead-Rule Validator**: Detects rules referencing un-emittable triggers or unsupported action handlers, applying penalties during quality evaluation.
+- **Active Gameplay Composition**: Reconnects co-existing metadata into active loops (vehicles for distant traversal, factions providing missions, threat escalating responses).
+
+
 ## GameDesignSpec
 Acts as an intermediate structured design layer between natural-language user concepts and executable Phaser Game DSL schemas:
 

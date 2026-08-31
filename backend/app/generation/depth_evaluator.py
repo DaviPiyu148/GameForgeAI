@@ -268,6 +268,17 @@ class GameDepthEvaluator:
             cross_system_score = (verified_interactions / len(interactions)) * 100.0
             if cross_system_score < 50.0:
                 warnings.append("Requested systems co-exist but lack meaningful gameplay relationships (e.g. Threat not linked to Activities).")
+                failure_codes.append(QualityFailureCode.PASSIVE_SYSTEM_DETECTED)
+
+        # Audit dead rules
+        dead_rules = RequirementCoverageMatrix.audit_rule_liveness(dsl)
+        dead_rule_penalty = 0.0
+        if dead_rules:
+            dead_rule_penalty = min(25.0, len(dead_rules) * 10.0)
+            failure_codes.append(QualityFailureCode.DEAD_RULE_DETECTED)
+            for r_id, r_reason in dead_rules:
+                warnings.append(f"Dead rule detected: rule '{r_id}' ({r_reason}).")
+
 
         # ─────────────────────────────────────────────────────────────────────
         # 6. Finale Quality Score (0 - 100)
@@ -289,7 +300,7 @@ class GameDepthEvaluator:
         # ─────────────────────────────────────────────────────────────────────
         # 7. Total Scale-Aware Weighted Score
         # ─────────────────────────────────────────────────────────────────────
-        raw_score = (
+        raw_score = ((
             (core_loop_score * WEIGHT_CORE_LOOP) +
             (objective_score * WEIGHT_OBJECTIVE_CLARITY) +
             (progression_score * WEIGHT_PROGRESSION) +
@@ -297,9 +308,10 @@ class GameDepthEvaluator:
             (mechanic_coverage_score * WEIGHT_MECHANIC_COVERAGE) +
             (cross_system_score * WEIGHT_CROSS_SYSTEM) +
             (finale_score * WEIGHT_FINALE)
-        ) / 100.0
+        ) / 100.0) - dead_rule_penalty
 
         overall_score = int(math.floor(max(0.0, min(100.0, raw_score))))
+
 
         # Determine acceptability based on scale threshold
         threshold = THRESHOLD_ACCEPTABLE_PROTOTYPE if scale == "prototype" else (

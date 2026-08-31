@@ -270,13 +270,15 @@ PREVIOUS CANDIDATE:
 
 Repair the issues while strictly respecting the capability matrix, bounds, and rules:
 - MINIMAL PATCHING: Preserve the overall game concept, valid mechanics, and already-correct subsystems; do not completely rewrite valid parts of the game.
+- If dead rules were detected: remove or fix any rules whose triggers or actions are not supported by the Phaser runtime (e.g. use standard triggers like 'on_collect', 'on_collide_enemy', 'on_enemy_defeat', 'on_reach_goal', 'on_score_target' and standard actions like 'add_score', 'damage_player', 'heal_player', 'win_game', 'lose_game').
+- If passive systems were detected: connect disconnected systems into active loops (e.g. ensure vehicle max_speed > player speed across large districts, name factions in activity descriptions, or link combat kills to threat escalation).
 - If repeated adjacent objectives failed: diversify the objective types across adjacent levels (e.g. Level 1: collect_all -> Level 2: defeat_all -> Level 3: reach_exit).
-- If system interaction failed: link subsystems meaningfully (e.g. ensure vehicle max_speed > player speed, tie activities to faction names, or link combat defeat to score/threat).
 - If finale quality failed: add a designated Boss entity (is_boss: true, health >= 150) or high-intensity extraction condition on the final level.
 - Ensure player spawn is at least 80px away from enemies/hazards.
 - Ensure entity type is STRICTLY one of ["enemy", "collectible", "obstacle", "platform", "hazard"].
 - If is_boss is true on an entity, health must be >= 150.
 - Output ONLY the repaired single JSON object with "design_spec" and "dsl"."""
+
 
 
 
