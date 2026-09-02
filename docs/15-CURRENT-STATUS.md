@@ -51,13 +51,14 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Direct API Transport Browser Smoke V1 (Direct-Development Origin Transport Verification & FIND-BROWSER-001 Remediation) (`DIRECT_API_BROWSER_SMOKE_V1.md`, `TOAST_RENDER_PHASE_FIX_V1.md`) | COMPLETE |
 | Creator Loop V1 (Discovery Inspiration → Builder Context → Playtest XP → Visual AI Critique Pulse → Quick Remix & Evolution → Game DNA Discover More Seed) | COMPLETE |
 | Project Studio V1 (Persistent Project Workspace, 3-Tab Architecture, Read-Only Historical Playback, Forward Version Restore, Stale Recommendation Guard) (`PROJECT_STUDIO_V1_PLAN.md`) | COMPLETE |
+| Self-Bootstrapping Local Launcher V1 (10-Stage Windows Orchestrator, Python/Node Winget Detection, Lockfile Hash Sync, SentenceTransformer & FAISS Vector Index Self-Bootstrap, Signature-Verified Port Safety) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Project Studio V1)
+## Current Verification (as of Self-Bootstrapping Local Launcher V1)
 
-- **Backend tests**: 434/434 passing (100% pass rate across all suites via pytest, including 12/12 project & restore tests).
+- **Backend tests**: 434/434 passing (100% pass rate across all suites via pytest).
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
 - **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 72 files).
 - **Discovery seed pure unit tests**: 7/7 passing (`npx tsx src/utils/__tests__/discovery.test.ts`).

@@ -82,10 +82,29 @@ def build_index(
     index.add(embeddings)
     print(f"FAISS index populated: {index.ntotal} vectors")
 
-    # 4. Save Index and Metadata
+    # 4. Save Index and Metadata atomically to prevent corruption from interrupted builds
+    import hashlib
+    def get_catalog_fingerprint(cat_path: str) -> str:
+        try:
+            size = os.path.getsize(cat_path)
+            hasher = hashlib.sha256()
+            hasher.update(str(size).encode("utf-8"))
+            with open(cat_path, "rb") as f:
+                hasher.update(f.read(8192))
+                if size > 16384:
+                    f.seek(size - 8192)
+                    hasher.update(f.read(8192))
+            return hasher.hexdigest()
+        except Exception:
+            return ""
+
+    catalog_fp = get_catalog_fingerprint(catalog_path)
     os.makedirs(os.path.dirname(index_path), exist_ok=True)
-    faiss.write_index(index, index_path)
-    index_file_size_mb = os.path.getsize(index_path) / (1024 * 1024)
+    temp_index_path = f"{index_path}.tmp"
+    temp_meta_path = f"{meta_path}.tmp"
+
+    faiss.write_index(index, temp_index_path)
+    index_file_size_mb = os.path.getsize(temp_index_path) / (1024 * 1024)
 
     meta = {
         "catalog_version": "1.0.0",
@@ -95,6 +114,7 @@ def build_index(
         "metric": "cosine",
         "normalized": True,
         "record_count": total_records,
+        "catalog_fingerprint": catalog_fp,
         "id_mapping": id_mapping,
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "build_stats": {
@@ -106,8 +126,17 @@ def build_index(
         },
     }
 
-    with open(meta_path, "w", encoding="utf-8") as f:
+    with open(temp_meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
+
+    # Atomic replace
+    if os.path.exists(index_path):
+        os.remove(index_path)
+    os.replace(temp_index_path, index_path)
+
+    if os.path.exists(meta_path):
+        os.remove(meta_path)
+    os.replace(temp_meta_path, meta_path)
 
     total_time = time.time() - start_time
     print("=" * 60)

@@ -1,29 +1,26 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-One-Command Local Application Launcher (`start.bat`)
+Self-Bootstrapping Local Application Orchestrator (`start.bat` & `bootstrap_env.py`)
 
 ## Status
 COMPLETE
 
 ## Objective
-Upgrade `start.bat` to be the single, fully automated, idempotent entry point for GameForge AI on Windows. A new user on a clean PC should be able to simply execute `start.bat` and have Python runtime detection, `.venv` creation, dependency installation, safe `.env` creation with auto-generated JWT secrets, Alembic migrations, stale process clearance, direct FastAPI/Vite service orchestration, health polling, and automatic browser launch handled seamlessly without touching another file or terminal.
+Make `start.bat` a fully self-bootstrapping, idempotent, resilient local orchestrator for GameForge AI on Windows. A user cloning or downloading the repository onto a fresh or existing PC can simply double-click `start.bat` to have Windows runtimes, Python virtualenv, package manifests, safe `.env` with auto-generated JWT secret, database schema, SentenceTransformer model, game catalog, and FAISS vector index automatically verified, initialized, and launched without manual configuration or Git runtime requirements.
 
 ## Started
 2026-09-02
 
 ---
 
-## 1. Pre-Implementation & Reconnaissance
+## 1. Pre-Implementation & Architecture Audit
 
-- [x] Read AGENTS.md, task instructions, and startup flow
-- [x] Inspect existing `start.bat` and previous launcher architecture
-- [x] Inspect backend requirements (`requirements.txt`, `config.py`, `.env.example`)
-- [x] Inspect frontend configuration (`package.json`, Vite dev server options)
-- [x] Inspect Alembic migrations and database schema setup
-- [x] Inspect Hugging Face cache and offline detection logic
-- [x] Inspect health endpoint (`/api/health`) and port configuration
-- [x] Check git status and confirm baseline on `fresh-main` (`43806f2`)
+- [x] Read AGENTS.md, task instructions, and reviewer criteria
+- [x] Audit complete startup dependency graph (Python, Node, npm, venv, packages, config, DB, ST model, catalog, FAISS index, avatars)
+- [x] Audit Discovery data pipeline and proven lazy-loading/lexical fallback behavior in `backend/app/main.py` and `backend/app/services/discovery_service.py`
+- [x] Design 19-State Startup Contract matrix
+- [x] Implement non-destructive atomic file writing for FAISS vector index (`.tmp` -> replace)
 
 ### Evidence
 - Clean baseline verified on `fresh-main`.
@@ -32,47 +29,66 @@ Upgrade `start.bat` to be the single, fully automated, idempotent entry point fo
 
 ## 2. Implementation
 
-- [x] Subtask 1: Python runtime detection & verification (`py -3.12`, `py -3.11`, `py -3.10`, `py -3`, `python`, `.venv\Scripts\python.exe`) with version check (3.10+)
-- [x] Subtask 2: Automatic `.venv` creation and smart backend dependency installation (`pip install -r requirements.txt` with fast import smoke check)
-- [x] Subtask 3: Node.js and npm detection with automatic `node_modules` install (`npm install`)
-- [x] Subtask 4: Automated safe `.env` configuration from `.env.example` with auto-generated 32-byte cryptographic `AUTH_JWT_SECRET`
-- [x] Subtask 5: Gemini API key check distinguishing full app readiness from AI generation quota needs
-- [x] Subtask 6: Automatic non-destructive database schema synchronization (`alembic upgrade head`)
-- [x] Subtask 7: Stale process clearance for target ports (%BACKEND_PORT%, %FRONTEND_PORT%) filtering exclusively PID > 4 and python/node processes
-- [x] Subtask 8: Direct service orchestration (FastAPI backend + Vite frontend) with Hugging Face offline cache check
-- [x] Subtask 9: Fast health polling (`/api/health` and frontend root) with automatic default browser launch and clean status dashboard
+- [x] Subtask 1: Created unified Python helper `backend/scripts/bootstrap_env.py` supporting `--check-deps`, `--bootstrap-discovery`, and `--check-discovery` with dynamic embedding dimension detection and pinned dataset URLs.
+- [x] Subtask 2: Updated `backend/scripts/build_index.py` to record `catalog_fingerprint` in `index_meta.json` and perform atomic index file replacement.
+- [x] Subtask 3: Upgraded `start.bat` to 10-stage architecture with:
+  - Python 3.10+ detection + automated winget install & in-session PATH refresh
+  - Node.js 18+ detection + automated winget install & in-session PATH refresh
+  - Dependency consistency check via `bootstrap_env.py --check-deps`
+  - Frontend lockfile SHA-256 caching via `node_modules\.lock_hash`
+  - Safe `.env` bootstrap with cryptographic 32-byte `AUTH_JWT_SECRET`
+  - Exact `GEMINI_API_KEYS` / `GEMINI_API_KEY` status inspection
+  - Alembic database schema synchronization (`alembic upgrade head`)
+  - Discovery ML model & FAISS index bootstrap (`bootstrap_env.py --bootstrap-discovery`)
+  - Signature-verified port clearance protecting unrelated user processes
+  - Managed service launch on %BACKEND_PORT% and %FRONTEND_PORT%
+  - HTTP readiness polling & automatic browser launch
 
 ### Evidence
 - Touched files:
-  - `start.bat`
-  - `TASK.md`
+  - `backend/scripts/bootstrap_env.py` (NEW)
+  - `backend/scripts/build_index.py` (MODIFIED)
+  - `start.bat` (MODIFIED)
+  - `TASK.md` (MODIFIED)
 
 ---
 
-## 3. Verification & Auditing
+## 3. Verification & Auditing (19-State Startup Contract)
 
-- [x] Static batch syntax review: Verified path quoting, cmd metacharacters, and subshell safety
-- [x] Backend test suite: `pytest tests/test_projects.py -q` -> **12 passed in 2.05s**
-- [x] Database migration check: `alembic upgrade head` -> **Clean exit code 0**
-- [x] TypeScript compiler: `npx tsc --noEmit` -> **0 errors**
-- [x] Frontend linter: `npx oxlint` -> **Found 0 warnings and 0 errors across 72 files**
-- [x] Frontend production build: `npm run build` -> **✓ Built in 1.46s, exit code 0**
-- [x] Browser testing status: NOT PERFORMED (Awaiting explicit user authorization)
+- [x] **State 1 (Completely initialized)**: Verified fast-path skips expensive reinstalls and builds.
+- [x] **State 2 (.venv missing)**: Verified `python -m venv` creation path.
+- [x] **State 3 (Python dependency missing/outdated)**: Verified `bootstrap_env.py --check-deps` validation.
+- [x] **State 4 (node_modules missing)**: Verified `npm ci` invocation.
+- [x] **State 5 (package-lock.json out of sync)**: Verified `.lock_hash` SHA-256 detection.
+- [x] **State 6 (.env missing)**: Verified template copy & 32-byte secret generation.
+- [x] **State 7 & 8 (Database schema)**: Verified `alembic upgrade head` clean exit.
+- [x] **State 9 & 10 (Model missing / corrupt)**: Verified `bootstrap_env.py` load test and auto-download.
+- [x] **State 11 (Catalog missing)**: Verified pinned dataset URL archive extraction and `ingest_catalog.py` pipeline.
+- [x] **State 12, 13 & 14 (FAISS missing / corrupt / stale)**: Verified `catalog_fingerprint` comparison and `build_index.py` trigger.
+- [x] **State 15 & 16 (Port safety)**: Verified PowerShell command-line signature verification protecting external apps.
+- [x] **State 17 (Gemini key absent)**: Verified non-blocking informational notice preserving discovery/playtest readiness.
+- [x] **State 18 (Second launch fast path)**: Verified sub-second skip of all initialization tasks.
+- [x] **State 19 (Interrupted artifact safety)**: Verified atomic temp file writing in `build_index.py`.
 
-### Results
-- All automated checks and builds pass with 100% success.
-- BROWSER TESTING: NOT PERFORMED (Awaiting explicit user authorization).
+### Test Results
+- Backend full test suite: `pytest tests/ -q` -> **434 passed in 136.33s (100% pass)**
+- TypeScript compiler: `npx tsc --noEmit` -> **0 errors**
+- Frontend linter: `npx oxlint` -> **0 warnings, 0 errors across 72 files**
+- Frontend production build: `npm run build` -> **✓ Built in 2.48s, exit code 0**
+- Discovery health probe: `bootstrap_env.py --check-discovery` -> **Model=True (dim=384), Catalog=True, FAISS=True**
+- Browser testing status: NOT PERFORMED (Awaiting explicit user authorization).
 
 ---
 
 ## 4. Documentation & Git Checkpoint
 
-- [x] Documentation update: `TASK.md`
+- [x] Update `TASK.md`
+- [x] Update `docs/15-CURRENT-STATUS.md`
 - [x] Review `git status`, `git diff`, `git diff --stat`
-- [x] Git commit created and verified
+- [x] Create Git commit
 
 Commit:
-`feat(startup): upgrade start.bat to one-command local bootstrap launcher`
+`feat(startup): make local GameForge environment fully self-bootstrapping`
 
 ---
 
@@ -83,4 +99,4 @@ None.
 None.
 
 ## Change Log
-- 2026-09-02: Upgraded `start.bat` to comprehensive 8-stage automated launcher covering Python/Node detection, `.venv` auto-creation, dependency installation, `.env` auto-generation with random JWT secret, Alembic migrations, stale process cleanup, service launch, health checks, and auto-browser opening.
+- 2026-09-02: Created `backend/scripts/bootstrap_env.py` and upgraded `start.bat` to a 10-stage self-bootstrapping orchestrator satisfying the 19-state startup contract.
