@@ -190,21 +190,28 @@ set "NEEDS_NPM=0"
 
 if not exist "%FRONTEND_DIR%\node_modules" (
     set "NEEDS_NPM=1"
+) else if not exist "%FRONTEND_DIR%\node_modules\vite" (
+    set "NEEDS_NPM=1"
 ) else if exist "%FRONTEND_LOCK%" (
     if not exist "%HASH_FILE%" (
-        set "NEEDS_NPM=1"
+        REM node_modules exists and is healthy; initialize hash stamp
+        "%VENV_PYTHON%" -c "import hashlib, pathlib; p = pathlib.Path(r'%FRONTEND_LOCK%'); h = pathlib.Path(r'%HASH_FILE%'); h.write_text(hashlib.sha256(p.read_bytes()).hexdigest(), encoding='utf-8')" >nul 2>&1
     ) else (
-        for /f "tokens=*" %%H in ('powershell -NoProfile -Command "(Get-FileHash -Path '%FRONTEND_LOCK%' -Algorithm SHA256).Hash"') do set "CURRENT_LOCK_HASH=%%H"
+        for /f "tokens=*" %%H in ('"%VENV_PYTHON%" -c "import hashlib, pathlib; print(hashlib.sha256(pathlib.Path(r'%FRONTEND_LOCK%').read_bytes()).hexdigest())"') do set "CURRENT_LOCK_HASH=%%H"
         set /p SAVED_LOCK_HASH=<"%HASH_FILE%"
         if not "!CURRENT_LOCK_HASH!"=="!SAVED_LOCK_HASH!" set "NEEDS_NPM=1"
     )
 )
 
 if "!NEEDS_NPM!"=="1" (
-    echo        Installing frontend dependencies via npm ci...
+    echo        Reconciling frontend dependencies...
     cd /d "%FRONTEND_DIR%"
     if exist "%FRONTEND_LOCK%" (
         call npm ci --quiet
+        if !ERRORLEVEL! NEQ 0 (
+            echo        npm ci encountered locked files; falling back to npm install...
+            call npm install --quiet
+        )
     ) else (
         call npm install --quiet
     )
@@ -215,7 +222,7 @@ if "!NEEDS_NPM!"=="1" (
         exit /b 1
     )
     if exist "%FRONTEND_LOCK%" (
-        powershell -NoProfile -Command "(Get-FileHash -Path '%FRONTEND_LOCK%' -Algorithm SHA256).Hash | Set-Content -Path '%HASH_FILE%'" >nul 2>&1
+        "%VENV_PYTHON%" -c "import hashlib, pathlib; p = pathlib.Path(r'%FRONTEND_LOCK%'); h = pathlib.Path(r'%HASH_FILE%'); h.write_text(hashlib.sha256(p.read_bytes()).hexdigest(), encoding='utf-8')" >nul 2>&1
     )
     cd /d "%PROJECT_ROOT%"
     echo        Frontend dependencies installed successfully.
@@ -255,9 +262,9 @@ if !ERRORLEVEL! EQU 0 (
 )
 
 if "!GEMINI_CONFIGURED!"=="1" (
-    echo        Configuration ready (Gemini credentials configured) -- OK
+    echo        Configuration ready [Gemini credentials configured] -- OK
 ) else (
-    echo        Configuration ready (Discovery, Blueprints, & Playtests ready; AI builds require key) -- OK
+    echo        Configuration ready [Discovery, Blueprints, and Playtests ready; AI builds require key] -- OK
 )
 
 REM ============================================================================
@@ -277,9 +284,9 @@ cd /d "%PROJECT_ROOT%"
 echo        Database schema synchronized -- OK
 
 REM ============================================================================
-REM  STAGE 7: Discovery ML Model & FAISS Vector Index Bootstrap
+REM  STAGE 7: Discovery ML Model and FAISS Vector Index Bootstrap
 REM ============================================================================
-echo [7/10] Verifying Discovery ML model & FAISS vector index...
+echo [7/10] Verifying Discovery ML model and FAISS vector index...
 
 REM Set offline cache flag if model is already cached locally
 if exist "%USERPROFILE%\.cache\huggingface\hub\models--sentence-transformers--all-MiniLM-L6-v2" (
@@ -290,35 +297,11 @@ if exist "%USERPROFILE%\.cache\huggingface\hub\models--sentence-transformers--al
 echo        Discovery engine verified -- OK
 
 REM ============================================================================
-REM  STAGE 8: Signature-Verified Process & Port Safety
+REM  STAGE 8: Signature-Verified Process and Port Safety
 REM ============================================================================
-echo [8/10] Checking port availability (Backend: %BACKEND_PORT%, Frontend: %FRONTEND_PORT%)...
+echo [8/10] Checking port availability [Backend: %BACKEND_PORT%, Frontend: %FRONTEND_PORT%]...
 
-powershell -NoProfile -Command "& {
-    $ports = @(%BACKEND_PORT%, %FRONTEND_PORT%)
-    $projRoot = '%PROJECT_ROOT%'.Replace('\', '\\')
-    foreach ($p in $ports) {
-        $conns = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
-        if ($conns) {
-            foreach ($c in $conns) {
-                $procId = $c.OwningProcess
-                if ($procId -gt 4) {
-                    $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
-                    if ($proc) {
-                        $cmd = (Get-CimInstance Win32_Process -Filter \"ProcessId = $procId\").CommandLine
-                        if ($cmd -match 'uvicorn.*app\.main:app' -or $cmd -match 'vite' -or $cmd -match 'GameForge' -or $cmd -match [regex]::Escape($projRoot)) {
-                            Write-Host \"       Stopping stale GameForge process on port $p (PID: $procId)...\"
-                            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-                        } else {
-                            Write-Host \"[ERROR] Port $p is occupied by unrelated process: $($proc.ProcessName) (PID: $procId).\"
-                            exit 1
-                        }
-                    }
-                }
-            }
-        }
-    }
-}"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ports = @(%BACKEND_PORT%, %FRONTEND_PORT%); $projRoot = '%PROJECT_ROOT%'.Replace('\', '\\'); foreach ($p in $ports) { $conns = $null; try { $conns = @(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue) } catch {}; if ($conns) { foreach ($c in $conns) { if ($c -and $c.OwningProcess -gt 4) { $procId = $c.OwningProcess; $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue; if ($proc) { $cmd = (Get-CimInstance Win32_Process -Filter \"ProcessId = $procId\").CommandLine; if ($cmd -match 'uvicorn.*app\.main:app' -or $cmd -match 'vite' -or $cmd -match 'GameForge' -or $cmd -match [regex]::Escape($projRoot)) { Write-Host \"       Stopping stale GameForge process on port $p (PID: $procId)...\"; Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue } else { Write-Host \"[ERROR] Port $p is occupied by unrelated process: $($proc.ProcessName) (PID: $procId).\"; exit 1 } } } } } }; exit 0"
 
 if !ERRORLEVEL! NEQ 0 (
     echo.
@@ -338,10 +321,10 @@ set "CORS_ORIGINS=http://localhost:%FRONTEND_PORT%,http://127.0.0.1:%FRONTEND_PO
 set "PYTHONUNBUFFERED=1"
 
 REM Launch Backend in managed child window
-start "GameForge AI | Backend [:%BACKEND_PORT%]" cmd /k "color 0A && title GameForge AI ^| Backend [:%BACKEND_PORT%] && cd /d "%BACKEND_DIR%" && set "PYTHONUNBUFFERED=1" && set "CORS_ORIGINS=%CORS_ORIGINS%" && "%VENV_PYTHON%" -m uvicorn app.main:app --host 127.0.0.1 --port %BACKEND_PORT% --reload"
+start "GameForge AI | Backend [:%BACKEND_PORT%]" /D "%BACKEND_DIR%" cmd /k "color 0A && set PYTHONUNBUFFERED=1 && set CORS_ORIGINS=%CORS_ORIGINS% && "%VENV_PYTHON%" -m uvicorn app.main:app --host 127.0.0.1 --port %BACKEND_PORT% --reload"
 
 REM Launch Frontend in managed child window
-start "GameForge AI | Frontend [:%FRONTEND_PORT%]" cmd /k "color 0B && title GameForge AI ^| Frontend [:%FRONTEND_PORT%] && cd /d "%FRONTEND_DIR%" && set "VITE_API_URL=%VITE_API_URL%" && npm run dev -- --host 127.0.0.1 --port %FRONTEND_PORT%"
+start "GameForge AI | Frontend [:%FRONTEND_PORT%]" /D "%FRONTEND_DIR%" cmd /k "color 0B && set VITE_API_URL=%VITE_API_URL% && set FRONTEND_PORT=%FRONTEND_PORT% && set BACKEND_PORT=%BACKEND_PORT% && call npm run dev -- --host 127.0.0.1 --port %FRONTEND_PORT%"
 
 echo        Backend launching at http://127.0.0.1:%BACKEND_PORT%/
 echo        Frontend launching at http://127.0.0.1:%FRONTEND_PORT%/

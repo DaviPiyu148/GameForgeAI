@@ -18,6 +18,7 @@ export default defineConfig({
     // the server unreachable at the 127.0.0.1 URL that start.bat opens and
     // reports.
     host: '127.0.0.1',
+    port: Number(process.env.FRONTEND_PORT) || 5173,
     proxy: {
       '/api': {
         target: backendTarget,
