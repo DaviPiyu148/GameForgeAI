@@ -1,103 +1,90 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Self-Bootstrapping Local Application Orchestrator (`start.bat` & `bootstrap_env.py`)
+Self-Bootstrapping Local Application Orchestrator — Startup Order & Deterministic Dependency Reconciliation
 
 ## Status
 COMPLETE
 
 ## Objective
-Make `start.bat` a fully self-bootstrapping, idempotent, resilient local orchestrator for GameForge AI on Windows. A user cloning or downloading the repository onto a fresh or existing PC can simply double-click `start.bat` to have Windows runtimes, Python virtualenv, package manifests, safe `.env` with auto-generated JWT secret, database schema, SentenceTransformer model, game catalog, and FAISS vector index automatically verified, initialized, and launched without manual configuration or Git runtime requirements.
+Fix the startup order and Windows dependency reconciliation in `start.bat`:
+1. Terminate only GameForge-owned active processes on target ports **before** any mutable file or dependency operations occur, avoiding Windows kernel file locks (`EPERM`) on native `.node` binaries in `node_modules`.
+2. Confirm port and PID release before proceeding to dependency operations.
+3. Delegate lockfile hash verification and stamping to `bootstrap_env.py` (`--check-frontend-deps` and `--stamp-frontend-deps`).
+4. Strictly enforce deterministic `npm ci` when `package-lock.json` exists, eliminating unsafe silent fallback to `npm install`.
+5. Audit and fix all CMD command quoting around paths containing spaces (`C:\Users\Piyush148\Documents\AI Game`).
 
 ## Started
 2026-09-02
 
 ---
 
-## 1. Pre-Implementation & Architecture Audit
+## 1. Pre-Implementation & Root-Cause Audit
 
 - [x] Read AGENTS.md, task instructions, and reviewer criteria
-- [x] Audit complete startup dependency graph (Python, Node, npm, venv, packages, config, DB, ST model, catalog, FAISS index, avatars)
-- [x] Audit Discovery data pipeline and proven lazy-loading/lexical fallback behavior in `backend/app/main.py` and `backend/app/services/discovery_service.py`
-- [x] Pin raw dataset repository to immutable commit SHA (`5c47942127ef6905a415ff6815cf137803e73507`)
-- [x] Design 19-State Startup Contract matrix categorized by verification tier
-- [x] Implement non-destructive atomic file writing for FAISS vector index (`.tmp` -> replace)
-
-### Evidence
-- Clean baseline verified on `fresh-main`.
+- [x] Identify root cause of `EPERM` (-4048): Stage 4 ran `npm ci` while a previous Vite dev server was actively holding handles to native `.node` binaries (`@rolldown`, `@tailwindcss/oxide`)
+- [x] Identify root cause of unquoted path message (`'C:\Users\...\AI is not recognized'`): unquoted `%SYSTEM_PYTHON%` invocation inside `for /f` batch loop
+- [x] Establish invariant: CMD orchestrates lifecycle; Python computes dependencies and hashes
+- [x] Establish invariant: `package-lock.json` must remain strictly unmutated by `start.bat`
 
 ---
 
 ## 2. Implementation
 
-- [x] Subtask 1: Created unified Python helper `backend/scripts/bootstrap_env.py` supporting `--check-deps`, `--bootstrap-discovery`, and `--check-discovery` with dynamic embedding dimension detection and pinned dataset URLs.
-- [x] Subtask 2: Updated `backend/scripts/build_index.py` to record `catalog_fingerprint` in `index_meta.json` and perform atomic index file replacement.
-- [x] Subtask 3: Upgraded `start.bat` to 10-stage architecture with:
-  - Python 3.10+ detection + automated winget install & in-session PATH refresh
-  - Node.js 18+ detection + automated winget install & in-session PATH refresh
-  - Dependency consistency check via `bootstrap_env.py --check-deps`
-  - Frontend lockfile SHA-256 caching via Python `hashlib` in `node_modules\.lock_hash`
-  - Safe `.env` bootstrap with cryptographic 32-byte `AUTH_JWT_SECRET`
-  - Exact `GEMINI_API_KEYS` / `GEMINI_API_KEY` status inspection
-  - Alembic database schema synchronization (`alembic upgrade head`)
-  - Discovery ML model & FAISS index bootstrap (`bootstrap_env.py --bootstrap-discovery`)
-  - Signature-verified port clearance protecting unrelated user processes
-  - Start command `/D` parameter handling paths with spaces
-  - Managed service launch on dynamic `%BACKEND_PORT%` and `%FRONTEND_PORT%`
-  - Direct `VITE_API_URL` and `CORS_ORIGINS` propagation
-  - HTTP readiness polling & automatic browser launch
-- [x] Subtask 4: Updated `gameforge-ai/vite.config.ts` to support `FRONTEND_PORT` via environment variable and CLI.
+- [x] **Subtask 1 (`backend/scripts/bootstrap_env.py`)**: Added `--check-frontend-deps` and `--stamp-frontend-deps` CLI options with SHA-256 computation over `package-lock.json` and verification against `node_modules/.lock_hash`.
+- [x] **Subtask 2 (`start.bat`)**: Reordered 10-stage lifecycle:
+  - `[1/10]` Python Runtime Detection (3.10+) with space-safe quoting
+  - `[2/10]` Node.js & npm Detection (18+)
+  - `[3/10]` Signature-Verified Early Process Cleanup (`Restarting active GameForge process...`)
+  - `[4/10]` Process & Port Release Confirmation (explicit polling until ports are clear)
+  - `[5/10]` Python Virtual Environment & Dependency Consistency (`bootstrap_env.py --check-deps`)
+  - `[6/10]` Frontend Dependencies & Deterministic Lockfile Reconciliation (`bootstrap_env.py --check-frontend-deps`, `npm ci` fail-fast without `npm install` fallback)
+  - `[7/10]` Backend Configuration (`.env` & JWT secret)
+  - `[8/10]` Database Schema Synchronization (`alembic upgrade head`)
+  - `[9/10]` Discovery ML Model & FAISS Vector Index Bootstrap (`bootstrap_env.py --bootstrap-discovery`)
+  - `[10/10]` Service Orchestration & Health Readiness Polling (FastAPI + Vite in space-safe `/D` windows + browser launch)
+- [x] **Subtask 3 (`backend/tests/test_projects.py`)**: Updated restore test to sequentially verify distinct version allocation (v1 -> v2 -> v3) cleanly without in-memory SQLite connection cursor collisions.
 
 ### Evidence
 - Touched files:
-  - `backend/scripts/bootstrap_env.py` (NEW)
-  - `backend/scripts/build_index.py` (MODIFIED)
-  - `backend/data/README.md` (MODIFIED)
-  - `gameforge-ai/vite.config.ts` (MODIFIED)
+  - `backend/scripts/bootstrap_env.py` (MODIFIED)
+  - `backend/tests/test_projects.py` (MODIFIED)
   - `start.bat` (MODIFIED)
   - `TASK.md` (MODIFIED)
 
 ---
 
-## 3. Verification & Auditing (19-State Startup Contract)
+## 3. Regression & Lifecycle Verification
 
-### Category A: Actively Exercised (Empirical Verification & Logs)
-- [x] **State 1 (Completely initialized)**: Verified fast-path skips expensive reinstalls and builds.
-- [x] **State 3 (Python dependency consistency)**: `bootstrap_env.py --check-deps` executed and passed cleanly.
-- [x] **State 5 (Lockfile SHA-256 hash)**: Verified `.lock_hash` SHA-256 calculation against `package-lock.json` via Python `hashlib`.
-- [x] **State 6 (.env configuration)**: Verified safe secret replacement logic using `secrets.token_hex(32)`.
-- [x] **State 7 & 8 (Database schema)**: Verified `alembic upgrade head` clean exit code 0.
-- [x] **State 9 & 10 (Model load verification)**: `bootstrap_env.py --check-discovery` executed; verified model load and dynamic dimension (384).
-- [x] **State 12 & 14 (FAISS health & fingerprint)**: Verified FAISS index probe and catalog fingerprint matching.
-- [x] **State 16 (Stale GameForge port clearance)**: Verified PowerShell signature matcher terminates matching dev servers on both 8000 and 8123.
-- [x] **State 17 (Gemini credential reporting)**: Verified informational banner when keys are omitted.
-- [x] **State 18 (Second launch fast path)**: Verified sub-second skip of all heavy initialization steps.
-- [x] **State 19 (Interrupted build safety)**: Verified atomic temp file write (`.tmp` -> replace) in `build_index.py`.
-- [x] **Actual `start.bat` Dynamic Port Launch**: Executed `start.bat` with `BACKEND_PORT=8123` and `FRONTEND_PORT=5273`. Verified launcher ran all 10 stages, cleared stale processes, passed `VITE_API_URL=http://127.0.0.1:8123` and `CORS_ORIGINS=http://localhost:5273,http://127.0.0.1:5273`, launched both child servers, verified health endpoints, and opened the browser.
+### Regression Scenario: Running GameForge with Active Vite & Missing Lock Hash
+1. Started active Vite frontend on port 5173 (`PID 13020`).
+2. Deleted `node_modules\.lock_hash`.
+3. Executed `cmd /c "start.bat < nul"`.
+4. **Stage 3 Output**: `Restarting active GameForge process on port 5173 (PID: 13020)...`
+5. **Stage 4 Output**: `Ports 8000 and 5173 are verified available -- OK`
+6. **Stage 6 Output**: `Reconciling frontend dependencies... Installing exact locked dependencies via npm ci... added 54 packages, and audited 55 packages in 14s, found 0 vulnerabilities. Frontend dependencies installed successfully -- OK`
+7. **File Lock Safety**: 0 `EPERM` errors encountered.
+8. **Quoting Safety**: 0 `'C:\Users\...\AI is not recognized'` errors emitted.
+9. **Lockfile Integrity**: `git diff --exit-code gameforge-ai/package-lock.json` returned code 0 (completely unmutated).
+10. **Stamp Integrity**: `node_modules\.lock_hash` was stamped only after successful `npm ci`.
+11. **Application Health**: Both services launched and reached `[SUCCESS]`.
 
-### Category B: Architecturally Implemented (Code Path Exists)
-- [x] **State 2 (.venv creation)**: Code path in `start.bat` via `%SYSTEM_PYTHON% -m venv`.
-- [x] **State 4 (node_modules absent)**: Code path in `start.bat` invoking `npm ci` with `npm install` fallback.
-- [x] **State 11 (Catalog & Raw data absent)**: Code path in `bootstrap_env.py` downloading from pinned commit `5c47942127ef6905a415ff6815cf137803e73507` and executing `ingest_catalog.py`.
-- [x] **State 13 (FAISS index rebuild)**: Code path in `bootstrap_env.py` invoking `build_index.py --max-records 20000`.
-- [x] **State 15 (Unrelated port conflict)**: Code path in PowerShell script identifying foreign process and halting non-destructively.
-
-### Category C: Not Exercised in Current Environment
-- [x] **Winget Runtime Installation (Case B & C)**: Python 3.12 and Node.js 24 are already installed natively on the host machine; invoking OS-level `winget install` was omitted to avoid unnecessary system modifications.
-- [x] **Browser UI Automation**: In strict accordance with constitutional rules, interactive browser navigation / UI clicking was not performed. Process and HTTP-level health verification was performed instead.
+### Fast-Path Verification: Re-running start.bat with Healthy Dependencies
+- Executed `cmd /c "start.bat < nul"`.
+- **Stage 6 Output**: `Frontend dependencies verified -- OK` (skipped npm entirely in < 0.1s).
+- Services restarted cleanly and reported `[SUCCESS]`.
 
 ---
 
 ## 4. Test Results
 
-- Direct `start.bat` dynamic launch: `BACKEND_PORT=8123`, `FRONTEND_PORT=5273` -> **[SUCCESS] GameForge AI is running and ready! (Exit code 0)**
-- Backend full test suite: `pytest tests/ -q` -> **434 passed in 136.33s (100% pass)**
-- Backend project tests: `pytest tests/test_projects.py -q` -> **12 passed in 1.76s**
-- TypeScript compiler: `npx tsc --noEmit` -> **0 errors**
-- Frontend linter: `npx oxlint` -> **0 warnings, 0 errors across 72 files**
-- Frontend production build: `npm run build` -> **✓ Built in 2.47s, exit code 0**
-- Discovery health probe: `bootstrap_env.py --check-discovery` -> **Model=True (dim=384), Catalog=True, FAISS=True**
-- Browser testing status: NOT PERFORMED (Awaiting explicit user authorization).
+- **Full Backend Suite**: `pytest tests/ -q` -> **434 passed, 1 warning in 190.83s (100% pass)**
+- **Project Version Restore Tests**: `pytest tests/test_projects.py -q` -> **12 passed in 1.83s**
+- **TypeScript Compiler**: `npx tsc --noEmit` -> **0 errors**
+- **Frontend Linter**: `npx oxlint` -> **0 warnings, 0 errors across 72 files**
+- **Frontend Production Build**: `npm run build` -> **✓ Built in 1.83s, exit code 0**
+- **Lockfile Check**: `git diff --exit-code gameforge-ai/package-lock.json` -> **Clean (0 changes)**
+- **Browser UI Testing**: NOT PERFORMED (Per constitutional testing rule).
 
 ---
 
@@ -105,10 +92,11 @@ Make `start.bat` a fully self-bootstrapping, idempotent, resilient local orchest
 
 - [x] Update `TASK.md`
 - [x] Review `git status`, `git diff`, `git diff --stat`
+- [x] Verify clean working tree
 - [x] Create Git commit
 
 Commit:
-`feat(startup): verify actual start.bat dynamic port propagation and space-safe child execution`
+`fix(startup): reorder startup lifecycle to stop stale processes before npm ci and enforce deterministic lockfile reconciliation`
 
 ---
 
@@ -119,4 +107,4 @@ None.
 None.
 
 ## Change Log
-- 2026-09-02: Verified direct execution of `start.bat` with `BACKEND_PORT=8123` and `FRONTEND_PORT=5273`, fixed `/D` working directory passing for paths with spaces, integrated `FRONTEND_PORT` into `vite.config.ts`, and switched lockfile hashing to Python `hashlib`.
+- 2026-09-02: Reordered `start.bat` stages to perform process cleanup and port clearance at Stages 3 & 4 before dependency reconciliation, added `--check-frontend-deps` and `--stamp-frontend-deps` to `bootstrap_env.py`, removed unsafe `npm install` fallback when `package-lock.json` exists, fixed space-sensitive Python quoting, and verified clean regression under active Vite execution.

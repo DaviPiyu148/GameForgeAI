@@ -272,15 +272,87 @@ def bootstrap_discovery() -> bool:
     return True
 
 
+FRONTEND_DIR = PROJECT_ROOT / "gameforge-ai"
+FRONTEND_LOCK = FRONTEND_DIR / "package-lock.json"
+NODE_MODULES_DIR = FRONTEND_DIR / "node_modules"
+LOCK_HASH_FILE = NODE_MODULES_DIR / ".lock_hash"
+
+
+def compute_lockfile_hash() -> Optional[str]:
+    """Compute SHA-256 hash of gameforge-ai/package-lock.json."""
+    if not FRONTEND_LOCK.exists():
+        return None
+    try:
+        return hashlib.sha256(FRONTEND_LOCK.read_bytes()).hexdigest()
+    except Exception as e:
+        print(f"[WARN] Failed to read package-lock.json: {e}")
+        return None
+
+
+def check_frontend_dependencies() -> bool:
+    """
+    Verify frontend dependencies:
+    Returns True if node_modules exists, contains vite, and .lock_hash matches package-lock.json.
+    Returns False if node_modules is missing/corrupted or package-lock.json hash has changed.
+    """
+    if not NODE_MODULES_DIR.exists():
+        return False
+    if not (NODE_MODULES_DIR / "vite").exists():
+        return False
+    if not FRONTEND_LOCK.exists():
+        return True
+    if not LOCK_HASH_FILE.exists():
+        return False
+
+    current_hash = compute_lockfile_hash()
+    if not current_hash:
+        return False
+
+    try:
+        saved_hash = LOCK_HASH_FILE.read_text(encoding="utf-8").strip()
+        return current_hash == saved_hash
+    except Exception:
+        return False
+
+
+def stamp_frontend_dependencies() -> bool:
+    """
+    Record current SHA-256 hash of package-lock.json into node_modules/.lock_hash.
+    Must be called only after successful npm ci/install.
+    """
+    if not FRONTEND_LOCK.exists():
+        return True
+    current_hash = compute_lockfile_hash()
+    if not current_hash:
+        return False
+    try:
+        NODE_MODULES_DIR.mkdir(parents=True, exist_ok=True)
+        LOCK_HASH_FILE.write_text(current_hash, encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[WARN] Failed to write .lock_hash: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="GameForge AI Bootstrap & Environment Helper")
     parser.add_argument("--check-deps", action="store_true", help="Check Python dependency consistency against requirements.txt")
+    parser.add_argument("--check-frontend-deps", action="store_true", help="Check frontend node_modules & lockfile consistency")
+    parser.add_argument("--stamp-frontend-deps", action="store_true", help="Record current lockfile hash to node_modules/.lock_hash")
     parser.add_argument("--bootstrap-discovery", action="store_true", help="Ensure embedding model, catalog, and FAISS index are initialized")
     parser.add_argument("--check-discovery", action="store_true", help="Diagnostic check of discovery components")
     args = parser.parse_args()
 
     if args.check_deps:
         is_ok = check_python_dependencies()
+        sys.exit(0 if is_ok else 1)
+
+    if args.check_frontend_deps:
+        is_ok = check_frontend_dependencies()
+        sys.exit(0 if is_ok else 1)
+
+    if args.stamp_frontend_deps:
+        is_ok = stamp_frontend_dependencies()
         sys.exit(0 if is_ok else 1)
 
     if args.bootstrap_discovery:
@@ -295,7 +367,7 @@ def main():
         print(f"Discovery Health Summary: Model={model_ok} (dim={model_dim}), Catalog={CATALOG_PATH.exists()}, FAISS={index_ok}")
         sys.exit(0 if (model_ok and index_ok) else 1)
 
-    print("No mode specified. Use --check-deps or --bootstrap-discovery.")
+    print("No mode specified. Use --check-deps, --check-frontend-deps, or --bootstrap-discovery.")
     sys.exit(0)
 
 

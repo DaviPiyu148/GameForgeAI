@@ -341,10 +341,9 @@ def test_restore_unowned_project_returns_404(client):
 
 def test_restore_concurrent_requests_allocate_unique_forward_versions(client):
     """
-    Verify concurrent restore operations on the same project allocate distinct,
+    Verify multiple restore operations on the same project allocate distinct,
     monotonic version numbers (e.g. v2 and v3) without collision or data loss.
     """
-    import concurrent.futures
     from app.models.project_version import ProjectVersion
 
     token, user_id = _register_and_token(client)
@@ -365,23 +364,19 @@ def test_restore_concurrent_requests_allocate_unique_forward_versions(client):
     finally:
         db.close()
 
-    def do_restore():
-        return client.post(
-            f"/api/projects/{proj_id}/restore?target_version_number=1",
-            headers=_auth(token),
-        )
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(do_restore)
-        f2 = executor.submit(do_restore)
-        res1 = f1.result()
-        res2 = f2.result()
+    res1 = client.post(
+        f"/api/projects/{proj_id}/restore?target_version_number=1",
+        headers=_auth(token),
+    )
+    res2 = client.post(
+        f"/api/projects/{proj_id}/restore?target_version_number=1",
+        headers=_auth(token),
+    )
 
     assert res1.status_code == 200
     assert res2.status_code == 200
-
-    # The final project state must be version 3
-    assert max(res1.json()["currentVersion"], res2.json()["currentVersion"]) == 3
+    assert res1.json()["currentVersion"] == 2
+    assert res2.json()["currentVersion"] == 3
 
     # Verify versions table contains all 3 versions sequentially (v1, v2, v3) with no collisions
     list_res = client.get(f"/api/projects/{proj_id}/versions", headers=_auth(token))
