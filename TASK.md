@@ -7,7 +7,7 @@ Project Studio V1 (Persistent Project Workspace & Iteration Hub)
 COMPLETE
 
 ## Objective
-Implement Project Studio V1: a project-centric creator workspace consolidating Game Blueprint, Playtest & AI Insights (with Stale Recommendation Guard), Version History (with Read-Only Historical Playback and Forward Restore), and Discovery quick actions into a responsive 3-tab workspace modal (`ProjectStudioModal`) that cleanly replaces `ProjectDetailsModal` without adding primary routes or database migrations.
+Implement Project Studio V1: a project-centric creator workspace consolidating Game Blueprint, Playtest & AI Insights (with Version-Aware Stale Recommendation Guard), Version History (with Read-Only Historical Playback and Concurrency-Safe Forward Restore), and Discovery quick actions into a responsive 3-tab workspace modal (`ProjectStudioModal`) that cleanly replaces `ProjectDetailsModal` without adding primary routes or database migrations.
 
 ## Started
 2026-09-02
@@ -41,14 +41,17 @@ Implement Project Studio V1: a project-centric creator workspace consolidating G
 - [x] Subtask 3: Add `getPlaytests(id)` and `restoreVersion(id, targetVersionNumber)` to `gameforge-ai/src/services/projects.ts` (reusing existing `getVersions`)
 - [x] Subtask 4: Update `PrototypeModal.tsx` to support `versionNumber` and strictly read-only `isHistoricalPlayback` mode (zero telemetry POST, zero XP, zero mutations)
 - [x] Subtask 5: Create `StudioOverviewTab.tsx` with Game Blueprint, core loop, objectives, and build specifications
-- [x] Subtask 6: Create `StudioPlaytestsTab.tsx` with telemetry history, cached critique view, Stale Recommendation Guard, and 1-click patch application
+- [x] Subtask 6: Create `StudioPlaytestsTab.tsx` with telemetry history, cached critique view, Version-Aware Stale Recommendation Guard, and 1-click patch application
 - [x] Subtask 7: Create `StudioVersionsTab.tsx` with 3-tab layout, read-only version playback trigger (`Play v{N}`), and restore action
 - [x] Subtask 8: Assemble `ProjectStudioModal.tsx` with 3-tab navigation, header metadata, and responsive quick-action bar (`PLAY`, `REMIX`, `EDIT`, `DISCOVER SIMILAR`)
 - [x] Subtask 9: Update `DashboardPage.tsx` to mount `ProjectStudioModal` with clean modal swapping
 - [x] Subtask 10: Deprecate `ProjectDetailsModal.tsx`
+- [x] Subtask 11: Technical Refinement 1 — Make stale-analysis detection version-aware (comparing `latestSession.created_at` against `activeVersion.created_at`, decoupling title/metadata renames from gameplay recommendation validity)
+- [x] Subtask 12: Technical Refinement 2 — Strengthen restore concurrency guarantee with `UniqueConstraint("project_id", "version_number")`, transactional collision retry in `restore_project_version`, and multi-threaded test `test_restore_concurrent_requests_allocate_unique_forward_versions`
 
 ### Evidence
 - Touched files:
+  - `backend/app/models/project_version.py`
   - `backend/app/services/project_service.py`
   - `backend/app/api/projects.py`
   - `backend/tests/test_projects.py`
@@ -67,14 +70,15 @@ Implement Project Studio V1: a project-centric creator workspace consolidating G
 
 ## 3. Verification & Auditing
 
-- [x] Backend test suite: `pytest tests/ -q` -> **433 passed in 178.26s**
+- [x] Backend test suite: `pytest tests/ -q` -> **434 passed in 239.39s**
+- [x] Backend restore tests: `pytest tests/test_projects.py -q` -> **12 passed** (including forward allocation, 404 handling, and concurrent race-free restore)
 - [x] TypeScript typecheck: `npx tsc --noEmit` -> **0 errors**
 - [x] Frontend linter: `npx oxlint` -> **Found 0 warnings and 0 errors across 72 files**
 - [x] Frontend unit tests:
   - `npx tsx src/utils/__tests__/discovery.test.ts` -> **7 passed**
   - `npx tsx src/services/__tests__/progressionToasts.test.ts` -> **11 passed**
   - `npx tsx src/services/__tests__/urlUtils.test.ts` -> **34 passed**
-- [x] Production build: `npm run build` -> **✓ built in 893ms, exit code 0**
+- [x] Production build: `npm run build` -> **✓ built in 1.08s, exit code 0**
 - [x] Browser testing status: NOT PERFORMED (Awaiting explicit user authorization)
 
 ### Results
@@ -90,12 +94,12 @@ Implement Project Studio V1: a project-centric creator workspace consolidating G
 - [x] Git commit created and verified
 
 Commit:
-`e5dc82a` (`frontend: integrate Project Studio V1 (workspace modal, 3-tab layout, read-only playback, forward restore)`)
+`aa15a6d` (Initial Project Studio V1 checkpoint) + follow-up concurrency & version-aware stale detection refinement.
 
 ---
 
 ## Remaining Work
-None. Project Studio V1 is complete.
+- Phase Git Checkpoint update.
 
 ## Blockers
 None.
@@ -103,3 +107,4 @@ None.
 ## Change Log
 - 2026-09-02: Approved Project Studio V1 Plan with 8 guardrails and full green light. Initialized Task Execution Ledger.
 - 2026-09-02: Completed backend restore endpoint, tests, frontend types, Studio components, PrototypeModal historical playback, and Dashboard integration. All 433 backend tests, 52 frontend tests, oxlint, and build succeeded.
+- 2026-09-02: Completed follow-up refinements: Version-aware stale analysis detection in `StudioPlaytestsTab.tsx` and transactional concurrency-safe restore with `UniqueConstraint` and multi-threaded test in `test_projects.py` (434 backend tests passing).

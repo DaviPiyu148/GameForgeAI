@@ -646,44 +646,55 @@ class ProjectService:
           - Concurrency-safe forward version allocation: calculates candidate next version
             and commits atomically within transaction.
         """
-        project = self._get_owned_project(db, project_id, user_id)
-
-        target_version = (
-            db.query(ProjectVersion)
-            .filter(
-                ProjectVersion.project_id == project_id,
-                ProjectVersion.version_number == target_version_number,
-            )
-            .first()
-        )
-        if not target_version:
-            raise ValueError(f"Version {target_version_number} not found for project '{project_id}'.")
-
         from sqlalchemy import func
-        max_v = (
-            db.query(func.max(ProjectVersion.version_number))
-            .filter(ProjectVersion.project_id == project.id)
-            .scalar()
-        )
-        new_version_num = max(max_v or 0, project.current_version or 0) + 1
+        from sqlalchemy.exc import IntegrityError
 
-        project.game_dsl = target_version.game_dsl
-        project.design_spec = target_version.design_spec
-        project.current_version = new_version_num
-        project.updated_at = datetime.now(timezone.utc)
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            try:
+                project = self._get_owned_project(db, project_id, user_id)
 
-        new_version_rec = ProjectVersion(
-            project_id=project.id,
-            version_number=new_version_num,
-            game_dsl=target_version.game_dsl,
-            design_spec=target_version.design_spec,
-            change_summary=f"Restored from version {target_version_number}.",
-            remix_intent=None,
-        )
-        db.add(new_version_rec)
-        db.commit()
-        db.refresh(project)
-        return self.to_response(project)
+                target_version = (
+                    db.query(ProjectVersion)
+                    .filter(
+                        ProjectVersion.project_id == project_id,
+                        ProjectVersion.version_number == target_version_number,
+                    )
+                    .first()
+                )
+                if not target_version:
+                    raise ValueError(f"Version {target_version_number} not found for project '{project_id}'.")
+
+                # Query highest recorded version number for this project within transaction
+                max_v = (
+                    db.query(func.max(ProjectVersion.version_number))
+                    .filter(ProjectVersion.project_id == project.id)
+                    .scalar()
+                )
+                new_version_num = max(max_v or 0, project.current_version or 0) + 1
+
+                project.game_dsl = target_version.game_dsl
+                project.design_spec = target_version.design_spec
+                project.current_version = new_version_num
+                project.updated_at = datetime.now(timezone.utc)
+
+                new_version_rec = ProjectVersion(
+                    project_id=project.id,
+                    version_number=new_version_num,
+                    game_dsl=target_version.game_dsl,
+                    design_spec=target_version.design_spec,
+                    change_summary=f"Restored from version {target_version_number}.",
+                    remix_intent=None,
+                )
+                db.add(new_version_rec)
+                db.commit()
+                db.refresh(project)
+                return self.to_response(project)
+            except IntegrityError:
+                db.rollback()
+                db.expire_all()
+                if attempt == max_attempts - 1:
+                    raise
 
 
 project_service = ProjectService()

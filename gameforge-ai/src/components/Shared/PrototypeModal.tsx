@@ -175,7 +175,10 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     // If authenticated with a backend project, record session
     if (project?.id) {
       try {
-        await apiClient.post(`/projects/${project.id}/playtests`, summary);
+        await apiClient.post(`/projects/${project.id}/playtests`, {
+          ...summary,
+          version_number: currentVersion,
+        });
         // REQ-4: Exactly one progress refresh per completed playtest action
         await refreshProgress();
       } catch (err) {

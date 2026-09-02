@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from app.db.session import Base
 
 
@@ -12,6 +12,9 @@ def generate_uuid() -> str:
 class ProjectVersion(Base):
     """SQLAlchemy model for tracking project revision history and DSL improvement patches."""
     __tablename__ = "project_versions"
+    __table_args__ = (
+        UniqueConstraint("project_id", "version_number", name="uq_project_version_number"),
+    )
 
     id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
     project_id = Column(

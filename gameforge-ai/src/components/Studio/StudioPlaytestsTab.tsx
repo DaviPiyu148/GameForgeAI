@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import type { GameProject, PlaytestSessionRecord } from '../../types';
+import type { GameProject, PlaytestSessionRecord, ProjectVersionSummary } from '../../types';
 import type { PlaytestAnalysis } from '../../runtime/types';
 import { projectService } from '../../services/projects';
 import { apiClient, ApiError } from '../../services/api';
@@ -18,6 +18,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
 }) => {
   const { refreshProgress } = useAppContext();
   const [playtests, setPlaytests] = useState<PlaytestSessionRecord[]>([]);
+  const [versions, setVersions] = useState<ProjectVersionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isApplyingPatches, setIsApplyingPatches] = useState(false);
@@ -26,15 +27,19 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
   const [patchSuccessMessage, setPatchSuccessMessage] = useState<string | null>(null);
   const [patchErrorMessage, setPatchErrorMessage] = useState<string | null>(null);
 
-  const fetchPlaytests = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await projectService.getPlaytests(project.id);
-      setPlaytests(data);
-      if (data.length > 0 && data[0].ai_analysis) {
-        setActiveAnalysis(data[0].ai_analysis);
-        if (data[0].ai_analysis.recommendations) {
-          setSelectedPatches(data[0].ai_analysis.recommendations.map((_, i) => i));
+      const [ptData, verData] = await Promise.all([
+        projectService.getPlaytests(project.id),
+        projectService.getVersions(project.id).catch(() => [] as ProjectVersionSummary[]),
+      ]);
+      setPlaytests(ptData);
+      setVersions(verData);
+      if (ptData.length > 0 && ptData[0].ai_analysis) {
+        setActiveAnalysis(ptData[0].ai_analysis);
+        if (ptData[0].ai_analysis.recommendations) {
+          setSelectedPatches(ptData[0].ai_analysis.recommendations.map((_, i) => i));
         }
       }
     } catch (err) {
@@ -45,16 +50,20 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
   }, [project.id]);
 
   useEffect(() => {
-    fetchPlaytests();
-  }, [fetchPlaytests]);
+    fetchData();
+  }, [fetchData, project.currentVersion]);
 
   const latestSession = playtests.length > 0 ? playtests[0] : null;
+  const currentVerNum = project.currentVersion || 1;
+  const currentVersionRecord = versions.find((v) => v.version_number === currentVerNum);
 
-  // Stale Recommendation Guard: check if project was modified after latest playtest
+  // Version-Aware Stale Recommendation Guard:
+  // Analysis is only marked stale if a new project version was created AFTER the playtest session.
+  // Project metadata renames / edits do NOT invalidate playtest recommendations.
   const isAnalysisStale = Boolean(
     latestSession?.created_at &&
-    project.updatedAt &&
-    new Date(latestSession.created_at).getTime() < new Date(project.updatedAt).getTime()
+    currentVersionRecord?.created_at &&
+    new Date(latestSession.created_at).getTime() < new Date(currentVersionRecord.created_at).getTime()
   );
 
   // Compute summary stats
@@ -77,7 +86,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
         setSelectedPatches(res.recommendations.map((_, i) => i));
       }
       await refreshProgress();
-      await fetchPlaytests();
+      await fetchData();
     } catch (err) {
       setPatchErrorMessage(err instanceof ApiError ? err.message : 'Analysis failed. Please try again.');
     } finally {
@@ -245,7 +254,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
                   <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/40 text-amber-400 text-xs flex items-start gap-2">
                     <span className="material-symbols-outlined text-sm mt-0.5">warning</span>
                     <div>
-                      <span className="font-bold">Recommendations are Stale:</span> This analysis was generated for an earlier version. Play a new session to generate updated patches.
+                      <span className="font-bold">Recommendations are Stale:</span> This analysis was recorded for an earlier version of this game (prior to v{currentVerNum}). Play a new session to generate updated patches.
                     </div>
                   </div>
                 )}

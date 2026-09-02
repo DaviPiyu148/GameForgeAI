@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.db.session import Base, get_db
 from app.models.project import Project
+from app.models.project_version import ProjectVersion
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -336,5 +337,60 @@ def test_restore_unowned_project_returns_404(client):
     )
     assert res.status_code == 404
     assert res.json()["error"]["code"] == "PROJECT_NOT_FOUND"
+
+
+def test_restore_concurrent_requests_allocate_unique_forward_versions(client):
+    """
+    Verify concurrent restore operations on the same project allocate distinct,
+    monotonic version numbers (e.g. v2 and v3) without collision or data loss.
+    """
+    import concurrent.futures
+    from app.models.project_version import ProjectVersion
+
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id, title="Concurrency Restore Project")
+
+    v1_dsl = {"title": "V1 Game", "player": {"speed": 200}}
+    db = TestingSessionLocal()
+    try:
+        ver1 = ProjectVersion(
+            project_id=proj_id,
+            version_number=1,
+            game_dsl=v1_dsl,
+            change_summary="Initial generation",
+            remix_intent=None,
+        )
+        db.add(ver1)
+        db.commit()
+    finally:
+        db.close()
+
+    def do_restore():
+        return client.post(
+            f"/api/projects/{proj_id}/restore?target_version_number=1",
+            headers=_auth(token),
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(do_restore)
+        f2 = executor.submit(do_restore)
+        res1 = f1.result()
+        res2 = f2.result()
+
+    assert res1.status_code == 200
+    assert res2.status_code == 200
+
+    # The final project state must be version 3
+    assert max(res1.json()["currentVersion"], res2.json()["currentVersion"]) == 3
+
+    # Verify versions table contains all 3 versions sequentially (v1, v2, v3) with no collisions
+    list_res = client.get(f"/api/projects/{proj_id}/versions", headers=_auth(token))
+    assert list_res.status_code == 200
+    versions = list_res.json()
+    all_versions = sorted([v["version_number"] for v in versions])
+    assert all_versions == [1, 2, 3]
+
+
+
 
 

@@ -57,13 +57,15 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 
 ## Current Verification (as of Project Studio V1)
 
-- **Backend tests**: 433/433 passing (100% pass rate across all suites via pytest).
+- **Backend tests**: 434/434 passing (100% pass rate across all suites via pytest, including 12/12 project & restore tests).
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
 - **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 72 files).
 - **Discovery seed pure unit tests**: 7/7 passing (`npx tsx src/utils/__tests__/discovery.test.ts`).
 - **Progression toasts unit tests**: 11/11 passing (`npx tsx src/services/__tests__/progressionToasts.test.ts`).
 - **URL normalization & direct transport unit tests**: 34/34 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
 - **Production build**: succeeds (`npm run build`).
+- **Technical Refinement 1 (Version-Aware Stale Guard)**: Analysis staleness evaluates against `activeVersion.created_at` timestamp rather than `project.updatedAt`, ensuring project renames do not invalidate recommendations while version updates flag stale analysis.
+- **Technical Refinement 2 (Restore Concurrency Safety)**: `ProjectVersion` enforces `UniqueConstraint("project_id", "version_number")`, and `restore_project_version` utilizes transactional collision retry proven via multi-threaded test.
 - **Zero-AI studio browsing audit**: Verified browsing tabs, viewing blueprint, inspecting versions, and historical playback execute client-side / cache with zero AI quota consumption.
 - **Single-invocation progress refresh audit**: Verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement/restore action.
 - **Browser verification**: Explicitly NOT PERFORMED for this milestone pending user authorization (`BROWSER TESTING: NOT PERFORMED`).
