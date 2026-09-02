@@ -1,27 +1,57 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Discovery V2.4 — Promote HIDDEN_GEMS Threshold 150
+Discovery V2.5 — Intentional Production Candidate-Pool Policy
 
 ## Status
 COMPLETE
 
 ## Objective
-Promote ONLY the validated HIDDEN_GEMS quality-confidence threshold from 2000 to 150:
-1. Update `backend/app/search/ranking_config.py` and `backend/app/search/ranker.py`:
-   - `DEFAULT_QUALITY_REVIEW_THRESHOLD = 2000.0`
-   - `HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD = 150.0`
-   - Use `review_thresh = HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD if mode == "HIDDEN_GEMS" else DEFAULT_QUALITY_REVIEW_THRESHOLD`
-2. Preserve all other ranking logic strictly unchanged (landmark boost, RRF, novelty, candidate pools, BEST_MATCH, POPULAR, DISCOVER).
-3. Add regression tests in `backend/tests/test_discovery_ranker.py` covering formula behavior at 50, 100, 150, 151, 250, 500, 2000, 5000 reviews and verifying strict isolation to HIDDEN_GEMS.
-4. Verify key titles (*Shapebreaker*, *MOTHERED*, *Floating Farmer*, *Colony Ship*, *Farming Simulator 2013*).
-5. Address and clarify the Farming Simulator 2013 report artifact.
-6. Re-run production benchmarks (Standard 30 + Long-Tail 25) using the production ranker.
-7. Run full regression test suite (`pytest`, `tsc`, `build`) and execute Git checkpoint.
-8. Zero Gemini AI calls / 0 runtime LLM dependency.
+Establish intentional production candidate-pool routing and resolve accidental scope inclusion:
+1. Candidate Pool Policy:
+   - `BEST_MATCH` -> `POPULAR_20K` (quality threshold 2000.0)
+   - `POPULAR` -> `POPULAR_20K` (quality threshold 2000.0)
+   - `DISCOVER` -> `POPULAR_20K` (quality threshold 2000.0) [reverted pending dedicated validation]
+   - `HIDDEN_GEMS` -> `REVIEWED_ONLY` (87,890 games, quality threshold 150.0)
+2. Retain all ranking, novelty, landmark, and candidate pool infrastructure.
+3. Update `backend/app/search/candidate_pool.py` and `backend/tests/test_mode_candidate_pools.py`.
+4. Run full test suite (440 backend tests, frontend typecheck, oxlint, build).
+5. Run live `DiscoveryService` benchmark under intentional production policy.
+6. Zero Gemini AI calls / 0 runtime LLM dependency.
 
 ## Started
 2026-09-02
+
+---
+
+## 1. Intentional Candidate-Pool Implementation
+
+- [x] Update `backend/app/search/candidate_pool.py` to route `DISCOVER` to `POPULAR_20K`
+- [x] Retain `HIDDEN_GEMS` routing to `REVIEWED_ONLY`
+- [x] Retain `BEST_MATCH` and `POPULAR` routing to `POPULAR_20K`
+- [x] Retain `HIDDEN_GEMS` quality threshold at 150.0
+- [x] Update `backend/tests/test_mode_candidate_pools.py` to assert this exact production mapping
+
+### Evidence
+- `backend/app/search/candidate_pool.py`: Set `MODE_CANDIDATE_POOLS["DISCOVER"] = DiscoveryCandidatePool.POPULAR_20K`.
+- `backend/tests/test_mode_candidate_pools.py`: Updated `test_candidate_pool_mode_mappings` to assert `DISCOVER` maps to `POPULAR_20K`. All 3 tests passed in 45.12s.
+- `backend/tests/test_discovery_ranker.py` + `test_mode_candidate_pools.py`: 14 passed in 49.51s.
+- Full backend suite: 440 passed in 193.66s.
+- Frontend: TypeScript clean, oxlint 0 warnings / 0 errors, Vite build clean in 1.22s.
+
+---
+
+## 2. Benchmark Verification
+
+- [x] Live `DiscoveryService` benchmark executed under intentional production policy
+- [x] `BEST_MATCH`: Precision@5 = 0.9067, 0 violations
+- [x] `POPULAR`: Precision@5 = 0.9200, 0 violations
+- [x] `DISCOVER`: Precision@5 = 0.8867, 0 violations (on 20k pool)
+- [x] `HIDDEN_GEMS`: Precision@5 = 0.9067, 0 violations, Long-Tail Exposure = 72.8%, Top-5 Surface Rate = 52.0% (on Reviewed-Only pool, T150)
+- [x] Representative titles: *Shapebreaker* #1 (0.8619), *Slay the Spire* #4 (0.8079), *MOTHERED* #2 (0.7878), *Colony Ship* #4 (0.7726), *Floating Farmer* #7 (0.8209), *Farming Simulator 2013* #1 (0.8589).
+
+---
+
 
 ---
 

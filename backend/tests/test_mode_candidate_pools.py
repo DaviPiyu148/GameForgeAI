@@ -9,8 +9,10 @@ from app.services.discovery_service import DiscoveryService
 def test_candidate_pool_mode_mappings():
     assert get_candidate_pool_for_mode("BEST_MATCH") == DiscoveryCandidatePool.POPULAR_20K
     assert get_candidate_pool_for_mode("popular") == DiscoveryCandidatePool.POPULAR_20K
+    assert get_candidate_pool_for_mode("DISCOVER") == DiscoveryCandidatePool.POPULAR_20K
+    assert get_candidate_pool_for_mode("discover") == DiscoveryCandidatePool.POPULAR_20K
     assert get_candidate_pool_for_mode("HIDDEN_GEMS") == DiscoveryCandidatePool.REVIEWED_ONLY
-    assert get_candidate_pool_for_mode("discover") == DiscoveryCandidatePool.REVIEWED_ONLY
+    assert get_candidate_pool_for_mode("hidden_gems") == DiscoveryCandidatePool.REVIEWED_ONLY
     assert get_candidate_pool_for_mode(None) == DiscoveryCandidatePool.POPULAR_20K
     assert get_candidate_pool_for_mode("UNKNOWN_MODE") == DiscoveryCandidatePool.POPULAR_20K
 
