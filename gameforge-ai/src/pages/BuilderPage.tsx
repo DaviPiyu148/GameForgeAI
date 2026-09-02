@@ -10,6 +10,7 @@ const BuilderPage = () => {
     state,
     setPrompt,
     updateBuildParams,
+    clearBuildInspiration,
     compileProject,
     cancelCurrentBuild,
     clearCompilerLogs,
@@ -158,6 +159,31 @@ const BuilderPage = () => {
                   </div>
                 )}
               </div>
+
+              {/* Inspiration Context Banner (Creator Loop V1) */}
+              {state.buildInspirationSource && (
+                <div className="bg-primary/10 border-b border-primary/30 px-4 py-1.5 flex items-center justify-between gap-2 text-primary font-mono text-[10px] animate-fade-in">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-[14px] text-primary shrink-0">auto_awesome</span>
+                    <span className="font-bold tracking-wider uppercase shrink-0">INSPIRED BY:</span>
+                    <span className="text-white font-bold truncate">{state.buildInspirationSource.title}</span>
+                    {state.buildInspirationSource.genres.length > 0 && (
+                      <span className="text-primary/70 truncate hidden sm:inline">
+                        [{state.buildInspirationSource.genres.slice(0, 3).join(' • ')}]
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearBuildInspiration}
+                    aria-label="Dismiss inspiration source"
+                    title="Dismiss inspiration source"
+                    className="text-primary/70 hover:text-primary hover:bg-primary/20 p-0.5 rounded transition-colors cursor-pointer shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                </div>
+              )}
 
               {/* Editor Body */}
               <div className="flex-1 relative flex">

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 const ErrorStatusPage = () => {
-  const { state, retryBuild, pushToast } = useAppContext();
+  const { state, retryBuild, pushToast, clearBuildInspiration } = useAppContext();
   const navigate = useNavigate();
   const [showLogModal, setShowLogModal] = useState(false);
   const [isClosingModal, setIsClosingModal] = useState(false);
@@ -167,6 +167,7 @@ const ErrorStatusPage = () => {
 
         <Link
           to="/build"
+          onClick={clearBuildInspiration}
           className="font-mono text-xs uppercase px-6 py-3 text-primary border-2 border-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary/10 btn-interactive cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">edit_note</span>

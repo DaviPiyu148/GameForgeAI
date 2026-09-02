@@ -38,6 +38,7 @@ const defaultState: AppState = {
   isSavedDiscoveriesLoading: false,
   currentBuildParams: defaultBuildParams,
   currentPrompt: '',
+  buildInspirationSource: null,
   buildStatus: 'IDLE',
   compilerLogs: [],
   currentBuildId: null,
@@ -396,6 +397,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       compilerLogs: [],
       currentBuildId: null,
       activeProjectId: null,
+      buildInspirationSource: null,
       lastError: null,
     }));
   };
@@ -433,6 +435,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const setPrompt = (prompt: string) => setState((s) => ({ ...s, currentPrompt: prompt }));
   const updateBuildParams = (params: Partial<BuildParams>) =>
     setState((s) => ({ ...s, currentBuildParams: { ...s.currentBuildParams, ...params } }));
+  const setBuildInspirationSource = (source: AppState['buildInspirationSource']) =>
+    setState((s) => ({ ...s, buildInspirationSource: source }));
+  const clearBuildInspiration = () =>
+    setState((s) => ({ ...s, buildInspirationSource: null }));
   const setBuildStatus = (status: AppState['buildStatus']) => setState((s) => ({ ...s, buildStatus: status }));
   const addGameProject = (project: GameProject) =>
     setState((s) => ({ ...s, myGames: [project, ...s.myGames] }));
@@ -692,6 +698,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         state,
         setPrompt,
         updateBuildParams,
+        setBuildInspirationSource,
+        clearBuildInspiration,
         setBuildStatus,
         addGameProject,
         updateGameProject,

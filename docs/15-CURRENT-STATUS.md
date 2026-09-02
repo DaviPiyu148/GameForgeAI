@@ -48,20 +48,23 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Small Product Fixes & Reliability Polish V2 (Blueprint Recovery, Persistent Build Logs, Fullscreen API, Account Settings, Builder Design Preview) | COMPLETE |
 | Browser Audit Remediation V1 (API Transport Normalization, Auth Deduplication, Validation Error JSON Serialization, Discovery Stale Response Guard, Web Speech Voice Input, Modal Portal & Scroll Lock Migration, InfoModal Tabbed Documentation, Copy Output Actions) (`BROWSER_PRODUCT_REMEDIATION_V1.md`) | COMPLETE |
 | Deployment & Product Hygiene Fix V1 (Deployment-Safe Swagger URL `getSwaggerDocsUrl()`, Standalone Documentation Pages `#/documentation`, `#/api-access`, `#/community`, `#/support`, `#/privacy`, Footer Navigation, Test Credential Isolation from Production Code) | COMPLETE |
+| Direct API Transport Browser Smoke V1 (Direct-Development Origin Transport Verification & FIND-BROWSER-001 Remediation) (`DIRECT_API_BROWSER_SMOKE_V1.md`, `TOAST_RENDER_PHASE_FIX_V1.md`) | COMPLETE |
+| Creator Loop V1 (Discovery Inspiration → Builder Context → Playtest XP → Visual AI Critique Pulse → Quick Remix & Evolution → Game DNA Discover More Seed) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Deployment & Product Hygiene Fix V1)
+## Current Verification (as of Creator Loop V1)
 
-- **Backend tests**: 430/430 passing (100% pass rate across all suites via `uv run pytest tests/ -q`).
-- **Auth test suite**: 16/16 tests passing.
+- **Backend tests**: 430/430 passing (100% pass rate across all suites via pytest).
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings on 65 files).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings).
+- **Discovery seed pure unit tests**: 7/7 passing (`npx tsx src/utils/__tests__/discovery.test.ts`).
+- **Progression toasts unit tests**: 11/11 passing (`npx tsx src/services/__tests__/progressionToasts.test.ts`).
 - **URL normalization & direct transport unit tests**: 34/34 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
-- **Production build**: succeeds (`npm run build` — built in 944ms).
-- **Alembic**: single head, `bc9ae398f146` (`alembic current` / `alembic heads`).
-- **Browser verification**: Explicitly NOT PERFORMED for this milestone per instructions (`BROWSER TESTING: NOT PERFORMED`).
+- **Production build**: succeeds (`npm run build`).
+- **Single-invocation progress refresh audit**: Verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement action.
+- **Browser verification**: Explicitly NOT PERFORMED for this milestone pending user authorization (`BROWSER TESTING: NOT PERFORMED`).
 
 - **Dev API Transport (Elimination of FS-034 Dev Proxy Dependency)**: Local development (`start.bat`) automatically supplies `VITE_API_URL=http://127.0.0.1:<BACKEND_PORT>` and `CORS_ORIGINS` when not explicitly set, routing browser REST and SSE traffic directly to FastAPI. This bypasses the development-only Vite proxy hop and permanently eliminates intermittent `ECONNRESET` socket drops in local dev. The Vite proxy remains in place only as a backward-compatible fallback for environments without `VITE_API_URL`.
 

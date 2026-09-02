@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 
 export const Navbar = () => {
   const location = useLocation();
-  const { state, openAuthModal } = useAppContext();
+  const { state, openAuthModal, clearBuildInspiration } = useAppContext();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +70,7 @@ export const Navbar = () => {
               <Link
                 key={link.name}
                 to={link.path}
+                onClick={link.path === '/build' ? clearBuildInspiration : undefined}
                 aria-current={active ? 'page' : undefined}
                 className={`relative h-full flex items-center font-mono text-xs uppercase tracking-wider transition-colors px-3 ${
                   active ? 'text-primary text-glow-cyan font-bold' : 'text-on-surface-variant hover:text-primary'
@@ -91,6 +92,7 @@ export const Navbar = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             to="/build"
+            onClick={clearBuildInspiration}
             className="bg-secondary-container text-white font-mono text-[10px] sm:text-xs uppercase py-2 px-3 sm:px-4 glow-box-magenta flex items-center gap-1.5 sm:gap-2 btn-interactive glow-magenta energy-sweep"
           >
             <span className="material-symbols-outlined text-sm" aria-hidden="true" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -185,6 +187,7 @@ export const Navbar = () => {
                   <Link
                     key={link.name}
                     to={link.path}
+                    onClick={link.path === '/build' ? clearBuildInspiration : undefined}
                     aria-current={active ? 'page' : undefined}
                     className={`flex items-center justify-between min-h-[44px] px-3.5 py-2.5 rounded font-mono text-xs uppercase tracking-wider transition-all ${
                       active

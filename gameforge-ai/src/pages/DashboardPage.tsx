@@ -6,6 +6,7 @@ import { ProjectDetailsModal } from '../components/Shared/ProjectDetailsModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
 import { projectService } from '../services/projects';
 import { pushToast } from '../services/toastBus';
+import { buildDiscoverySeed } from '../utils/discovery';
 import type { GameProject } from '../types';
 
 // ─────────────────────────────────────────────────────────
@@ -121,10 +122,13 @@ const DashboardPage = () => {
     updateGameProject,
     deleteProject,
     duplicateProject,
+    searchDiscovery,
+    clearBuildInspiration,
   } = useAppContext();
   const navigate = useNavigate();
 
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
+  const [playModalInitialTab, setPlayModalInitialTab] = useState<'play' | 'remix'>('play');
   const [detailsProject, setDetailsProject] = useState<GameProject | null>(null);
 
   // Per-card UI state: rename / delete confirm / duplicating
@@ -135,13 +139,25 @@ const DashboardPage = () => {
   // Per-card contextual action menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const handleContinueEditing = (game: GameProject) => {
-    setPrompt(game.prompt);
-    updateBuildParams(game.parameters);
-    navigate('/build');
+  const handlePlay = (game: GameProject) => {
+    setPlayModalInitialTab('play');
+    setSelectedPlayProject(game);
   };
 
-  const handleRemix = (game: GameProject) => {
+  const handleDirectRemix = (game: GameProject) => {
+    setOpenMenuId(null);
+    setPlayModalInitialTab('remix');
+    setSelectedPlayProject(game);
+  };
+
+  const handleDiscoverSimilar = (game: GameProject) => {
+    setOpenMenuId(null);
+    const seed = buildDiscoverySeed(game);
+    searchDiscovery(seed, navigate, 'BEST_MATCH');
+  };
+
+  const handleContinueEditing = (game: GameProject) => {
+    clearBuildInspiration();
     setPrompt(game.prompt);
     updateBuildParams(game.parameters);
     navigate('/build');
@@ -247,25 +263,32 @@ const DashboardPage = () => {
                 {/* ── Title row ── */}
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    {renamingId === game.id ? (
-                      <RenameInput
-                        initialTitle={game.title}
-                        onSave={(t) => handleRename(game.id, t)}
-                        onCancel={() => setRenamingId(null)}
-                      />
-                    ) : (
-                      <h3 className="font-display text-base md:text-lg text-primary uppercase truncate max-w-[200px]">
-                        <button
-                          type="button"
-                          onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
-                          className="truncate max-w-full text-left cursor-pointer hover:text-primary/80 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-xs"
-                          aria-label={`Rename project ${game.title}`}
-                          title={`${game.title} (click to rename)`}
-                        >
-                          {game.title}
-                        </button>
-                      </h3>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {renamingId === game.id ? (
+                        <RenameInput
+                          initialTitle={game.title}
+                          onSave={(t) => handleRename(game.id, t)}
+                          onCancel={() => setRenamingId(null)}
+                        />
+                      ) : (
+                        <h3 className="font-display text-base md:text-lg text-primary uppercase truncate max-w-[200px]">
+                          <button
+                            type="button"
+                            onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
+                            className="truncate max-w-full text-left cursor-pointer hover:text-primary/80 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-xs"
+                            aria-label={`Rename project ${game.title}`}
+                            title={`${game.title} (click to rename)`}
+                          >
+                            {game.title}
+                          </button>
+                        </h3>
+                      )}
+                      {game.currentVersion && game.currentVersion > 1 && (
+                        <span className="bg-primary/10 border border-primary/30 text-primary font-mono text-[9px] px-1.5 py-0.5 rounded-xs font-bold shrink-0">
+                          v{game.currentVersion}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="font-mono text-[10px] text-outline border border-outline px-1">
                         &gt; v{game.currentVersion ?? 1}.0
@@ -317,21 +340,43 @@ const DashboardPage = () => {
                   />
                 ) : (
                   /* ── Action bar ── */
-                  <div className="flex gap-2 mt-auto">
+                  <div className="flex gap-1.5 mt-auto items-center">
                     {/* Primary: PLAY */}
                     <button
-                      onClick={() => setSelectedPlayProject(game)}
-                      className="flex-1 bg-primary text-on-primary font-mono text-xs py-2 uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer btn-interactive energy-sweep glow-cyan"
+                      onClick={() => handlePlay(game)}
+                      className="flex-1 bg-primary text-on-primary font-mono text-xs py-2 uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer btn-interactive energy-sweep glow-cyan text-center"
                     >
                       PLAY
                     </button>
 
-                    {/* Secondary: CONTINUE EDITING */}
+                    {/* Secondary: REMIX */}
+                    <button
+                      onClick={() => handleDirectRemix(game)}
+                      className="flex-1 border border-secondary text-secondary font-mono text-xs py-2 hover:bg-secondary/10 uppercase cursor-pointer btn-interactive text-center flex items-center justify-center gap-1"
+                      title="Directly remix and evolve this game"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">shuffle</span>
+                      <span>REMIX</span>
+                    </button>
+
+                    {/* Tertiary: EDIT IN BUILDER */}
                     <button
                       onClick={() => handleContinueEditing(game)}
-                      className="flex-1 border border-primary text-primary font-mono text-xs py-2 hover:bg-primary/10 uppercase cursor-pointer btn-interactive"
+                      className="px-2.5 py-2 border border-outline-variant text-on-surface-variant font-mono text-xs hover:border-primary hover:text-primary hover:bg-primary/5 uppercase cursor-pointer btn-interactive text-center"
+                      title="Continue editing prompt in Builder"
                     >
                       EDIT
+                    </button>
+
+                    {/* Discover Similar icon button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDiscoverSimilar(game)}
+                      className="border border-outline-variant text-on-surface-variant p-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center justify-center shrink-0"
+                      title="Discover similar games from catalog"
+                      aria-label={`Discover games similar to ${game.title}`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">explore</span>
                     </button>
 
                     {/* Contextual: ⋮ menu */}
@@ -340,13 +385,13 @@ const DashboardPage = () => {
                         id={`menu-btn-${game.id}`}
                         type="button"
                         onClick={() => setOpenMenuId(openMenuId === game.id ? null : game.id)}
-                        className="border border-outline-variant text-on-surface-variant px-2 py-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center"
+                        className="border border-outline-variant text-on-surface-variant p-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center justify-center shrink-0"
                         title="More actions"
                         aria-label={`More actions for ${game.title}`}
                         aria-expanded={openMenuId === game.id}
                         aria-controls={`actions-dropdown-${game.id}`}
                       >
-                        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">more_vert</span>
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">more_vert</span>
                       </button>
 
                       {openMenuId === game.id && (
@@ -367,11 +412,19 @@ const DashboardPage = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleRemix(game)}
+                              onClick={() => handleDirectRemix(game)}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
                             >
                               <span className="material-symbols-outlined text-[14px]" aria-hidden="true">shuffle</span>
-                              Remix
+                              Remix Prototype
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDiscoverSimilar(game)}
+                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                            >
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">explore</span>
+                              Discover Similar
                             </button>
                             <button
                               type="button"
@@ -385,16 +438,15 @@ const DashboardPage = () => {
                             <button
                               type="button"
                               onClick={() => { setDetailsProject(game); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left border-t border-primary/10"
                             >
                               <span className="material-symbols-outlined text-[14px]" aria-hidden="true">info</span>
-                              Details
+                              Project Details
                             </button>
-                            <div className="border-t border-outline-variant/50 my-0.5" />
                             <button
                               type="button"
                               onClick={() => { setDeleteConfirmId(game.id); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-error/80 hover:bg-error/10 hover:text-error transition-colors cursor-pointer text-left"
+                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-error hover:bg-error/10 transition-colors cursor-pointer text-left border-t border-primary/10"
                             >
                               <span className="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>
                               Delete
@@ -480,7 +532,11 @@ const DashboardPage = () => {
       {selectedPlayProject && (
         <PrototypeModal
           project={selectedPlayProject}
-          onClose={() => setSelectedPlayProject(null)}
+          initialTab={playModalInitialTab}
+          onClose={() => {
+            setSelectedPlayProject(null);
+            setPlayModalInitialTab('play');
+          }}
           onProjectUpdated={updateGameProject}
         />
       )}

@@ -401,6 +401,11 @@ export interface AppError {
   message: string;
 }
 
+export interface BuildInspirationSource {
+  title: string;
+  genres: string[];
+}
+
 export interface AppState {
   user: AuthUser | null;
   authStatus: AuthStatus;
@@ -413,6 +418,7 @@ export interface AppState {
   isSavedDiscoveriesLoading?: boolean;
   currentBuildParams: BuildParams;
   currentPrompt: string;
+  buildInspirationSource: BuildInspirationSource | null;
   buildStatus: 'IDLE' | 'COMPILING' | 'SUCCESS' | 'ERROR';
   compilerLogs: string[];
   currentBuildId?: string | null;
@@ -433,6 +439,8 @@ export interface AppContextType {
   state: AppState;
   setPrompt: (prompt: string) => void;
   updateBuildParams: (params: Partial<BuildParams>) => void;
+  setBuildInspirationSource: (source: BuildInspirationSource | null) => void;
+  clearBuildInspiration: () => void;
   setBuildStatus: (status: AppState['buildStatus']) => void;
   addGameProject: (project: GameProject) => void;
   updateGameProject: (project: GameProject) => void;

@@ -6,7 +6,7 @@ import { PrototypeModal } from '../components/Shared/PrototypeModal';
 export const SuccessStatusPage = () => {
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
-  const { state, updateGameProject, pushToast } = useAppContext();
+  const { state, updateGameProject, pushToast, clearBuildInspiration } = useAppContext();
   const navigate = useNavigate();
 
   const logsToDisplay = state.compilerLogs.length > 0
@@ -128,12 +128,12 @@ export const SuccessStatusPage = () => {
           Build succeeded but project data could not be retrieved. Please visit the Dashboard to access your project.
         </p>
         <div className="flex gap-3">
-          <a href="#/dashboard" className="px-4 py-2 font-mono text-xs uppercase bg-primary text-on-primary rounded cursor-pointer">
+          <Link to="/dashboard" className="px-4 py-2 font-mono text-xs uppercase bg-primary text-on-primary rounded cursor-pointer">
             Dashboard
-          </a>
-          <a href="#/build" className="px-4 py-2 font-mono text-xs uppercase border border-outline-variant text-on-surface rounded cursor-pointer">
+          </Link>
+          <Link to="/build" onClick={clearBuildInspiration} className="px-4 py-2 font-mono text-xs uppercase border border-outline-variant text-on-surface rounded cursor-pointer">
             Build Again
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -369,6 +369,7 @@ export const SuccessStatusPage = () => {
 
           <Link
             to="/build"
+            onClick={clearBuildInspiration}
             className="border border-secondary-soft text-secondary-soft hover:bg-secondary/10 font-mono uppercase px-8 py-4 flex items-center justify-center gap-2 font-bold tracking-wider rounded btn-interactive cursor-pointer"
           >
             <span className="material-symbols-outlined text-xl">edit</span>

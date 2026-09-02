@@ -1,65 +1,73 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Fix React Toast Render-Phase Warning V1 (FIND-BROWSER-001)
+Creator Loop V1 (Discovery → Creation → Playtest → Remix → Game DNA)
 
 ## Status
 COMPLETE
 
 ## Objective
-Diagnose and resolve the React lifecycle warning observed during progress diffing ("Cannot update a component ('ToastContainer') while rendering a different component ('AppProvider')") by moving the side effect out of the render phase into an appropriate React lifecycle boundary, ensuring zero duplicate toasts, full StrictMode safety, and 100% test & typecheck pass with zero browser execution.
+Connect GameForge's existing Discovery, Builder, Prototype, Playtest, Remix, Dashboard, and Game DNA subsystems into a coherent product creator loop without adding new backend endpoints, routes, migrations, or global context. Adhere strictly to the approved plan with user guardrails (non-optional `buildInspirationSource`, native `<Link>` onClick preservation, pure `buildDiscoverySeed`, explicit call-site progress refresh audit, and no automatic browser execution).
 
 ## Started
 2026-09-02
 
 ---
 
-## 1. Pre-Implementation & Reconnaissance
+## 1. Pre-Implementation & Architectural Alignment
 
-- [x] Read AGENTS.md, task instructions, and absolute exclusions (NO BROWSER TESTING • NO GAME GENERATION • NO GEMINI)
-- [x] Phase 1: Inspect `AppContext.tsx`, `ToastContainer.tsx`, `toastBus.ts`, and all `pushToast` call sites
-- [x] Phase 2: Trace and document the exact render-phase lifecycle violation call path
-- [x] Phase 3: Formulate React-idiomatic fix according to React lifecycle rules
+- [x] Read AGENTS.md, task instructions, and absolute exclusions
+- [x] Audit all 6 subsystem touchpoints (Discovery, Builder, Prototype, Analysis, Remix, Dashboard, Game DNA)
+- [x] Create comprehensive implementation plan (`implementation_plan.md`)
+- [x] Address review requirements (REQ-1 to REQ-8, CLA-1 to CLA-3, and guardrails 1-3)
+- [x] Obtain explicit user approval and green light
+- [x] Verify clean git status before code modifications
 
 ### Evidence
-- Traced `pushToast()` call site inside `refreshProgress` at `gameforge-ai/src/context/AppContext.tsx:150-184`.
-- Identified that `pushToast(...)` was invoked synchronously inside a `setState((s) => { ... })` pure state updater callback.
-- `pushToast` invoked `toastBus` subscribers synchronously, executing `setToasts((prev) => [...prev, newToast])` inside `ToastContainer.tsx:61` during the render/state computation phase of `AppProvider`.
-- React emitted `Cannot update a component ('ToastContainer') while rendering a different component ('AppProvider')`.
+- `git status` clean on branch `fresh-main`
+- Approved `implementation_plan.md` updated with all 11 requirements and 3 guardrails
 
 ---
 
-## 2. Implementation & Prevention
+## 2. Implementation
 
-- [x] Phase 4: Preserve all existing toast behaviors (+XP, LEVEL UP, NEW MILESTONE, GAME SAVED, BUILD COMPLETE, auto-dismiss, focus/hover pause, stacking)
-- [x] Phase 5: Implement duplicate-toast prevention for state transitions
-- [x] Phase 6: Ensure React StrictMode double-invocation safety
-- [x] Phase 7: Audit `toastBus.ts` subscription/publication mechanics (verified clean pub/sub; no microtask/setTimeout hacks required)
-- [x] Phase 8: Refactor progression diffing into pure `diffUserProgress(prev, current)` in `profile.ts` and post-commit `useEffect([state.progress])` with `prevProgressRef` in `AppContext.tsx`
-- [x] Phase 9: Add focused unit tests for progress diffing, level-up, milestone unlock, re-render safety, and toast bus in `gameforge-ai/src/services/__tests__/progressionToasts.test.ts`
+- [x] Subtask A: Add `buildInspirationSource` (non-optional typed `BuildInspirationSource | null`) and inspiration actions (`setBuildInspirationSource`, `clearBuildInspiration`) to types (`src/types/index.ts`)
+- [x] Subtask B: Create shared pure `buildDiscoverySeed()` helper and test suite (`src/utils/discovery.ts`, `src/utils/__tests__/discovery.test.ts`)
+- [x] Subtask C: Implement `buildInspirationSource`, `setBuildInspirationSource`, `clearBuildInspiration` in `AppContext.tsx` (reset in `logout()`, session-only, not persisted to `localStorage`)
+- [x] Subtask D: Wire inspiration trigger in `HomePage.tsx` (`handleBuildSimilar` sets inspiration source, "Build From Scratch" / empty submit clears)
+- [x] Subtask E: Render persistent "Inspired by" banner in `BuilderPage.tsx` with dismiss `×` action
+- [x] Subtask F: Wire lifecycle clear handlers to native `<Link to="/build" onClick={clearBuildInspiration}>` in `Navbar.tsx`, `SuccessStatusPage.tsx`, `ErrorStatusPage.tsx`
+- [x] Subtask G: Enhance `PrototypeModal.tsx` (`initialTab` prop, `ai-pulse` visual prominence on Analyze CTA, single `refreshProgress()` after playtest / improvement / remix, "Try a Remix →", "Discover More →" with `buildDiscoverySeed`)
+- [x] Subtask H: Enhance `DashboardPage.tsx` (`v{currentVersion}` badge, `buildDiscoverySeed`-powered "Discover Similar", direct "Remix" modal trigger with `initialTab="remix"`)
 
 ### Evidence
-- Created `diffUserProgress` pure helper in `gameforge-ai/src/services/profile.ts:38-73`.
-- Refactored `refreshProgress` in `gameforge-ai/src/context/AppContext.tsx:142-158` to a pure state updater.
-- Added post-commit `useEffect` with `prevProgressRef` in `gameforge-ai/src/context/AppContext.tsx:162-173`.
-- Created comprehensive test suite in `gameforge-ai/src/services/__tests__/progressionToasts.test.ts` (11 tests).
+- `gameforge-ai/src/types/index.ts`: added `BuildInspirationSource`, `AppState.buildInspirationSource`, and `AppContextType` actions.
+- `gameforge-ai/src/utils/discovery.ts`: implemented pure `buildDiscoverySeed` with `designSpec` priority (genre + theme + core_gameplay_loop) and prompt fallback.
+- `gameforge-ai/src/context/AppContext.tsx`: added `buildInspirationSource: null` in default/logout state, `setBuildInspirationSource`, `clearBuildInspiration`.
+- `gameforge-ai/src/pages/HomePage.tsx`: wired `setBuildInspirationSource` in `handleBuildSimilar`, `clearBuildInspiration` in `handleSubmit` and Build From Scratch.
+- `gameforge-ai/src/pages/BuilderPage.tsx`: added persistent `INSPIRED BY` banner with dismiss button.
+- `gameforge-ai/src/components/Shared/Navbar.tsx`: added `onClick={clearBuildInspiration}` to all desktop/mobile `/build` links while preserving native `<Link>`.
+- `gameforge-ai/src/pages/SuccessStatusPage.tsx`: added `clearBuildInspiration` to Build Again and MODIFY links.
+- `gameforge-ai/src/pages/ErrorStatusPage.tsx`: added `clearBuildInspiration` to MODIFY IN BUILDER link.
+- `gameforge-ai/src/components/Shared/PrototypeModal.tsx`: added `initialTab`, single `refreshProgress` after playtest/improvement/remix, `ai-pulse` Analyze CTA, "Try a Remix →", "Discover More →".
+- `gameforge-ai/src/pages/DashboardPage.tsx`: added `v{currentVersion}` badge, REMIX button opening `PrototypeModal` with `initialTab="remix"`, and `buildDiscoverySeed`-powered Discover Similar.
 
 ---
 
 ## 3. Verification & Auditing
 
-- [x] Phase 10: Static React audit across `AppContext.tsx` for any other render-time side effects (all other `pushToast` calls are located inside async click handlers/callbacks)
-- [x] Phase 11: Automated Test Suite Execution:
-  - `npx tsx src/services/__tests__/progressionToasts.test.ts` -> 11 passed, 0 failed
-  - `npx tsx src/services/__tests__/urlUtils.test.ts` -> 34 passed, 0 failed
-  - `npx tsc --noEmit` -> 0 errors (Exit code: 0)
-  - `npx oxlint` -> 0 errors, 0 warnings (Exit code: 0)
-  - `npm run build` -> 92 modules transformed, built in 1.00s (Exit code: 0)
-  - `pytest tests -q` -> 430 passed, 2 warnings in 74.45s (Exit code: 0)
-- [x] Phase 12: BROWSER TESTING: NOT PERFORMED (Zero browser instances, zero AI quota consumed)
-- [x] Phase 13: Review `git status`, `git diff`, `git diff --stat`
+- [x] Focused unit tests: `npx tsx src/utils/__tests__/discovery.test.ts` (7 passed, 0 failed)
+- [x] Existing progression toast tests: `npx tsx src/services/__tests__/progressionToasts.test.ts` (11 passed, 0 failed)
+- [x] Existing URL transport tests: `npx tsx src/services/__tests__/urlUtils.test.ts` (34 passed, 0 failed)
+- [x] TypeScript typecheck: `npx tsc --noEmit` (0 errors)
+- [x] Linter: `npx oxlint` (0 errors, 0 warnings across 68 files)
+- [x] Production build: `npm run build` (built in 1.33s, 93 modules)
+- [x] Full backend regression: `pytest tests/ -q` (430 passed, 1 warning in 162.35s)
+- [x] `refreshProgress()` single-invocation audit (verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement action)
+- [x] Browser testing status: NOT PERFORMED (Authorized user instruction to proceed with Git Checkpoint)
 
 ### Results
+- `discovery.test.ts`: 7 passed, 0 failed.
 - `progressionToasts.test.ts`: 11 passed, 0 failed.
 - `urlUtils.test.ts`: 34 passed, 0 failed.
 - `tsc --noEmit`: 0 errors.
@@ -71,12 +79,12 @@ Diagnose and resolve the React lifecycle warning observed during progress diffin
 
 ## 4. Documentation & Git Checkpoint
 
-- [x] Phase 14: Update `DIRECT_API_BROWSER_SMOKE_V1.md` (marked FIND-BROWSER-001 as FIXED with full remediation summary)
-- [x] Phase 15: Create `TOAST_RENDER_PHASE_FIX_V1.md` with complete structured diagnostic report
-- [x] Phase 16: Git Checkpoint (One logical commit for the completed phase)
+- [x] Documentation update: `docs/15-CURRENT-STATUS.md`
+- [x] Review `git status`, `git diff`, `git diff --stat`
+- [x] Git commit created and verified
 
 Commit:
-40747a2 - `frontend: fix React toast render-phase warning in AppContext (FIND-BROWSER-001)`
+`frontend: integrate Creator Loop V1 (Discovery -> Builder -> Playtest -> Remix -> Game DNA)`
 
 ---
 
@@ -87,9 +95,7 @@ None.
 None.
 
 ## Change Log
-- 2026-09-02: Initialized task execution ledger for Fix React Toast Render-Phase Warning V1 (FIND-BROWSER-001).
-- 2026-09-02: Completed root cause investigation of FIND-BROWSER-001 render-phase warning.
-- 2026-09-02: Implemented pure `diffUserProgress` in `profile.ts` and post-commit `useEffect` in `AppContext.tsx`.
-- 2026-09-02: Authored unit tests in `progressionToasts.test.ts` (11/11 passing).
-- 2026-09-02: Verified full static, build, and backend test suites (430 backend tests passing).
-- 2026-09-02: Updated `DIRECT_API_BROWSER_SMOKE_V1.md` and authored `TOAST_RENDER_PHASE_FIX_V1.md`.
+- 2026-09-02: Approved implementation plan with 11 requirements and 3 guardrails. Initialized Task Execution Ledger for Creator Loop V1.
+- 2026-09-02: Completed Subtasks A-H (types, discovery seed helper, context inspiration actions, banner, links, PrototypeModal shortcuts & pulse, Dashboard badge & actions).
+- 2026-09-02: Verified full suite (7 discovery tests, 11 progression toast tests, 34 urlUtils tests, tsc, oxlint, npm run build, 430 backend tests).
+- 2026-09-02: Completed Git Checkpoint.

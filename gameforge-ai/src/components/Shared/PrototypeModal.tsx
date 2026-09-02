@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import type { GameDSL, Archetype, PlaytestSummary, PlaytestAnalysis, PlaytestRecommendation } from '../../runtime/types';
 import type { GameProject, GameBlueprint, RemixIntentType } from '../../types';
 import {
@@ -9,6 +10,8 @@ import {
   COLLECTOR_FIXTURE,
 } from '../../runtime/fixtures';
 import { apiClient, ApiError } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+import { buildDiscoverySeed } from '../../utils/discovery';
 
 const PhaserCanvas = React.lazy(() => import('../../runtime/PhaserCanvas').then(m => ({ default: m.PhaserCanvas })));
 import { projectService } from '../../services/projects';
@@ -24,6 +27,7 @@ interface PrototypeModalProps {
   project?: GameProject | null;
   gameDsl?: GameDSL;
   onProjectUpdated?: (updatedProject: GameProject) => void;
+  initialTab?: 'play' | 'remix';
 }
 
 const ARCHETYPE_FIXTURES: Record<Archetype, GameDSL> = {
@@ -42,7 +46,10 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   project,
   gameDsl,
   onProjectUpdated,
+  initialTab = 'play',
 }) => {
+  const navigate = useNavigate();
+  const { refreshProgress, searchDiscovery } = useAppContext();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenPulse, setFullscreenPulse] = useState(false);
   const [currentDsl, setCurrentDsl] = useState<GameDSL>(
@@ -76,7 +83,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [blueprint, setBlueprint] = useState<GameBlueprint | null>(null);
   const [isLoadingBlueprint, setIsLoadingBlueprint] = useState(false);
   const [blueprintError, setBlueprintError] = useState<string | null>(null);
-  const [isRemixPanelOpen, setIsRemixPanelOpen] = useState(false);
+  const [isRemixPanelOpen, setIsRemixPanelOpen] = useState(initialTab === 'remix');
   const [isApplyingRemix, setIsApplyingRemix] = useState(false);
   const [remixError, setRemixError] = useState<string | null>(null);
 
@@ -158,6 +165,8 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     if (project?.id) {
       try {
         await apiClient.post(`/projects/${project.id}/playtests`, summary);
+        // REQ-4: Exactly one progress refresh per completed playtest action
+        await refreshProgress();
       } catch (err) {
         console.warn('Could not record playtest session to backend:', err);
       }
@@ -257,6 +266,8 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
             currentVersion: data.version_number,
           });
         }
+        // REQ-4: Exactly one progress refresh per completed improvement action
+        await refreshProgress();
         return;
       } catch (err) {
         console.warn('Backend improvement application failed, applying local patch:', err);
@@ -331,11 +342,20 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
           currentVersion: data.version_number,
         });
       }
+      // REQ-4: Exactly one progress refresh per completed remix action
+      await refreshProgress();
     } catch (err) {
       setRemixError(err instanceof ApiError ? err.message : 'Remix failed. Please try again.');
     } finally {
       setIsApplyingRemix(false);
     }
+  };
+
+  const handleDiscoverMoreLikeThis = () => {
+    if (!project) return;
+    const seed = buildDiscoverySeed(project);
+    handleClose();
+    searchDiscovery(seed, navigate, 'BEST_MATCH');
   };
 
   return createPortal(
@@ -428,16 +448,43 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
           </div>
         </div>
 
-        {/* Improvement Success Banner */}
+        {/* Improvement Success Banner with Creator Loop Actions */}
         {improvementSuccess && (
-          <div className="bg-primary/20 border-b border-primary/40 px-4 py-2 flex items-center justify-between text-xs font-mono text-primary animate-fadeIn">
+          <div className="bg-primary/20 border-b border-primary/40 px-4 py-2 flex items-center justify-between text-xs font-mono text-primary animate-fadeIn flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-sm">check_circle</span>
               <span>{improvementSuccess} Prototype hot-reloaded.</span>
             </div>
-            <button onClick={() => setImprovementSuccess(null)} className="hover:text-white">
-              ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {projectId && !isRemixPanelOpen && (
+                <button
+                  type="button"
+                  onClick={() => setIsRemixPanelOpen(true)}
+                  className="px-2.5 py-1 text-[11px] font-mono font-bold rounded bg-secondary text-on-secondary hover:bg-secondary/90 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xs">shuffle</span>
+                  <span>Try a Remix →</span>
+                </button>
+              )}
+              {projectId && (
+                <button
+                  type="button"
+                  onClick={handleDiscoverMoreLikeThis}
+                  className="px-2.5 py-1 text-[11px] font-mono font-bold rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xs">explore</span>
+                  <span>Discover More →</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setImprovementSuccess(null)}
+                className="hover:text-white p-0.5 transition-colors cursor-pointer"
+                aria-label="Dismiss banner"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
 
@@ -516,7 +563,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
                   <button
                     onClick={handleAnalyzeWithAI}
                     disabled={isAnalyzing}
-                    className="px-4 py-1.5 text-xs font-mono font-bold rounded bg-primary text-surface hover:bg-primary/90 transition-colors flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.3)] disabled:opacity-50"
+                    className="px-4 py-1.5 text-xs font-mono font-bold rounded bg-primary text-surface hover:bg-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(76,224,210,0.5)] ai-pulse disabled:opacity-50"
                   >
                     <span className="material-symbols-outlined text-sm">psychology</span>
                     <span>{isAnalyzing ? 'ANALYZING PLAYTEST...' : 'ANALYZE WITH AI'}</span>

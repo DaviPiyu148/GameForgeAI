@@ -31,6 +31,8 @@ const HomePage = () => {
   const {
     setPrompt,
     updateBuildParams,
+    setBuildInspirationSource,
+    clearBuildInspiration,
     state,
     setState,
     searchDiscovery,
@@ -82,6 +84,7 @@ const HomePage = () => {
     if (promptText.trim()) {
       searchDiscovery(promptText, navigate, activeMode);
     } else {
+      clearBuildInspiration();
       navigate('/build');
     }
   };
@@ -188,6 +191,9 @@ const HomePage = () => {
 
   const handleBuildSimilar = async (result: DiscoverySearchResult) => {
     const gameId = result.game.external_id || result.game.id;
+    const inspirationTitle = result.game.display_title || result.game.title;
+    const inspirationGenres = result.game.display_genres || result.game.genres || [];
+
     try {
       setIsActionLoading(`build-${gameId}`);
       const inspiration = await discoveryService.getBuildInspiration(gameId);
@@ -198,6 +204,10 @@ const HomePage = () => {
         ...(inspiration.suggested_physics !== undefined ? { physics: inspiration.suggested_physics } : {}),
       });
       setPrompt(inspiration.recommended_prompt);
+      setBuildInspirationSource({
+        title: inspirationTitle,
+        genres: inspirationGenres,
+      });
       navigate('/build');
     } catch (err) {
       console.warn('Failed to fetch build inspiration, using fallback:', err);
@@ -205,6 +215,10 @@ const HomePage = () => {
         ? `${result.game.title}: ${result.game.description}`
         : result.game.title;
       setPrompt(promptToUse);
+      setBuildInspirationSource({
+        title: inspirationTitle,
+        genres: inspirationGenres,
+      });
       navigate('/build');
     } finally {
       setIsActionLoading(null);
@@ -454,7 +468,10 @@ const HomePage = () => {
 
               <button
                 type="button"
-                onClick={() => navigate('/build')}
+                onClick={() => {
+                  clearBuildInspiration();
+                  navigate('/build');
+                }}
                 className="px-4 py-2 bg-secondary text-on-secondary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-magenta flex items-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">construction</span>
