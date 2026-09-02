@@ -1,68 +1,95 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Gemini Interactions API Migration & Multi-Model Failover V1 (Implementation)
+Fix React Toast Render-Phase Warning V1 (FIND-BROWSER-001)
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute the approved 4-phase Gemini Interactions API Migration:
-1. **Phase 1: Dependency & Transport Adapter Setup**: Install and pin `google-genai`, implement `GeminiInteractionsAdapter` with Pydantic structured output, thinking budgets, and server-side thought stripping.
-2. **Phase 2: Failover Executor & Routing**: Dynamic remaining-deadline budgeting, hard global $\le 5$ interaction ceiling, refined 403 error classification (credential vs model/policy), `AI_TRANSPORT` switch, and Gemini 3 GA model router chains.
-3. **Phase 3: Stateful Remix & Service Integration**: Optional `previous_interaction_id` acceleration with authoritative database `GameDSL` fallback; strictly stateless DSL repair.
-4. **Phase 4: Verification & Test Suite**: Unit tests, mock tests, and full backend regression suite.
+Diagnose and resolve the React lifecycle warning observed during progress diffing ("Cannot update a component ('ToastContainer') while rendering a different component ('AppProvider')") by moving the side effect out of the render phase into an appropriate React lifecycle boundary, ensuring zero duplicate toasts, full StrictMode safety, and 100% test & typecheck pass with zero browser execution.
 
 ## Started
-2026-09-01
+2026-09-02
 
 ---
 
-## 1. Pre-Implementation Checklist
-- [x] Read `AGENTS.md` and constitution rules
-- [x] Author and approve `GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md` with 6 amendments
-- [x] Inspect git status and working tree
-- [x] Confirm no browser testing, no external database dependencies, no chain-of-thought exposure
+## 1. Pre-Implementation & Reconnaissance
+
+- [x] Read AGENTS.md, task instructions, and absolute exclusions (NO BROWSER TESTING • NO GAME GENERATION • NO GEMINI)
+- [x] Phase 1: Inspect `AppContext.tsx`, `ToastContainer.tsx`, `toastBus.ts`, and all `pushToast` call sites
+- [x] Phase 2: Trace and document the exact render-phase lifecycle violation call path
+- [x] Phase 3: Formulate React-idiomatic fix according to React lifecycle rules
+
+### Evidence
+- Traced `pushToast()` call site inside `refreshProgress` at `gameforge-ai/src/context/AppContext.tsx:150-184`.
+- Identified that `pushToast(...)` was invoked synchronously inside a `setState((s) => { ... })` pure state updater callback.
+- `pushToast` invoked `toastBus` subscribers synchronously, executing `setToasts((prev) => [...prev, newToast])` inside `ToastContainer.tsx:61` during the render/state computation phase of `AppProvider`.
+- React emitted `Cannot update a component ('ToastContainer') while rendering a different component ('AppProvider')`.
 
 ---
 
-## 2. Implementation Sprints
+## 2. Implementation & Prevention
 
-### Sprint 1: Dependency & Interactions Adapter Setup
-- [x] Subtask 1.1: Install `google-genai` and pin exact tested version in `backend/requirements.txt` (`google-genai==2.20.0`).
-- [x] Subtask 1.2: Implement `backend/app/ai/gemini_interactions_adapter.py` supporting `generate_structured` and `generate_structured_with_meta`, Pydantic JSON schemas, thinking levels, and server-side thought stripping.
-- [x] Subtask 1.3: Add `AI_TRANSPORT` configuration in `backend/app/config.py` (`"interactions"` default, `"legacy_http"` rollback).
+- [x] Phase 4: Preserve all existing toast behaviors (+XP, LEVEL UP, NEW MILESTONE, GAME SAVED, BUILD COMPLETE, auto-dismiss, focus/hover pause, stacking)
+- [x] Phase 5: Implement duplicate-toast prevention for state transitions
+- [x] Phase 6: Ensure React StrictMode double-invocation safety
+- [x] Phase 7: Audit `toastBus.ts` subscription/publication mechanics (verified clean pub/sub; no microtask/setTimeout hacks required)
+- [x] Phase 8: Refactor progression diffing into pure `diffUserProgress(prev, current)` in `profile.ts` and post-commit `useEffect([state.progress])` with `prevProgressRef` in `AppContext.tsx`
+- [x] Phase 9: Add focused unit tests for progress diffing, level-up, milestone unlock, re-render safety, and toast bus in `gameforge-ai/src/services/__tests__/progressionToasts.test.ts`
 
-### Sprint 2: Failover Executor, Deadline Budgeting & Refined 403 Routing
-- [x] Subtask 2.1: Implement dynamic remaining-deadline budgeting in `FailoverExecutor` (`attempt_timeout = min(cap, remaining_deadline)`).
-- [x] Subtask 2.2: Enforce hard global ceiling of $\le 5$ total Gemini API calls per build lifecycle (`MAX_GLOBAL_ATTEMPTS = 5`).
-- [x] Subtask 2.3: Refine `classify_ai_error` in `provider.py` to distinguish credential 403 vs model/policy 403.
-- [x] Subtask 2.4: Update `ModelRouter` default task chains to Gemini 3 GA models (`gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).
-
-### Sprint 3: Stateful Remix & Service Integration
-- [x] Subtask 3.1: Wire optional `previous_interaction_id` into `apply_remix` in `game_generation_service.py`.
-- [x] Subtask 3.2: Implement automatic database `GameDSL` fallback on interaction expiration or failover.
-- [x] Subtask 3.3: Verify `DSL_PATCH` semantic repair remains strictly stateless.
-
-### Sprint 4: Verification & Test Suite
-- [x] Subtask 4.1: Update `backend/tests/test_ai_provider.py` with mock tests for Interactions adapter, deadline budgeting, and 403 classification (42/42 tests passing).
-- [x] Subtask 4.2: Run full backend regression suite (`uv run pytest tests -q` -> 430/430 tests passing).
-- [x] Subtask 4.3: Verify frontend build (`npm run build` -> passing in 2.09s).
+### Evidence
+- Created `diffUserProgress` pure helper in `gameforge-ai/src/services/profile.ts:38-73`.
+- Refactored `refreshProgress` in `gameforge-ai/src/context/AppContext.tsx:142-158` to a pure state updater.
+- Added post-commit `useEffect` with `prevProgressRef` in `gameforge-ai/src/context/AppContext.tsx:162-173`.
+- Created comprehensive test suite in `gameforge-ai/src/services/__tests__/progressionToasts.test.ts` (11 tests).
 
 ---
 
-## 3. Verification & Diagnostic Evidence
-- **Pinned Dependency**: `google-genai==2.20.0` pinned in `backend/requirements.txt` and verified in environment.
-- **Unit Test Suite**: `uv run pytest tests/test_ai_provider.py -v` (42 passed in 3.87s).
-- **Full Backend Regression**: `uv run pytest tests -q` (430 passed, 0 failed in 118.15s).
-- **Frontend Build**: `npm run build` in `gameforge-ai` (vite v8.2.1, 0 type errors, built in 2.09s).
+## 3. Verification & Auditing
+
+- [x] Phase 10: Static React audit across `AppContext.tsx` for any other render-time side effects (all other `pushToast` calls are located inside async click handlers/callbacks)
+- [x] Phase 11: Automated Test Suite Execution:
+  - `npx tsx src/services/__tests__/progressionToasts.test.ts` -> 11 passed, 0 failed
+  - `npx tsx src/services/__tests__/urlUtils.test.ts` -> 34 passed, 0 failed
+  - `npx tsc --noEmit` -> 0 errors (Exit code: 0)
+  - `npx oxlint` -> 0 errors, 0 warnings (Exit code: 0)
+  - `npm run build` -> 92 modules transformed, built in 1.00s (Exit code: 0)
+  - `pytest tests -q` -> 430 passed, 2 warnings in 74.45s (Exit code: 0)
+- [x] Phase 12: BROWSER TESTING: NOT PERFORMED (Zero browser instances, zero AI quota consumed)
+- [x] Phase 13: Review `git status`, `git diff`, `git diff --stat`
+
+### Results
+- `progressionToasts.test.ts`: 11 passed, 0 failed.
+- `urlUtils.test.ts`: 34 passed, 0 failed.
+- `tsc --noEmit`: 0 errors.
+- `oxlint`: 0 errors, 0 warnings.
+- `npm run build`: Exit code 0.
+- `pytest tests -q`: 430 passed.
 
 ---
+
+## 4. Documentation & Git Checkpoint
+
+- [x] Phase 14: Update `DIRECT_API_BROWSER_SMOKE_V1.md` (marked FIND-BROWSER-001 as FIXED with full remediation summary)
+- [x] Phase 15: Create `TOAST_RENDER_PHASE_FIX_V1.md` with complete structured diagnostic report
+- [x] Phase 16: Git Checkpoint (One logical commit for the completed phase)
+
+Commit:
+40747a2 - `frontend: fix React toast render-phase warning in AppContext (FIND-BROWSER-001)`
+
+---
+
+## Remaining Work
+None.
+
+## Blockers
+None.
 
 ## Change Log
-- 2026-09-01: Plan approved with 6 amendments.
-- 2026-09-01: Gemini Interactions API Migration & Multi-Model Failover V1 implemented across Sprints 1-4. All 430 backend tests and frontend production build passing.
-- 2026-09-01: Resolved DEF-001 (Swagger UI route resolution): Added Vite dev server proxy rules for `/docs` & `/openapi.json`, updated `getSwaggerDocsUrl()` in `src/services/urlUtils.ts` with safe environment fallback, added 9 regression tests (17/17 passed), verified `tsc --noEmit` (0 errors), `oxlint` (0 errors), and `npm run build` (built in 1.75s).
-- 2026-09-01: Resolved FIND-001 through FIND-005 in start.bat remediation V1: Dynamic HF model cache detection (`HF_HUB_OFFLINE`), comprehensive 9-package dependency smoke test (`google.genai`, `sentence_transformers`, `faiss`, etc.), dynamic Vite proxy target (`BACKEND_PORT`), multi-account `GEMINI_API_KEYS` launcher guidance, and documentation synchronization (430 tests, `gemini-3.7-flash`).
-- 2026-09-01: Resolved FIND-006 in start.bat: Fixed Windows CMD block parenthesis syntax defect in Check 3 `echo` statements. Executed real launcher smoke test in `cmd.exe`: 6/6 prerequisite checks passed, database migration succeeded, `/api/health` responded 200 OK, frontend initialized, and exit code 0.
-- 2026-09-01: Implemented Direct API Transport in Dev V1: Propagated `VITE_API_URL=http://127.0.0.1:%BACKEND_PORT%` and `CORS_ORIGINS` in `start.bat`, updated `urlUtils.test.ts` (34/34 passing), verified CORS preflight and credentials handling, full backend test suite (430/430 passing), typecheck (`tsc --noEmit`), lint (`oxlint`), production build (`npm run build` in 944ms), and verified real launcher execution with exit code 0.
+- 2026-09-02: Initialized task execution ledger for Fix React Toast Render-Phase Warning V1 (FIND-BROWSER-001).
+- 2026-09-02: Completed root cause investigation of FIND-BROWSER-001 render-phase warning.
+- 2026-09-02: Implemented pure `diffUserProgress` in `profile.ts` and post-commit `useEffect` in `AppContext.tsx`.
+- 2026-09-02: Authored unit tests in `progressionToasts.test.ts` (11/11 passing).
+- 2026-09-02: Verified full static, build, and backend test suites (430 backend tests passing).
+- 2026-09-02: Updated `DIRECT_API_BROWSER_SMOKE_V1.md` and authored `TOAST_RENDER_PHASE_FIX_V1.md`.

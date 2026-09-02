@@ -32,3 +32,44 @@ export const profileService = {
     return apiClient.delete<{ avatar_url: null; message: string }>('/auth/avatar');
   },
 };
+
+/**
+ * Pure diffing function that calculates celebratory toast notifications for user progression transitions.
+ * Returns an array of toast definitions to publish outside of the render cycle (e.g. within a React useEffect).
+ */
+export function diffUserProgress(
+  prev: UserProgressData | null | undefined,
+  current: UserProgressData | null | undefined
+): Array<{ variant: 'levelup' | 'xp' | 'milestone'; title: string; description?: string }> {
+  if (!prev || !current) return [];
+
+  const toasts: Array<{ variant: 'levelup' | 'xp' | 'milestone'; title: string; description?: string }> = [];
+
+  const xpGained = current.total_xp - prev.total_xp;
+  if (current.current_level > prev.current_level) {
+    toasts.push({
+      variant: 'levelup',
+      title: `LEVEL UP → ${current.current_level}`,
+      description: current.creator_title,
+    });
+  } else if (xpGained > 0) {
+    toasts.push({
+      variant: 'xp',
+      title: `+${xpGained} XP`,
+    });
+  }
+
+  if (current.unlocked_milestone_count > prev.unlocked_milestone_count) {
+    const newlyUnlocked = current.milestones.find(
+      (m) => m.is_unlocked && !prev.milestones.some((pm) => pm.milestone_key === m.milestone_key && pm.is_unlocked)
+    );
+    toasts.push({
+      variant: 'milestone',
+      title: 'NEW MILESTONE',
+      description: newlyUnlocked?.title,
+    });
+  }
+
+  return toasts;
+}
+
