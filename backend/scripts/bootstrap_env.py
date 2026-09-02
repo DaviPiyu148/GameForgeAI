@@ -23,6 +23,8 @@ RAW_DIR = BACKEND_DIR / "data" / "raw"
 CATALOG_PATH = PROCESSED_DIR / "games_catalog.json"
 INDEX_PATH = PROCESSED_DIR / "games_index.faiss"
 META_PATH = PROCESSED_DIR / "index_meta.json"
+REVIEWED_INDEX_PATH = PROCESSED_DIR / "games_index_reviewed_only.faiss"
+REVIEWED_META_PATH = PROCESSED_DIR / "index_meta_reviewed_only.json"
 REQUIREMENTS_PATH = BACKEND_DIR / "requirements.txt"
 DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 # Dataset source: NewbieIndieGameDev/steam-insights (Steam Store & SteamSpy open export)
@@ -178,17 +180,25 @@ def ensure_raw_and_catalog() -> bool:
     return CATALOG_PATH.exists() and CATALOG_PATH.stat().st_size > 1024
 
 
-def validate_faiss_index(model_dim: int, catalog_fp: str) -> bool:
+def validate_faiss_index(
+    model_dim: int,
+    catalog_fp: str,
+    index_file: Optional[Path] = None,
+    meta_file: Optional[Path] = None,
+) -> bool:
     """
-    Perform a complete health and freshness validation of the FAISS index.
+    Perform a complete health and freshness validation of a FAISS index.
     """
-    if not INDEX_PATH.exists() or not META_PATH.exists():
+    target_index = index_file or INDEX_PATH
+    target_meta = meta_file or META_PATH
+
+    if not target_index.exists() or not target_meta.exists():
         return False
 
     try:
         import faiss
-        index = faiss.read_index(str(INDEX_PATH))
-        with open(META_PATH, "r", encoding="utf-8") as f:
+        index = faiss.read_index(str(target_index))
+        with open(target_meta, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
         record_count = meta.get("record_count", 0)
@@ -197,17 +207,17 @@ def validate_faiss_index(model_dim: int, catalog_fp: str) -> bool:
 
         # 1. Vector count match
         if index.ntotal == 0 or index.ntotal != record_count or len(id_mapping) != index.ntotal:
-            print(f"[WARN] FAISS vector count mismatch: index.ntotal={index.ntotal}, meta={record_count}")
+            print(f"[WARN] FAISS vector count mismatch for {target_index.name}: index.ntotal={index.ntotal}, meta={record_count}")
             return False
 
         # 2. Embedding dimension match
         if index.d != model_dim:
-            print(f"[WARN] FAISS dimension mismatch: index.d={index.d}, model_dim={model_dim}")
+            print(f"[WARN] FAISS dimension mismatch for {target_index.name}: index.d={index.d}, model_dim={model_dim}")
             return False
 
         # 3. Catalog freshness match
         if stored_fp and catalog_fp and stored_fp != catalog_fp:
-            print("[INFO] Catalog fingerprint changed. Vector index is stale.")
+            print(f"[INFO] Catalog fingerprint changed for {target_index.name}. Vector index is stale.")
             return False
 
         # 4. Search probe test
@@ -219,15 +229,15 @@ def validate_faiss_index(model_dim: int, catalog_fp: str) -> bool:
 
         return True
     except Exception as e:
-        print(f"[WARN] FAISS index validation failed: {e}")
+        print(f"[WARN] FAISS index validation failed for {target_index.name}: {e}")
         return False
 
 
 def build_faiss_index() -> bool:
     """
-    Build FAISS vector index and save with catalog fingerprint.
+    Build primary FAISS vector index (20,000 records) and save with catalog fingerprint.
     """
-    print("Building FAISS Discovery vector index...")
+    print("Building primary FAISS Discovery vector index (20,000 records)...")
     import subprocess
     res = subprocess.run(
         [sys.executable, str(BACKEND_DIR / "scripts" / "build_index.py"), "--max-records", "20000"],
@@ -236,10 +246,23 @@ def build_faiss_index() -> bool:
     return res.returncode == 0 and INDEX_PATH.exists() and META_PATH.exists()
 
 
+def build_reviewed_faiss_index() -> bool:
+    """
+    Build reviewed-only FAISS vector index (87,890 records) and save with catalog fingerprint.
+    """
+    print("Building reviewed-only FAISS Discovery vector index (87,890 records)...")
+    import subprocess
+    res = subprocess.run(
+        [sys.executable, str(BACKEND_DIR / "scripts" / "build_index.py"), "--reviewed-only"],
+        cwd=str(BACKEND_DIR),
+    )
+    return res.returncode == 0 and REVIEWED_INDEX_PATH.exists() and REVIEWED_META_PATH.exists()
+
+
 def bootstrap_discovery() -> bool:
     """
     Full self-healing Discovery bootstrap pipeline:
-      Model -> Raw Data -> Catalog -> FAISS Index.
+      Model -> Raw Data -> Catalog -> Primary Index (20k) -> Reviewed Index (87,890).
     """
     # 1. Verify / Download Model
     model_ok, model_dim = ensure_model()
@@ -255,21 +278,45 @@ def bootstrap_discovery() -> bool:
 
     catalog_fp = compute_catalog_fingerprint(CATALOG_PATH) or ""
 
-    # 3. Validate / Build FAISS Index
-    if not validate_faiss_index(model_dim, catalog_fp):
-        print("FAISS index missing, corrupted, or stale. Rebuilding...")
+    # 3. Validate / Build Primary FAISS Index (20k)
+    if not validate_faiss_index(model_dim, catalog_fp, INDEX_PATH, META_PATH):
+        print("Primary FAISS index (20k) missing, corrupted, or stale. Rebuilding...")
         build_ok = build_faiss_index()
         if not build_ok:
-            print("[WARN] Failed to build FAISS index. Discovery search will use lexical fallback.")
+            print("[WARN] Failed to build primary FAISS index. Discovery search will use lexical fallback.")
             return False
 
         # Re-verify after build
-        if not validate_faiss_index(model_dim, catalog_fp):
-            print("[WARN] FAISS index post-build validation failed.")
+        if not validate_faiss_index(model_dim, catalog_fp, INDEX_PATH, META_PATH):
+            print("[WARN] Primary FAISS index post-build validation failed.")
             return False
 
-    print("Discovery vector index & embedding pipeline verified and ready.")
+    # 4. Validate / Self-Heal Reviewed-Only FAISS Index (87,890 records for HIDDEN_GEMS)
+    if not validate_faiss_index(model_dim, catalog_fp, REVIEWED_INDEX_PATH, REVIEWED_META_PATH):
+        # Check if legacy benchmark path exists to avoid unnecessary rebuild
+        legacy_reviewed = BACKEND_DIR / "data" / "benchmark_indexes" / "games_index_reviewed_only.faiss"
+        legacy_meta = BACKEND_DIR / "data" / "benchmark_indexes" / "index_meta_reviewed_only.json"
+        if legacy_reviewed.exists() and legacy_meta.exists():
+            print("[INFO] Migrating reviewed-only FAISS index from benchmark directory to processed/...")
+            import shutil
+            shutil.copy2(legacy_reviewed, REVIEWED_INDEX_PATH)
+            shutil.copy2(legacy_meta, REVIEWED_META_PATH)
+
+        if not validate_faiss_index(model_dim, catalog_fp, REVIEWED_INDEX_PATH, REVIEWED_META_PATH):
+            print("[INFO] Reviewed-only FAISS index missing or stale. Generating (87,890 records)...")
+            build_rev_ok = build_reviewed_faiss_index()
+            if not build_rev_ok:
+                print("[WARN] Reviewed-only FAISS index generation failed; HIDDEN_GEMS will fall back to primary 20k index safely.")
+            else:
+                print("Reviewed-only FAISS index successfully built and verified.")
+        else:
+            print("Reviewed-only FAISS index verified and ready.")
+    else:
+        print("Reviewed-only FAISS index verified and ready.")
+
+    print("Discovery vector indexes & embedding pipeline verified and ready.")
     return True
+
 
 
 FRONTEND_DIR = PROJECT_ROOT / "gameforge-ai"

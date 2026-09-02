@@ -57,3 +57,26 @@ async def test_multi_pool_discovery_service_invariants():
     assert len(res_disc.results) > 0
     for r in res_disc.results:
         assert r.game.total_reviews > 0
+
+
+def test_reviewed_only_fallback_when_file_absent(monkeypatch):
+    """When reviewed-only FAISS index is absent, index manager falls back to POPULAR_20K gracefully."""
+    import os
+    mgr = FAISSIndexManager()
+    mgr._pool_cache.clear()
+
+    original_exists = os.path.exists
+
+    def mock_exists(path):
+        if "reviewed_only" in str(path):
+            return False
+        return original_exists(path)
+
+    monkeypatch.setattr(os.path, "exists", mock_exists)
+
+    pool_data = mgr._get_or_load_pool(DiscoveryCandidatePool.REVIEWED_ONLY)
+    assert pool_data is not None
+    assert pool_data["index"].ntotal == 20000
+    assert len(pool_data["id_mapping"]) == 20000
+
+

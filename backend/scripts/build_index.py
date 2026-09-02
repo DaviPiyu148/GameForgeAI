@@ -22,18 +22,30 @@ def build_index(
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     max_records: int = 20000,
     batch_size: int = 128,
+    reviewed_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Build FAISS IndexFlatIP index over normalized catalog semantic profiles.
     """
+    if reviewed_only:
+        if index_path == DEFAULT_INDEX_PATH:
+            index_path = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "games_index_reviewed_only.faiss")
+        if meta_path == DEFAULT_META_PATH:
+            meta_path = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "index_meta_reviewed_only.json")
+
     if not os.path.exists(catalog_path) and os.path.exists("backend/data/processed/games_catalog.json"):
         catalog_path = "backend/data/processed/games_catalog.json"
-        index_path = "backend/data/processed/games_index.faiss"
-        meta_path = "backend/data/processed/index_meta.json"
+        if not reviewed_only:
+            index_path = "backend/data/processed/games_index.faiss"
+            meta_path = "backend/data/processed/index_meta.json"
+        else:
+            index_path = "backend/data/processed/games_index_reviewed_only.faiss"
+            meta_path = "backend/data/processed/index_meta_reviewed_only.json"
 
     start_time = time.time()
     print("=" * 60)
-    print(f"Building FAISS Index using {model_name}...")
+    mode_label = "Reviewed-Only (total_reviews > 0)" if reviewed_only else f"Top {max_records}"
+    print(f"Building FAISS Index ({mode_label}) using {model_name}...")
     print("=" * 60)
 
     if not os.path.exists(catalog_path):
@@ -42,7 +54,10 @@ def build_index(
     with open(catalog_path, "r", encoding="utf-8") as f:
         catalog: List[Dict[str, Any]] = json.load(f)
 
-    if max_records and max_records > 0 and len(catalog) > max_records:
+    if reviewed_only:
+        print("Filtering catalog to reviewed games only (total_reviews > 0)...")
+        catalog = [g for g in catalog if g.get("total_reviews", 0) > 0]
+    elif max_records and max_records > 0 and len(catalog) > max_records:
         print(f"Subsetting catalog to top {max_records} games by popularity/relevance...")
         catalog = catalog[:max_records]
 
@@ -152,6 +167,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build FAISS Vector Index for GameForge AI")
     parser.add_argument("--max-records", type=int, default=20000, help="Max records to index (0 for all)")
     parser.add_argument("--batch-size", type=int, default=128, help="Encoding batch size")
+    parser.add_argument("--reviewed-only", action="store_true", help="Build index over all reviewed games (total_reviews > 0)")
+    parser.add_argument("--index-path", type=str, default=DEFAULT_INDEX_PATH, help="Output path for FAISS index")
+    parser.add_argument("--meta-path", type=str, default=DEFAULT_META_PATH, help="Output path for metadata JSON")
     args = parser.parse_args()
 
-    build_index(max_records=args.max_records, batch_size=args.batch_size)
+    build_index(
+        max_records=args.max_records,
+        batch_size=args.batch_size,
+        reviewed_only=args.reviewed_only,
+        index_path=args.index_path,
+        meta_path=args.meta_path,
+    )

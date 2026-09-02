@@ -33,12 +33,12 @@ POOL_INDEX_PATHS: Dict[DiscoveryCandidatePool, Tuple[str, str]] = {
         "data/processed/index_meta.json",
     ),
     DiscoveryCandidatePool.REVIEWED_ONLY: (
-        "data/benchmark_indexes/games_index_reviewed_only.faiss",
-        "data/benchmark_indexes/index_meta_reviewed_only.json",
+        "data/processed/games_index_reviewed_only.faiss",
+        "data/processed/index_meta_reviewed_only.json",
     ),
     DiscoveryCandidatePool.FULL_CATALOG: (
-        "data/benchmark_indexes/games_index_full.faiss",
-        "data/benchmark_indexes/index_meta_full.json",
+        "data/processed/games_index_full.faiss",
+        "data/processed/index_meta_full.json",
     ),
 }
 
@@ -47,7 +47,7 @@ class FAISSIndexManager:
     """Manager for loading, querying, and managing multi-pool FAISS vector indexes."""
 
     _instance: Optional["FAISSIndexManager"] = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __init__(
         self,
@@ -121,8 +121,24 @@ class FAISSIndexManager:
             meta_path = resolve_file_path(paths[1])
 
             if not os.path.exists(idx_path) or not os.path.exists(meta_path):
-                logger.info(f"Designated index for pool {pool.value} not found at {idx_path}; falling back to primary index.")
-                return self._get_or_load_pool(DiscoveryCandidatePool.POPULAR_20K)
+                # Fallback to legacy benchmark path if present
+                legacy_map = {
+                    DiscoveryCandidatePool.REVIEWED_ONLY: (
+                        "data/benchmark_indexes/games_index_reviewed_only.faiss",
+                        "data/benchmark_indexes/index_meta_reviewed_only.json",
+                    ),
+                    DiscoveryCandidatePool.FULL_CATALOG: (
+                        "data/benchmark_indexes/games_index_full.faiss",
+                        "data/benchmark_indexes/index_meta_full.json",
+                    ),
+                }
+                leg = legacy_map.get(pool)
+                if leg and os.path.exists(resolve_file_path(leg[0])) and os.path.exists(resolve_file_path(leg[1])):
+                    idx_path = resolve_file_path(leg[0])
+                    meta_path = resolve_file_path(leg[1])
+                else:
+                    logger.info(f"Designated index for pool {pool.value} not found at {idx_path}; falling back to primary index.")
+                    return self._get_or_load_pool(DiscoveryCandidatePool.POPULAR_20K)
 
             try:
                 logger.info(f"Loading FAISS index for pool {pool.value} from {idx_path}...")

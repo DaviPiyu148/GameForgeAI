@@ -41,14 +41,29 @@ Establish intentional production candidate-pool routing and resolve accidental s
 
 ---
 
-## 2. Benchmark Verification
+## 2. Benchmark Verification & Causal Analysis
 
 - [x] Live `DiscoveryService` benchmark executed under intentional production policy
-- [x] `BEST_MATCH`: Precision@5 = 0.9067, 0 violations
-- [x] `POPULAR`: Precision@5 = 0.9200, 0 violations
-- [x] `DISCOVER`: Precision@5 = 0.8867, 0 violations (on 20k pool)
-- [x] `HIDDEN_GEMS`: Precision@5 = 0.9067, 0 violations, Long-Tail Exposure = 72.8%, Top-5 Surface Rate = 52.0% (on Reviewed-Only pool, T150)
+- [x] `BEST_MATCH`: Precision@5 = 0.9067, 0 violations (20k pool, T2000)
+- [x] `POPULAR`: Precision@5 = 0.9200, 0 violations (20k pool, T2000)
+- [x] `DISCOVER`: Precision@5 = 0.8867, 0 violations (20k pool, T2000)
+- [x] `HIDDEN_GEMS`: Precision@5 = 0.9067, 0 violations, Long-Tail Exposure = 72.8%, Top-5 Surface Rate = 52.0% (Reviewed-Only pool, T150)
+- [x] **Causal Disambiguation**:
+  - The comparison against the previous baseline (20k + T2000: 0.8733) represents the **combined HIDDEN_GEMS configuration** (Reviewed-Only 87,890 pool + T150 threshold).
+  - The candidate-pool tradeoff isolated at T150 is: 20k (0.9133 Precision, 0.0% Top-5 long-tail) vs Reviewed-Only (0.9067 Precision, 52.0% Top-5 long-tail).
+  - The T150 threshold prevents small games from being crushed by the review-confidence ramp, enabling high-quality long-tail games (*Shapebreaker* #1, *MOTHERED* #2) to surface.
 - [x] Representative titles: *Shapebreaker* #1 (0.8619), *Slay the Spire* #4 (0.8079), *MOTHERED* #2 (0.7878), *Colony Ship* #4 (0.7726), *Floating Farmer* #7 (0.8209), *Farming Simulator 2013* #1 (0.8589).
+
+---
+
+## 3. Deployment, Bootstrap, and First-Class Artifact Audit
+
+- [x] Promote reviewed-only index from experimental `data/benchmark_indexes/` to canonical `backend/data/processed/games_index_reviewed_only.faiss`
+- [x] Update `backend/scripts/build_index.py` with `--reviewed-only` flag to build 87,890-record index reproducible from `games_catalog.json`
+- [x] Update `backend/scripts/bootstrap_env.py` (`validate_faiss_index` and `bootstrap_discovery`) to validate, migrate, or self-heal the reviewed-only index on startup
+- [x] Update `backend/app/search/index.py` to make `data/processed/` canonical for `REVIEWED_ONLY`, support legacy fallback, and switch `_lock` from `threading.Lock` to `threading.RLock` to eliminate reentrant deadlock during fallback
+- [x] Add automated test `test_reviewed_only_fallback_when_file_absent` to verify graceful degradation to 20k pool if index file is completely absent
+- [x] Verify `bootstrap_env.py --bootstrap-discovery` runs clean and validates all indexes
 
 ---
 
