@@ -446,3 +446,28 @@ def list_versions(
         return service.list_project_versions(db, project_id, current_user.id)
     except ProjectNotFoundError as e:
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+
+
+@router.post(
+    "/{project_id}/restore",
+    response_model=ProjectResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Restore a historical version as a new immutable vN+1 version",
+)
+def restore_version(
+    project_id: str,
+    target_version_number: int = Query(..., ge=1, description="Historical version number to restore"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> ProjectResponse:
+    """Restore an older ProjectVersion into a new forward vN+1 version without modifying history."""
+    try:
+        return service.restore_project_version(
+            db, project_id, current_user.id, target_version_number
+        )
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except ValueError as e:
+        return make_error_response("VERSION_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+

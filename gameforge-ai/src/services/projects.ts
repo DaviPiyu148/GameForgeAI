@@ -59,6 +59,22 @@ export const projectService = {
   },
 
   /**
+   * List historical playtest sessions and telemetry for a project.
+   */
+  async getPlaytests(id: string): Promise<import('../types').PlaytestSessionRecord[]> {
+    return await apiClient.get<import('../types').PlaytestSessionRecord[]>(`/projects/${id}/playtests`);
+  },
+
+  /**
+   * Restore an older version as a new immutable forward version (vN+1).
+   */
+  async restoreVersion(id: string, targetVersionNumber: number): Promise<GameProject> {
+    return await apiClient.post<GameProject>(`/projects/${id}/restore`, null, {
+      params: { target_version_number: targetVersionNumber },
+    });
+  },
+
+  /**
    * Permanently delete an owned project (204 No Content on success).
    */
   async deleteProject(id: string): Promise<void> {

@@ -26,6 +26,8 @@ interface PrototypeModalProps {
   onClose: () => void;
   project?: GameProject | null;
   gameDsl?: GameDSL;
+  versionNumber?: number;
+  isHistoricalPlayback?: boolean;
   onProjectUpdated?: (updatedProject: GameProject) => void;
   initialTab?: 'play' | 'remix';
 }
@@ -45,6 +47,8 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   onClose,
   project,
   gameDsl,
+  versionNumber,
+  isHistoricalPlayback = false,
   onProjectUpdated,
   initialTab = 'play',
 }) => {
@@ -53,9 +57,11 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenPulse, setFullscreenPulse] = useState(false);
   const [currentDsl, setCurrentDsl] = useState<GameDSL>(
-    project?.gameDsl || gameDsl || SURVIVAL_FIXTURE
+    gameDsl || project?.gameDsl || SURVIVAL_FIXTURE
   );
-  const [currentVersion, setCurrentVersion] = useState<number>(project?.currentVersion || 1);
+  const [currentVersion, setCurrentVersion] = useState<number>(
+    versionNumber || project?.currentVersion || 1
+  );
   const [resolvedSeed, setResolvedSeed] = useState<number>(project?.runtimeMetadata?.seed ?? 18492031);
 
   const [activeArchetype, setActiveArchetype] = useState<Archetype>(
@@ -160,6 +166,11 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
 
   const handlePlaytestComplete = async (summary: PlaytestSummary) => {
     setPlaytestSummary(summary);
+
+    // If in read-only historical playback mode, do NOT record telemetry or grant XP
+    if (isHistoricalPlayback) {
+      return;
+    }
 
     // If authenticated with a backend project, record session
     if (project?.id) {
@@ -392,8 +403,14 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
               <span className="font-mono text-sm tracking-widest font-bold">
                 {currentDsl.metadata.title.toUpperCase()}
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/40 uppercase font-bold">
-                v{currentVersion}.0
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold border ${
+                  isHistoricalPlayback
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    : 'bg-primary/20 text-primary border-primary/40'
+                }`}
+              >
+                {isHistoricalPlayback ? `HISTORICAL PLAYBACK // v${currentVersion}` : `v${currentVersion}.0`}
               </span>
             </div>
           </div>
@@ -559,7 +576,20 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
                     {playtestSummary.outcome}
                   </span>
                 </div>
-                {!aiAnalysis && (
+                {isHistoricalPlayback ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">info</span>
+                      <span>Read-Only Playback (Telemetry & AI disabled)</span>
+                    </span>
+                    <button
+                      onClick={handleClose}
+                      className="px-3 py-1.5 text-xs font-mono font-bold rounded bg-surface border border-outline-variant hover:border-primary text-on-surface transition-colors cursor-pointer"
+                    >
+                      Exit Playback
+                    </button>
+                  </div>
+                ) : !aiAnalysis && (
                   <button
                     onClick={handleAnalyzeWithAI}
                     disabled={isAnalyzing}

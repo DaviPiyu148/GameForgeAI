@@ -50,20 +50,22 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Deployment & Product Hygiene Fix V1 (Deployment-Safe Swagger URL `getSwaggerDocsUrl()`, Standalone Documentation Pages `#/documentation`, `#/api-access`, `#/community`, `#/support`, `#/privacy`, Footer Navigation, Test Credential Isolation from Production Code) | COMPLETE |
 | Direct API Transport Browser Smoke V1 (Direct-Development Origin Transport Verification & FIND-BROWSER-001 Remediation) (`DIRECT_API_BROWSER_SMOKE_V1.md`, `TOAST_RENDER_PHASE_FIX_V1.md`) | COMPLETE |
 | Creator Loop V1 (Discovery Inspiration → Builder Context → Playtest XP → Visual AI Critique Pulse → Quick Remix & Evolution → Game DNA Discover More Seed) | COMPLETE |
+| Project Studio V1 (Persistent Project Workspace, 3-Tab Architecture, Read-Only Historical Playback, Forward Version Restore, Stale Recommendation Guard) (`PROJECT_STUDIO_V1_PLAN.md`) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Creator Loop V1)
+## Current Verification (as of Project Studio V1)
 
-- **Backend tests**: 430/430 passing (100% pass rate across all suites via pytest).
+- **Backend tests**: 433/433 passing (100% pass rate across all suites via pytest).
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 72 files).
 - **Discovery seed pure unit tests**: 7/7 passing (`npx tsx src/utils/__tests__/discovery.test.ts`).
 - **Progression toasts unit tests**: 11/11 passing (`npx tsx src/services/__tests__/progressionToasts.test.ts`).
 - **URL normalization & direct transport unit tests**: 34/34 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
 - **Production build**: succeeds (`npm run build`).
-- **Single-invocation progress refresh audit**: Verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement action.
+- **Zero-AI studio browsing audit**: Verified browsing tabs, viewing blueprint, inspecting versions, and historical playback execute client-side / cache with zero AI quota consumption.
+- **Single-invocation progress refresh audit**: Verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement/restore action.
 - **Browser verification**: Explicitly NOT PERFORMED for this milestone pending user authorization (`BROWSER TESTING: NOT PERFORMED`).
 
 - **Dev API Transport (Elimination of FS-034 Dev Proxy Dependency)**: Local development (`start.bat`) automatically supplies `VITE_API_URL=http://127.0.0.1:<BACKEND_PORT>` and `CORS_ORIGINS` when not explicitly set, routing browser REST and SSE traffic directly to FastAPI. This bypasses the development-only Vite proxy hop and permanently eliminates intermittent `ECONNRESET` socket drops in local dev. The Vite proxy remains in place only as a backward-compatible fallback for environments without `VITE_API_URL`.

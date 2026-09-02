@@ -215,3 +215,126 @@ def test_project_persists_in_db(client):
         assert db_proj.user_id == user_id
     finally:
         direct_session.close()
+
+
+def test_restore_project_version_creates_forward_version(client):
+    """Verify restoring a historical version creates immutable vN+1 with clean provenance."""
+    from app.models.project_version import ProjectVersion
+
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id, title="Restore Test", genre="Action")
+
+    v1_dsl = {"title": "V1 Game", "player": {"speed": 200}}
+    v2_dsl = {"title": "V2 Game", "player": {"speed": 250}}
+    v3_dsl = {"title": "V3 Game", "player": {"speed": 300}}
+
+    # Set up historical versions in DB
+    db = TestingSessionLocal()
+    try:
+        # Update project to v3
+        proj = db.query(Project).filter(Project.id == proj_id).first()
+        proj.game_dsl = v3_dsl
+        proj.current_version = 3
+
+        # Add v1, v2, v3 rows
+        ver1 = ProjectVersion(
+            project_id=proj_id,
+            version_number=1,
+            game_dsl=v1_dsl,
+            change_summary="Initial generation",
+            remix_intent=None,
+        )
+        ver2 = ProjectVersion(
+            project_id=proj_id,
+            version_number=2,
+            game_dsl=v2_dsl,
+            change_summary="Speed patch",
+            remix_intent=None,
+        )
+        ver3 = ProjectVersion(
+            project_id=proj_id,
+            version_number=3,
+            game_dsl=v3_dsl,
+            change_summary="Remix applied: Fast & Agile",
+            remix_intent=[{"type": "fast_and_agile"}],
+        )
+        db.add_all([ver1, ver2, ver3])
+        db.commit()
+    finally:
+        db.close()
+
+    # Restore v1
+    res = client.post(
+        f"/api/projects/{proj_id}/restore?target_version_number=1",
+        headers=_auth(token),
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["currentVersion"] == 4
+    assert data["gameDsl"] == v1_dsl
+
+    # Verify versions list endpoint
+    ver_res = client.get(f"/api/projects/{proj_id}/versions", headers=_auth(token))
+    assert ver_res.status_code == 200
+    versions = ver_res.json()
+    assert len(versions) == 4
+    assert [v["version_number"] for v in versions] == [1, 2, 3, 4]
+
+    # Verify v4 details: clean provenance and accurate change summary
+    v4 = versions[3]
+    assert v4["version_number"] == 4
+    assert v4["game_dsl"] == v1_dsl
+    assert v4["change_summary"] == "Restored from version 1."
+    assert v4["remix_intent"] is None
+
+    # Verify v1, v2, v3 remain completely untouched
+    assert versions[0]["game_dsl"] == v1_dsl
+    assert versions[2]["remix_intent"] == [{"type": "fast_and_agile"}]
+
+
+def test_restore_nonexistent_version_returns_404(client):
+    """Verify restoring a nonexistent version number returns 404."""
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id, title="404 Restore Test")
+
+    res = client.post(
+        f"/api/projects/{proj_id}/restore?target_version_number=99",
+        headers=_auth(token),
+    )
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "VERSION_NOT_FOUND"
+
+
+def test_restore_unowned_project_returns_404(client):
+    """Verify cannot restore another user's project (IDOR protection)."""
+    from app.models.user import User
+    from app.services.auth_service import hash_password
+
+    # Create other user in DB
+    db = TestingSessionLocal()
+    try:
+        other_user = User(
+            email="other@example.com",
+            username="OtherUser",
+            password_hash=hash_password("securepass123"),
+            level=1,
+        )
+        db.add(other_user)
+        db.commit()
+        db.refresh(other_user)
+        other_user_id = other_user.id
+    finally:
+        db.close()
+
+    other_proj_id = _create_project_in_db(other_user_id, title="Other User Project")
+
+    # Current user attempts to restore other user's project
+    token, _ = _register_and_token(client)
+    res = client.post(
+        f"/api/projects/{other_proj_id}/restore?target_version_number=1",
+        headers=_auth(token),
+    )
+    assert res.status_code == 404
+    assert res.json()["error"]["code"] == "PROJECT_NOT_FOUND"
+
+

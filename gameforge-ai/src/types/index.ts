@@ -1,4 +1,5 @@
 import type { GameDSL, GameDesignSpec, RuntimeMetadata } from '../runtime/types';
+export type { GameDSL, GameDesignSpec, RuntimeMetadata };
 export type { PlaytestSummary, PlaytestAnalysis, PlaytestRecommendation } from '../runtime/types';
 
 export type ProjectStatus = 'PLAYABLE' | 'COMPILING' | 'ERROR';
@@ -383,6 +384,23 @@ export interface ProjectVersionSummary {
   created_at: string;
   game_dsl: GameDSL;
   remix_intent?: RemixIntent[] | null;
+}
+
+export interface PlaytestSessionRecord {
+  id: string;
+  project_id: string;
+  user_id: string;
+  duration_seconds: number;
+  score: number;
+  damage_taken: number;
+  damage_dealt: number;
+  enemies_defeated: number;
+  collectibles_gathered: number;
+  objectives_completed: number;
+  outcome: string;
+  telemetry_events?: unknown[] | null;
+  ai_analysis?: import('../runtime/types').PlaytestAnalysis | null;
+  created_at: string;
 }
 
 export interface BuildInspirationResponse {

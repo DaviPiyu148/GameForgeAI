@@ -2,12 +2,12 @@ import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
-import { ProjectDetailsModal } from '../components/Shared/ProjectDetailsModal';
+import { ProjectStudioModal, type StudioTabId } from '../components/Shared/ProjectStudioModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
 import { projectService } from '../services/projects';
 import { pushToast } from '../services/toastBus';
 import { buildDiscoverySeed } from '../utils/discovery';
-import type { GameProject } from '../types';
+import type { GameProject, ProjectVersionSummary } from '../types';
 
 // ─────────────────────────────────────────────────────────
 // Inline Rename component — lives inside each card
@@ -129,7 +129,9 @@ const DashboardPage = () => {
 
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
   const [playModalInitialTab, setPlayModalInitialTab] = useState<'play' | 'remix'>('play');
-  const [detailsProject, setDetailsProject] = useState<GameProject | null>(null);
+  const [playbackVersion, setPlaybackVersion] = useState<ProjectVersionSummary | null>(null);
+  const [studioProject, setStudioProject] = useState<GameProject | null>(null);
+  const [studioInitialTab, setStudioInitialTab] = useState<StudioTabId>('overview');
 
   // Per-card UI state: rename / delete confirm / duplicating
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -139,13 +141,25 @@ const DashboardPage = () => {
   // Per-card contextual action menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const handleOpenStudio = (game: GameProject, initialTab: StudioTabId = 'overview') => {
+    setOpenMenuId(null);
+    setSelectedPlayProject(null);
+    setPlaybackVersion(null);
+    setStudioInitialTab(initialTab);
+    setStudioProject(game);
+  };
+
   const handlePlay = (game: GameProject) => {
+    setStudioProject(null);
+    setPlaybackVersion(null);
     setPlayModalInitialTab('play');
     setSelectedPlayProject(game);
   };
 
   const handleDirectRemix = (game: GameProject) => {
     setOpenMenuId(null);
+    setStudioProject(null);
+    setPlaybackVersion(null);
     setPlayModalInitialTab('remix');
     setSelectedPlayProject(game);
   };
@@ -349,7 +363,17 @@ const DashboardPage = () => {
                       PLAY
                     </button>
 
-                    {/* Secondary: REMIX */}
+                    {/* Secondary: STUDIO */}
+                    <button
+                      onClick={() => handleOpenStudio(game)}
+                      className="px-3 py-2 border border-primary/60 text-primary font-mono text-xs hover:bg-primary/10 uppercase cursor-pointer btn-interactive text-center flex items-center justify-center gap-1"
+                      title="Open Project Studio workspace"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">developer_board</span>
+                      <span>STUDIO</span>
+                    </button>
+
+                    {/* Tertiary: REMIX */}
                     <button
                       onClick={() => handleDirectRemix(game)}
                       className="flex-1 border border-secondary text-secondary font-mono text-xs py-2 hover:bg-secondary/10 uppercase cursor-pointer btn-interactive text-center flex items-center justify-center gap-1"
@@ -357,15 +381,6 @@ const DashboardPage = () => {
                     >
                       <span className="material-symbols-outlined text-[13px]">shuffle</span>
                       <span>REMIX</span>
-                    </button>
-
-                    {/* Tertiary: EDIT IN BUILDER */}
-                    <button
-                      onClick={() => handleContinueEditing(game)}
-                      className="px-2.5 py-2 border border-outline-variant text-on-surface-variant font-mono text-xs hover:border-primary hover:text-primary hover:bg-primary/5 uppercase cursor-pointer btn-interactive text-center"
-                      title="Continue editing prompt in Builder"
-                    >
-                      EDIT
                     </button>
 
                     {/* Discover Similar icon button */}
@@ -404,10 +419,26 @@ const DashboardPage = () => {
                           >
                             <button
                               type="button"
-                              onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
+                              onClick={() => handleOpenStudio(game)}
+                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left"
+                            >
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">developer_board</span>
+                              Project Studio
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { handleContinueEditing(game); setOpenMenuId(null); }}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
                             >
                               <span className="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
+                              Edit in Builder
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
+                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                            >
+                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">label</span>
                               Rename
                             </button>
                             <button
@@ -420,28 +451,12 @@ const DashboardPage = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDiscoverSimilar(game)}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">explore</span>
-                              Discover Similar
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handleDuplicate(game.id)}
                               disabled={duplicatingId === game.id}
                               className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left disabled:opacity-50"
                             >
                               <span className="material-symbols-outlined text-[14px]" aria-hidden="true">content_copy</span>
                               {duplicatingId === game.id ? 'Duplicating…' : 'Duplicate'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setDetailsProject(game); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left border-t border-primary/10"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">info</span>
-                              Project Details
                             </button>
                             <button
                               type="button"
@@ -463,13 +478,13 @@ const DashboardPage = () => {
         )}
       </section>
 
-      {/* ═══ SAVED DISCOVERIES ═══ */}
-      <section className="flex flex-col gap-4 mt-4">
-        <div className="flex items-center gap-2 border-b border-outline-variant pb-2">
-          <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
-            bookmark
-          </span>
-          <h2 className="font-mono text-xs text-secondary uppercase tracking-widest">SAVED DISCOVERIES</h2>
+      {/* ── Saved Discoveries Section ── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-primary/30 pb-2">
+          <span className="material-symbols-outlined text-secondary text-lg">bookmark</span>
+          <h2 className="font-display text-lg text-on-surface uppercase tracking-wider">
+            SAVED DISCOVERIES ({state.savedDiscoveries.length})
+          </h2>
         </div>
 
         {state.authStatus !== 'AUTHENTICATED' ? (
@@ -481,22 +496,25 @@ const DashboardPage = () => {
             &gt; LOADING_SAVED_DISCOVERIES...
           </div>
         ) : state.savedDiscoveries.length === 0 ? (
-          <div className="text-on-surface-variant font-mono text-xs border border-outline-variant bg-surface-container-low p-6 text-center">
-            No saved discoveries yet. Bookmark interesting games found on the Discover page!
+          <div className="bg-surface-container-low border border-dashed border-outline-variant/60 p-8 text-center rounded-sm">
+            <span className="material-symbols-outlined text-3xl text-outline mb-2">bookmark_border</span>
+            <p className="font-mono text-xs text-on-surface-variant uppercase">
+              No saved discoveries yet. Bookmark games from the Discovery feed to curate your inspiration library.
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 stagger-enter stagger-2">
-            {state.savedDiscoveries.map((discovery, index) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {state.savedDiscoveries.map((discovery) => (
               <div
                 key={discovery.id}
-                className={`bg-surface-container border-2 border-outline-variant flex flex-col relative overflow-hidden stagger-enter stagger-${
-                  (index % 5) + 1
-                } hover:border-secondary/50 transition-colors group`}
+                className="bg-surface-container-low border border-outline-variant hover:border-secondary transition-colors p-0 rounded-sm flex flex-col justify-between overflow-hidden group"
               >
-                <div className="h-4 bg-outline-variant w-full flex justify-between px-2 items-center">
-                  <div className="flex gap-1">
-                    <div className="w-1 h-1 bg-background rounded-full"></div>
-                    <div className="w-1 h-1 bg-background rounded-full"></div>
+                <div className="bg-terminal-header px-3 py-1.5 flex justify-between items-center border-b border-outline-variant/50">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono text-secondary font-bold uppercase">BOOKMARK</span>
+                    <span className="text-[9px] font-mono text-outline">
+                      {discovery.created_at ? new Date(discovery.created_at).toLocaleDateString() : 'Saved'}
+                    </span>
                   </div>
                   <button
                     onClick={() => removeSavedDiscovery(discovery.id)}
@@ -529,9 +547,15 @@ const DashboardPage = () => {
         )}
       </section>
 
+      {/* ── Dialog Modals (Clean Swapping, Zero Nesting) ── */}
       {selectedPlayProject && (
         <PrototypeModal
           project={selectedPlayProject}
+          gameDsl={playbackVersion ? playbackVersion.game_dsl : selectedPlayProject.gameDsl}
+          versionNumber={playbackVersion ? playbackVersion.version_number : selectedPlayProject.currentVersion}
+          isHistoricalPlayback={Boolean(
+            playbackVersion && playbackVersion.version_number !== selectedPlayProject.currentVersion
+          )}
           initialTab={playModalInitialTab}
           onClose={() => {
             setSelectedPlayProject(null);
@@ -540,10 +564,40 @@ const DashboardPage = () => {
           onProjectUpdated={updateGameProject}
         />
       )}
-      {detailsProject && (
-        <ProjectDetailsModal
-          project={detailsProject}
-          onClose={() => setDetailsProject(null)}
+      {studioProject && (
+        <ProjectStudioModal
+          project={studioProject}
+          initialTab={studioInitialTab}
+          onClose={() => setStudioProject(null)}
+          onPlayCurrent={() => {
+            const p = studioProject;
+            setStudioProject(null);
+            setPlaybackVersion(null);
+            setPlayModalInitialTab('play');
+            setSelectedPlayProject(p);
+          }}
+          onRemix={() => {
+            const p = studioProject;
+            setStudioProject(null);
+            setPlaybackVersion(null);
+            setPlayModalInitialTab('remix');
+            setSelectedPlayProject(p);
+          }}
+          onEditInBuilder={() => {
+            const p = studioProject;
+            setStudioProject(null);
+            handleContinueEditing(p);
+          }}
+          onPlayHistoricalVersion={(ver) => {
+            const p = studioProject;
+            setStudioProject(null);
+            setPlaybackVersion(ver);
+            setSelectedPlayProject(p);
+          }}
+          onProjectUpdated={(updated) => {
+            updateGameProject(updated);
+            setStudioProject(updated);
+          }}
         />
       )}
     </div>
