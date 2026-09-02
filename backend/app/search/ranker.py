@@ -16,9 +16,11 @@ from app.search.lexical import normalize_string, tokenize
 from app.search.query_parser import ParsedQuery
 from app.search.ranking_config import (
     DEFAULT_MODE,
+    DEFAULT_QUALITY_REVIEW_THRESHOLD,
     DIRECT_SCORE_WEIGHT,
     DISCOVERY_MODES,
     DIVERSITY_LAMBDA,
+    HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD,
     HIDDEN_GEM_MAX_REVIEWS,
     HIDDEN_GEM_MIN_POSITIVE_PCT,
     HIDDEN_GEM_MIN_REVIEWS,
@@ -481,7 +483,12 @@ class Ranker:
                         core_relevance += 0.04
 
             # Quality term
-            quality_score = QUALITY_WEIGHT * (pos_pct * min(1.0, reviews / 2000.0)) * mode_adj.quality_mult
+            review_thresh = (
+                HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD
+                if mode == "HIDDEN_GEMS"
+                else DEFAULT_QUALITY_REVIEW_THRESHOLD
+            )
+            quality_score = QUALITY_WEIGHT * (pos_pct * min(1.0, reviews / review_thresh)) * mode_adj.quality_mult
 
             # Novelty term (rewards high acclaim games with fewer reviews in DISCOVER / HIDDEN_GEMS)
             novelty_score = 0.0

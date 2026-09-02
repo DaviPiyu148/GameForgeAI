@@ -267,6 +267,9 @@ def normalize_genres(raw_genres: List[str]) -> List[str]:
     return normalized
 
 
+from app.search.candidate_pool import DiscoveryCandidatePool
+
+
 class LexicalIndex:
     """Fast in-memory inverted index supporting exact title matching, token BM25-style scoring, and tag/genre matching."""
 
@@ -274,6 +277,10 @@ class LexicalIndex:
         self._catalog = catalog
         self._games_by_id: Dict[str, Dict[str, Any]] = {str(g["id"]): g for g in catalog if "id" in g}
         
+        # Precomputed candidate pool identifier sets
+        self._twenty_k_game_ids: Set[str] = {str(g["id"]) for g in self._catalog[:20000] if "id" in g}
+        self._reviewed_game_ids: Set[str] = {str(g["id"]) for g in self._catalog if "id" in g and g.get("total_reviews", 0) > 0}
+
         # Primary lookup tables
         self._exact_title_to_id: Dict[str, str] = {}
         self._normalized_title_to_id: Dict[str, str] = {}
@@ -402,15 +409,31 @@ class LexicalIndex:
         query: str,
         limit: int = 50,
         query_type: str = "CONCEPT",
+        candidate_pool: Optional[DiscoveryCandidatePool] = None,
+        allowed_game_ids: Optional[Set[str]] = None,
     ) -> List[Tuple[Dict[str, Any], float, Dict[str, Any]]]:
         """
-        Execute lexical candidate retrieval and scoring over full normalized catalog.
+        Execute lexical candidate retrieval and scoring over normalized catalog,
+        strictly respecting mode-specific candidate pool boundaries.
         Returns list of (game_dict, lexical_score, match_details).
         """
         norm_q = normalize_string(query)
         q_tokens = tokenize(query)
         if not norm_q or not q_tokens:
             return []
+
+        # Determine effective candidate pool whitelist
+        pool_filter_ids: Optional[Set[str]] = None
+        if candidate_pool == DiscoveryCandidatePool.POPULAR_20K:
+            pool_filter_ids = self._twenty_k_game_ids
+        elif candidate_pool == DiscoveryCandidatePool.REVIEWED_ONLY:
+            pool_filter_ids = self._reviewed_game_ids
+
+        if allowed_game_ids is not None:
+            if pool_filter_ids is not None:
+                pool_filter_ids = pool_filter_ids.intersection(allowed_game_ids)
+            else:
+                pool_filter_ids = allowed_game_ids
 
         # Normalized multilingual query dictionary for robust accented key lookup
         norm_dict = {normalize_string(k): v for k, v in MULTILINGUAL_QUERY_DICTIONARY.items()}
@@ -428,17 +451,18 @@ class LexicalIndex:
         candidate_scores: Dict[str, float] = {}
         candidate_details: Dict[str, Dict[str, Any]] = {}
 
-        # 1. Exact / Normalized Entity Check
+        # 1. Exact / Normalized Entity Check (must respect candidate pool policy)
         entity_game = self.resolve_entity(query)
         if entity_game:
             gid = str(entity_game["id"])
-            candidate_scores[gid] = 1.0
-            candidate_details[gid] = {
-                "exact_title": True,
-                "matched_tags": [],
-                "matched_genres": [],
-                "token_overlap": 1.0,
-            }
+            if pool_filter_ids is None or gid in pool_filter_ids:
+                candidate_scores[gid] = 1.0
+                candidate_details[gid] = {
+                    "exact_title": True,
+                    "matched_tags": [],
+                    "matched_genres": [],
+                    "token_overlap": 1.0,
+                }
 
         # 2. Token Overlap Scoring
         # Find all games matching query tokens (and multilingual expansions) and rank by match multiplicity and reviews
@@ -448,14 +472,18 @@ class LexicalIndex:
             t_comp = re.sub(r"[\s-]", "", t_norm)
             
             for gid in self._title_token_to_ids.get(t_norm, set()):
-                token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 4
+                if pool_filter_ids is None or gid in pool_filter_ids:
+                    token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 4
             for gid in self._tag_to_ids.get(t_norm, set()):
-                token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 2
+                if pool_filter_ids is None or gid in pool_filter_ids:
+                    token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 2
             if t_comp != t_norm:
                 for gid in self._tag_to_ids.get(t_comp, set()):
-                    token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 2
+                    if pool_filter_ids is None or gid in pool_filter_ids:
+                        token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 2
             for gid in self._genre_to_ids.get(t_norm, set()):
-                token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 1
+                if pool_filter_ids is None or gid in pool_filter_ids:
+                    token_hit_counts[gid] = token_hit_counts.get(gid, 0) + 1
 
         # Prune candidate pool if large (e.g. > 300) by hit count and log reviews
         if len(token_hit_counts) > 300:
@@ -470,9 +498,11 @@ class LexicalIndex:
         else:
             candidate_pool_gids = set(token_hit_counts.keys())
 
-        # Include exact entity if found
+        # Include exact entity if found (and passes pool filter)
         if entity_game:
-            candidate_pool_gids.add(str(entity_game["id"]))
+            gid = str(entity_game["id"])
+            if pool_filter_ids is None or gid in pool_filter_ids:
+                candidate_pool_gids.add(gid)
 
         for gid in candidate_pool_gids:
             game = self._games_by_id.get(gid)

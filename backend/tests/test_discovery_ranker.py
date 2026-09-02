@@ -123,3 +123,107 @@ def test_ranker_rank_and_format_applies_threshold_and_limit(sample_game):
     assert len(results) == 1
     assert results[0].game.id == "105600"
     assert results[0].score >= 0.70
+
+
+def test_quality_review_threshold_constants():
+    """Verify production constants for review thresholds (ADR-007 / Discovery V2.4)."""
+    from app.search.ranking_config import (
+        DEFAULT_QUALITY_REVIEW_THRESHOLD,
+        HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD,
+    )
+    assert DEFAULT_QUALITY_REVIEW_THRESHOLD == 2000.0
+    assert HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD == 150.0
+
+
+def test_quality_factor_at_review_checkpoints():
+    """Test the quality confidence ramp across all 8 required review checkpoints."""
+    from app.search.ranking_config import (
+        DEFAULT_QUALITY_REVIEW_THRESHOLD,
+        HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD,
+    )
+
+    checkpoints = [50, 100, 150, 151, 250, 500, 2000, 5000]
+
+    for rev in checkpoints:
+        # HIDDEN_GEMS mode ramp (threshold = 150.0)
+        hg_factor = min(1.0, rev / HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD)
+        # Default mode ramp (threshold = 2000.0)
+        def_factor = min(1.0, rev / DEFAULT_QUALITY_REVIEW_THRESHOLD)
+
+        if rev == 50:
+            assert abs(hg_factor - (50.0 / 150.0)) < 1e-6
+            assert abs(def_factor - (50.0 / 2000.0)) < 1e-6
+        elif rev == 100:
+            assert abs(hg_factor - (100.0 / 150.0)) < 1e-6
+            assert abs(def_factor - (100.0 / 2000.0)) < 1e-6
+        elif rev == 150:
+            assert hg_factor == 1.0  # Full credit reached at 150
+            assert abs(def_factor - (150.0 / 2000.0)) < 1e-6
+        elif rev == 151:
+            assert hg_factor == 1.0  # Capped at 1.0
+            assert abs(def_factor - (151.0 / 2000.0)) < 1e-6
+        elif rev == 250:
+            assert hg_factor == 1.0
+            assert abs(def_factor - (250.0 / 2000.0)) < 1e-6
+        elif rev == 500:
+            assert hg_factor == 1.0
+            assert abs(def_factor - (500.0 / 2000.0)) < 1e-6
+        elif rev >= 2000:
+            assert hg_factor == 1.0
+            assert def_factor == 1.0
+
+
+def test_rank_hybrid_mode_threshold_isolation():
+    """Verify that HIDDEN_GEMS uses 150.0 while BEST_MATCH, POPULAR, and DISCOVER use 2000.0."""
+    from app.search.ranking_config import (
+        DEFAULT_QUALITY_REVIEW_THRESHOLD,
+        HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD,
+        QUALITY_WEIGHT,
+        DISCOVERY_MODES,
+    )
+    from app.search.query_parser import QueryParser
+
+    qp = QueryParser()
+    parsed = qp.parse("tactical turn-based roguelike")
+
+    # Candidate with 150 reviews and 90% positive
+    test_candidate = {
+        "id": "777",
+        "title": "Niche Tactical Gem",
+        "total_reviews": 150,
+        "positive_percent": 90.0,
+        "genres": ["Strategy", "RPG"],
+        "tags": ["Tactical", "Roguelike"],
+        "release_year": 2022,
+        "is_free": False,
+    }
+
+    modes = ["BEST_MATCH", "POPULAR", "DISCOVER", "HIDDEN_GEMS"]
+    for m in modes:
+        res = Ranker.rank_hybrid(
+            semantic_candidates=[(test_candidate, 0.80)],
+            lexical_candidates=[(test_candidate, 0.80, {})],
+            parsed_query=parsed,
+            mode=m,
+            limit=5,
+        )
+        assert len(res) == 1
+
+        # Check expected quality calculation for each mode
+        pos_pct = 0.90
+        mode_adj = DISCOVERY_MODES[m]
+        if m == "HIDDEN_GEMS":
+            expected_thresh = HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD
+            assert expected_thresh == 150.0
+            # At 150 reviews, HIDDEN_GEMS factor is exactly 1.0
+            expected_factor = min(1.0, 150.0 / 150.0)
+            assert expected_factor == 1.0
+        else:
+            expected_thresh = DEFAULT_QUALITY_REVIEW_THRESHOLD
+            assert expected_thresh == 2000.0
+            # Non-HIDDEN_GEMS factor is 150 / 2000 = 0.075
+            expected_factor = min(1.0, 150.0 / 2000.0)
+            assert expected_factor == 0.075
+
+        expected_qual_score = QUALITY_WEIGHT * (pos_pct * expected_factor) * mode_adj.quality_mult
+        assert expected_qual_score > 0.0

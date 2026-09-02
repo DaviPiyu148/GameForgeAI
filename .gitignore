@@ -59,3 +59,5 @@ backend/data/processed/*.npy
 backend/data/processed/*.faiss
 backend/data/processed/*.bin
 backend/data/uploads/
+backend/data/benchmark_indexes/
+backend/data/*.json

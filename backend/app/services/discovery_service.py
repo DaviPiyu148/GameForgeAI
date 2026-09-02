@@ -9,6 +9,7 @@ from app.schemas.discovery import (
     DiscoverySearchResult,
     MoreLikeThisRequest,
 )
+from app.search.candidate_pool import DiscoveryCandidatePool, get_candidate_pool_for_mode
 from app.search.catalog import CatalogManager
 from app.search.embedder import QueryEmbedder
 from app.search.index import FAISSIndexManager
@@ -108,6 +109,7 @@ class DiscoveryService:
         """
         raw_prompt = request.prompt.strip()
         mode = request.mode or "BEST_MATCH"
+        candidate_pool = get_candidate_pool_for_mode(mode)
         if not raw_prompt:
             return DiscoverySearchResponse(
                 query=request.prompt,
@@ -128,10 +130,10 @@ class DiscoveryService:
 
         # 1. Deterministic Query Understanding
         parsed_query = self.query_parser.parse(raw_prompt)
-        logger.info("Parsed query '%s' as %s (target=%s)", raw_prompt, parsed_query.query_type, parsed_query.target_entity)
+        logger.info("Parsed query '%s' as %s (target=%s, pool=%s)", raw_prompt, parsed_query.query_type, parsed_query.target_entity, candidate_pool.value)
 
-        # 2. Semantic Retrieval via SentenceTransformer + FAISS (if index ready)
-        if self.index_manager.is_ready():
+        # 2. Semantic Retrieval via SentenceTransformer + FAISS (mode-specific candidate pool)
+        if self.index_manager.is_ready(pool=candidate_pool):
             try:
                 # For SIMILARITY queries, if a target game was identified, embed its rich semantic profile
                 if parsed_query.query_type == "SIMILARITY" and parsed_query.target_game:
@@ -140,7 +142,9 @@ class DiscoveryService:
                     embed_text = parsed_query.clean_search_query or raw_prompt
 
                 query_vec = self.embedder.embed_query(embed_text)
-                raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(query_vec, top_k=top_k)
+                raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(
+                    query_vec, top_k=top_k, pool=candidate_pool
+                )
 
                 for gid, score in raw_sem_matches:
                     game = self.catalog_manager.get_game(gid)
@@ -149,17 +153,18 @@ class DiscoveryService:
             except Exception as e:
                 logger.warning(f"DiscoveryService: Semantic search failed, falling back to lexical: {e}")
         else:
-            logger.warning("DiscoveryService: FAISS index is not initialized or index file missing; using lexical fallback.")
+            logger.warning(f"DiscoveryService: FAISS index for pool {candidate_pool.value} is not initialized; using lexical fallback.")
             if not self.lexical_index:
                 raise RuntimeError("Discovery vector index and lexical catalog are both unavailable.")
 
-        # 3. Lexical Retrieval over Full Catalog (121k+ records)
+        # 3. Lexical Retrieval strictly respecting designated candidate pool policy
         lexical_candidates: List[Tuple[Dict[str, Any], float, Dict[str, Any]]] = []
         if self.lexical_index:
             lexical_candidates = self.lexical_index.search_lexical(
                 query=parsed_query.clean_search_query or raw_prompt,
                 limit=top_k,
                 query_type=parsed_query.query_type,
+                candidate_pool=candidate_pool,
             )
 
         # 4. Extract User Profile & Vectors if authenticated

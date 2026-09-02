@@ -48,6 +48,8 @@ MAX_TOTAL_NEGATIVE_PENALTY: float = 0.35
 # Quality & Acclaim signals
 QUALITY_WEIGHT: float = 0.08
 MAX_STEAM_REVIEWS_LOG: float = 5.0  # Log-scale capped at 100,000 reviews
+DEFAULT_QUALITY_REVIEW_THRESHOLD: float = 2000.0  # Standard review confidence asymptote
+HIDDEN_GEMS_QUALITY_REVIEW_THRESHOLD: float = 150.0  # Tuned threshold for HIDDEN_GEMS mode (ADR-007 / V2.3)
 
 # Novelty / Hidden Gem configuration
 NOVELTY_WEIGHT: float = 0.08
