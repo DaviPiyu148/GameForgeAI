@@ -25,7 +25,9 @@ INDEX_PATH = PROCESSED_DIR / "games_index.faiss"
 META_PATH = PROCESSED_DIR / "index_meta.json"
 REQUIREMENTS_PATH = BACKEND_DIR / "requirements.txt"
 DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-PINNED_DATASET_URL_BASE = "https://raw.githubusercontent.com/NewbieIndieGameDev/steam-insights/main/"
+# Dataset source: NewbieIndieGameDev/steam-insights (Steam Store & SteamSpy open export)
+# Pinned immutable revision: 5c47942127ef6905a415ff6815cf137803e73507 (October 2024 export)
+PINNED_DATASET_URL_BASE = "https://raw.githubusercontent.com/NewbieIndieGameDev/steam-insights/5c47942127ef6905a415ff6815cf137803e73507/"
 
 
 def compute_catalog_fingerprint(catalog_file: Path) -> Optional[str]:

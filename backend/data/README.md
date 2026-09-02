@@ -65,7 +65,7 @@ import os, urllib.request, zipfile
 raw_dir = 'data/raw'
 os.makedirs(raw_dir, exist_ok=True)
 files = ['games.zip', 'genres.zip', 'categories.zip', 'tags.zip', 'descriptions.zip', 'reviews.zip']
-base_url = 'https://raw.githubusercontent.com/NewbieIndieGameDev/steam-insights/main/'
+base_url = 'https://raw.githubusercontent.com/NewbieIndieGameDev/steam-insights/5c47942127ef6905a415ff6815cf137803e73507/'
 for f in files:
     target = os.path.join(raw_dir, f)
     if not os.path.exists(target):
