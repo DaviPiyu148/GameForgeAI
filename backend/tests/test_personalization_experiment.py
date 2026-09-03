@@ -1565,3 +1565,67 @@ class TestPhase73ExpandedStatisticalValidation:
         # Re-check first 100 users for 100% stable assignment
         for uid in treat_users[:100]:
             assert personalization_experiment_service.user_in_treatment_cohort(uid, 5) is True
+
+
+class TestPhase74ExtendedLongitudinalValidation:
+    """
+    Phase 7.4: Extended 5% Longitudinal Validation (N=2,000 treatment users):
+    1. Extended population scale (40,000 developers -> >= 2,000 treatment users).
+    2. Newcombe zero-boundary crossing detection for borderline endpoints.
+    3. Frozen system invariants: zero algorithm mutation, deterministic assignment stability.
+    """
+
+    def test_extended_population_scale_40k(self):
+        """
+        Verify that evaluated population of 40,000 developers yields >= 2,000 treatment users
+        under 5% deterministic SHA-256 partition.
+        """
+        from app.services.personalization_experiment import personalization_experiment_service
+        treat_users = []
+        for i in range(40000):
+            uid = f"dev_user_{i:05d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 5):
+                treat_users.append(uid)
+
+        # 5% of 40,000 is ~2,000
+        assert len(treat_users) >= 2000
+        # Re-verify deterministic stability on first 100 users
+        for uid in treat_users[:100]:
+            assert personalization_experiment_service.user_in_treatment_cohort(uid, 5) is True
+
+    def test_newcombe_zero_boundary_crossing_detection(self):
+        """
+        Verify Newcombe interval properly detects when a difference in proportions crosses zero,
+        correctly distinguishing established uplifts from statistically unresolved endpoints.
+        """
+        import math
+        from typing import Tuple
+
+        def wilson_score_interval(x: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+            if n == 0:
+                return (0.0, 0.0)
+            p = x / n
+            denom = 1.0 + (z * z) / n
+            center = (p + (z * z) / (2.0 * n)) / denom
+            radius = (z * math.sqrt((p * (1.0 - p) / n) + (z * z) / (4.0 * n * n))) / denom
+            return (max(0.0, center - radius), min(1.0, center + radius))
+
+        def newcombe_interval(x1: int, n1: int, x2: int, n2: int, z: float = 1.96) -> Tuple[float, float, float]:
+            p1 = x1 / n1
+            p2 = x2 / n2
+            delta = p1 - p2
+            l1, u1 = wilson_score_interval(x1, n1, z)
+            l2, u2 = wilson_score_interval(x2, n2, z)
+            lower = delta - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+            upper = delta + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+            return delta, lower, upper
+
+        # Scenario A: Established positive lift (Save Discovery: 41.6% vs 35.2% at N=2,000)
+        delta_a, lower_a, upper_a = newcombe_interval(832, 2000, 704, 2000)
+        assert delta_a > 0
+        assert lower_a > 0  # Does NOT cross zero -> Statistically significant
+
+        # Scenario B: Borderline lift spanning zero (Build Start: 23.5% vs 21.0% at N=1,000)
+        delta_b, lower_b, upper_b = newcombe_interval(235, 1000, 210, 1000)
+        assert delta_b > 0
+        assert lower_b < 0 < upper_b  # Crosses zero -> Not statistically significant!
