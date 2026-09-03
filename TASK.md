@@ -1143,4 +1143,4 @@ Project Switching Isolation:
 PAU is positive (+0.0214) and beneficial changes exceed harmful changes 1.98x, with zero regressions on cold start and hard constraints. However, because harmful changes still account for 24.2% of Top-5 movements (particularly in BEST_MATCH and POPULAR), personalization should remain in SHADOW mode until additional real-traffic diagnostics are gathered and mode-specific dampening (e.g. lower lambda or zero boost for BEST_MATCH/POPULAR) is formally evaluated.
 
 ### Git Checkpoint
-- Commit hash: (see below after commit)
+- Commit hash: `f9958c2`
