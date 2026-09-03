@@ -265,6 +265,7 @@ class PersonalizationExperimentService:
         lambda_: float = 0.05,
         treatment_pct: int = 0,
         latency_budget_ms: float = 50.0,
+        mode_lambdas: Optional[Dict[str, float]] = None,
     ) -> Tuple[DiscoverySearchResponse, ExperimentDiagnostics]:
         """
         Apply the personalization experiment to a base Discovery response.
@@ -273,11 +274,18 @@ class PersonalizationExperimentService:
         - In OFF mode: returns base_response unchanged with minimal diagnostics.
         - In SHADOW mode: returns base_response, diagnostics contain the hypothetical impact.
         - In TREATMENT mode: returns personalized_response for cohort users; base for others.
+        - If mode_lambdas is provided, resolves lambda for the specific Discovery mode.
 
         Any exception falls back to base_response.
         """
-        diag = ExperimentDiagnostics(mode=mode, lambda_=lambda_)
-        diag.discovery_mode = getattr(base_response, "mode", "BEST_MATCH") or "BEST_MATCH"
+        disc_mode = getattr(base_response, "mode", "BEST_MATCH") or "BEST_MATCH"
+        if mode_lambdas and disc_mode in mode_lambdas:
+            effective_lambda = mode_lambdas[disc_mode]
+        else:
+            effective_lambda = lambda_
+
+        diag = ExperimentDiagnostics(mode=mode, lambda_=effective_lambda)
+        diag.discovery_mode = disc_mode
 
         # ── OFF: nothing to compute ──────────────────────────────────────────
         if mode not in VALID_MODES or mode == PERSONALIZATION_MODE_OFF:
@@ -317,7 +325,7 @@ class PersonalizationExperimentService:
                 base_response=base_response,
                 effective_profile=effective_profile,
                 mode=mode,
-                lambda_=lambda_,
+                lambda_=effective_lambda,
                 user_in_cohort=user_in_cohort,
                 latency_budget_ms=latency_budget_ms,
                 diag=diag,

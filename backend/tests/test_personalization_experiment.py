@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 from app.schemas.developer_profile import (
     DeveloperPreferenceProfile,
     EffectivePreferenceProfile,
+    ProjectPreferenceProfile,
 )
 from app.schemas.discovery import (
     DiscoverySearchResponse,
@@ -65,12 +66,12 @@ def _make_result(game_id: str, title: str, score: float = 0.9, genres: Optional[
     )
 
 
-def _make_base_response(results: List[DiscoverySearchResult]) -> DiscoverySearchResponse:
+def _make_base_response(results: List[DiscoverySearchResult], mode: str = "BEST_MATCH") -> DiscoverySearchResponse:
     return DiscoverySearchResponse(
         query="test query",
         match_count=len(results),
         no_strong_match=False,
-        mode="BEST_MATCH",
+        mode=mode,
         results=results,
     )
 
@@ -766,3 +767,191 @@ class TestTreatmentExplanations:
         for res in final.results:
             # Reasons are only injected when rank changed
             assert isinstance(res.personalization_reasons, list)
+
+
+class TestModeLambdas:
+    """Phase 6.2: Test mode-specific lambda resolution."""
+
+    def test_mode_lambdas_overrides_default_lambda(self):
+        svc = _make_service()
+        results = [
+            _make_result("g1", "Action Game", 0.90, ["Action"]),
+            _make_result("g2", "Strategy Game", 0.89, ["Strategy"]),
+        ]
+        base = _make_base_response(results, mode="BEST_MATCH")
+        profile = _warm_profile()
+
+        # Provide mode_lambdas with BEST_MATCH=0.02
+        _, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="u",
+            mode=PERSONALIZATION_MODE_SHADOW,
+            lambda_=0.05,
+            mode_lambdas={"BEST_MATCH": 0.02, "DISCOVER": 0.07},
+        )
+
+        assert diag.lambda_ == 0.02
+        assert diag.discovery_mode == "BEST_MATCH"
+
+    def test_mode_lambdas_falls_back_if_mode_not_specified(self):
+        svc = _make_service()
+        results = [_make_result("g1", "Action Game", 0.90, ["Action"])]
+        base = _make_base_response(results, mode="HIDDEN_GEMS")
+        profile = _warm_profile()
+
+        _, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="u",
+            mode=PERSONALIZATION_MODE_SHADOW,
+            lambda_=0.05,
+            mode_lambdas={"BEST_MATCH": 0.02},  # HIDDEN_GEMS not present
+        )
+
+        assert diag.lambda_ == 0.05
+        assert diag.discovery_mode == "HIDDEN_GEMS"
+
+
+class TestPhase62ProjectContextAndSafety:
+    """Phase 6.2: Formal regression tests for project-context sensitivity and safety invariants."""
+
+    def test_project_context_produces_actual_rank_movement(self):
+        from app.services.personalization_reranker import personalization_reranker
+        from app.services.context_blender import context_blender
+
+        # Global: Cozy Farming
+        global_prof = DeveloperPreferenceProfile(
+            user_id="dev_cozy",
+            genres={"Casual": 1.0, "Simulation": 0.9},
+            mechanics={"farming": 1.0},
+            themes={"cozy": 1.0},
+            total_signal_count=5,
+            confidence_tier="ESTABLISHED",
+        )
+        # Project A: Cyberpunk Tactical Shooter
+        proj_a = ProjectPreferenceProfile(
+            project_id="p_cyber",
+            title="Cyber Ops",
+            genres={"Shooter": 1.0, "Action": 1.0},
+            mechanics={"tactical": 1.0},
+            themes={"cyberpunk": 1.0},
+        )
+        # Project B: Dark Fantasy RPG
+        proj_b = ProjectPreferenceProfile(
+            project_id="p_rpg",
+            title="Dungeon Shadows",
+            genres={"RPG": 1.0},
+            mechanics={"dungeon crawler": 1.0},
+            themes={"dark fantasy": 1.0},
+        )
+
+        # Candidates:
+        # Candidate 1: Generic base leader
+        c1 = _make_result("c1", "Generic Strategy", 0.90, ["Strategy"])
+        # Candidate 2: Tactical Shooter (Matches Project A)
+        c2 = _make_result("c2", "Tactical Cyberpunk", 0.88, ["Shooter", "Action"])
+        # Candidate 3: Dark RPG (Matches Project B)
+        c3 = _make_result("c3", "Dark Fantasy Crawler", 0.87, ["RPG"])
+
+        items = [c1, c2, c3]
+
+        # 1. No project: Global has zero affinity for Shooter or RPG
+        p_none = context_blender.blend(global_prof, None)
+        res_none, _ = personalization_reranker.rerank(items, p_none, lambda_=0.10)
+        assert [r.game.id for r in res_none] == ["c1", "c2", "c3"]
+
+        # 2. Project A: Tactical Cyberpunk gets strong boost and overtakes c1
+        p_eff_a = context_blender.blend(global_prof, proj_a)
+        res_a, traces_a = personalization_reranker.rerank(items, p_eff_a, lambda_=0.10)
+        assert res_a[0].game.id == "c2"  # Candidate 2 rose to rank 1!
+
+        # 3. Project B: Dark Fantasy Crawler gets strong boost and overtakes c1
+        p_eff_b = context_blender.blend(global_prof, proj_b)
+        res_b, traces_b = personalization_reranker.rerank(items, p_eff_b, lambda_=0.10)
+        assert res_b[0].game.id == "c3"  # Candidate 3 rose to rank 1!
+
+        # 4. No project again: reverts to exact base ordering
+        res_none_again, _ = personalization_reranker.rerank(items, p_none, lambda_=0.10)
+        assert [r.game.id for r in res_none_again] == ["c1", "c2", "c3"]
+
+    def test_global_profile_immutability_during_blending(self):
+        from app.services.context_blender import context_blender
+
+        global_prof = DeveloperPreferenceProfile(
+            user_id="dev_immut",
+            genres={"Casual": 1.0, "Simulation": 0.8},
+            mechanics={"farming": 0.9},
+            themes={"cozy": 1.0},
+            total_signal_count=4,
+            confidence_tier="ESTABLISHED",
+        )
+        before_state = global_prof.model_dump()
+
+        proj_a = ProjectPreferenceProfile(
+            project_id="p1",
+            title="Title A",
+            genres={"Shooter": 1.0},
+            mechanics={"tactical": 0.9},
+        )
+        proj_b = ProjectPreferenceProfile(
+            project_id="p2",
+            title="Title B",
+            genres={"RPG": 1.0},
+            mechanics={"dungeon": 0.9},
+        )
+
+        _ = context_blender.blend(global_prof, proj_a)
+        _ = context_blender.blend(global_prof, proj_b)
+        _ = context_blender.blend(global_prof, None)
+
+        after_state = global_prof.model_dump()
+        assert before_state == after_state
+
+    def test_project_movement_produces_grounded_explanations(self):
+        from app.services.context_blender import context_blender
+        from app.services.personalization_explanation_service import PersonalizationExplanationService
+
+        expl_svc = PersonalizationExplanationService()
+        global_prof = DeveloperPreferenceProfile(
+            user_id="dev_expl",
+            genres={"Casual": 1.0},
+            total_signal_count=2,
+            confidence_tier="EMERGING",
+        )
+        proj = ProjectPreferenceProfile(
+            project_id="p_cyber",
+            title="Cyber Ops",
+            genres={"Shooter": 1.0},
+            themes={"cyberpunk": 1.0},
+        )
+        eff = context_blender.blend(global_prof, proj)
+
+        candidate = _make_result("g_cyber", "Cyber Vanguard", 0.90, ["Shooter"])
+        reasons = expl_svc.explain(candidate=candidate, effective_profile=eff, project_profile=proj)
+
+        assert len(reasons) > 0
+        assert reasons[0].source == "PROJECT"
+        assert "Shooter" in reasons[0].text or "active project" in reasons[0].text
+
+    def test_saved_discovery_gradient_monotonicity(self):
+        from app.services.personalization_reranker import personalization_reranker
+
+        cold_prof = EffectivePreferenceProfile(user_id="test_cold")
+        dummy = _make_result("g1", "Test Game", 0.90, [])
+
+        sim_ladder = [0.95, 0.90, 0.80, 0.75, 0.70, 0.50]
+        scores = []
+        for s in sim_ladder:
+            score, _ = personalization_reranker.compute_personalization_score(
+                candidate=dummy,
+                effective_profile=cold_prof,
+                saved_discovery_similarities=[("ReferenceGame", s)],
+            )
+            scores.append(score)
+
+        # Monotonicity check
+        assert all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
+        # Threshold: < 0.75 gets zero boost
+        assert scores[-2] == 0.0
+        assert scores[-1] == 0.0

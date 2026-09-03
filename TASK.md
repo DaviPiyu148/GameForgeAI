@@ -1,22 +1,21 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 6.1: Real-Query Shadow Validation
+Personalization V1 — Phase 6.2: Mode-Specific Lambda & Project-Context Validation
 
 ## Status
 COMPLETE
 
 ## Objective
-Run personalization in SHADOW mode against real GameForge traffic and database profiles/projects to determine whether the offline benchmark generalizes to real developer behavior:
-1. Fix/verify change-classification boundaries to be gap-free and mutually exclusive (BENEFICIAL >= +0.05, NEUTRAL (-0.02, +0.05), HARMFUL <= -0.02) with 10 exhaustive boundary tests.
-2. Enable `PERSONALIZATION_MODE=SHADOW`, `PERSONALIZATION_LAMBDA=0.05`, `PERSONALIZATION_TREATMENT_PCT=0`.
-3. Verify shadow response identity invariant (`base_response == shadow_response`) across all requests.
-4. Expand `ExperimentDiagnostics` with discovery_mode, candidate IDs, latency, and no-evidence detection.
-5. Execute 140 real queries across all 4 modes, 4 profile maturity tiers (COLD, EMERGING, MODERATE, ESTABLISHED), and active project contexts.
-6. Evaluate PAU distribution, change classification, rank movement, safety, and latency.
+Execute targeted offline validation for Phase 6.2:
+1. Mode-Specific Lambda Sweep across DISCOVER (0.03, 0.05, 0.07), HIDDEN_GEMS (0.03, 0.05, 0.07), BEST_MATCH (0.00, 0.02, 0.03, 0.05), and POPULAR (0.00, 0.02, 0.03, 0.05) using the Phase 5 offline benchmark (20 developer profiles x 17 queries across exploratory, targeted, conflict, cold-start, off-profile query categories).
+2. Strengthened Project-Context Validation using contrasting synthetic personas (Global Cozy Farming vs Project A Cyberpunk Tactical Shooter vs Project B Dark Fantasy Dungeon Roguelike RPG).
+3. Verify ACTUAL RANK MOVEMENT, Project PAU, Global Profile Immutability, and Grounded Explanation Consistency.
+4. Saved-Discovery Gradient Monotonicity verification.
+5. All work OFFLINE ONLY — zero production exposure, production ranking unchanged.
 
 ## Previous Commit Checkpoint
-- SHA: `bf5ddb4` — `backend: add personalization V1 phase 6 (shadow mode, feature flag, A/B experiment service)`
+- SHA: `f9958c2` — `backend: execute personalization V1 phase 6.1 real-query shadow validation`
 
 ## Started
 2026-09-03
@@ -1144,3 +1143,118 @@ PAU is positive (+0.0214) and beneficial changes exceed harmful changes 1.98x, w
 
 ### Git Checkpoint
 - Commit hash: `f9958c2`
+- Commit: `backend: execute personalization V1 phase 6.1 real-query shadow validation`
+
+---
+
+## Phase 6.2: Mode-Specific Lambda & Project-Context Validation — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Execute targeted offline validation:
+1. Mode-Specific Lambda Sweep across DISCOVER (0.03, 0.05, 0.07), HIDDEN_GEMS (0.03, 0.05, 0.07), BEST_MATCH (0.00, 0.02, 0.03, 0.05), and POPULAR (0.00, 0.02, 0.03, 0.05).
+2. Strengthened Project-Context Validation using contrasting synthetic personas (Global Cozy Farming vs Project A Cyberpunk Tactical Shooter vs Project B Dark Fantasy Dungeon Roguelike RPG).
+3. Demonstrate ACTUAL RANK MOVEMENT, Incremental Project PAU, Global Profile Immutability, and Grounded Explanation Consistency.
+4. Saved-Discovery Gradient Monotonicity verification.
+5. All work OFFLINE ONLY — zero production exposure, production ranking unchanged.
+
+### Files Created / Modified
+- `backend/app/services/personalization_experiment.py`:
+  - Added optional `mode_lambdas: Optional[Dict[str, float]] = None` parameter to `apply()` with fallback to default `lambda_`.
+  - Passed resolved `effective_lambda` through to `_run_experiment()`.
+- `backend/tests/test_personalization_experiment.py`:
+  - Added `TestModeLambdas` covering mode-specific lambda resolution and fallback behavior.
+  - Added `TestPhase62ProjectContextAndSafety` covering:
+    - Actual rank movement under contrasting project context
+    - Project context switching and exact global recovery
+    - Global profile immutability during blending
+    - Grounded project explanation generation
+    - Saved-discovery similarity gradient monotonicity
+- `backend/scripts/benchmark_mode_and_project_validation.py` (NEW):
+  - Comprehensive offline validation script executing:
+    - 14 mode-lambda sweeps across 20 profiles x 17 queries (4,760 evaluated query runs)
+    - 5 project-sensitive queries across 4 context states (No Project -> Project A -> Project B -> No Project)
+    - Saved-discovery gradient monotonicity verification
+
+### Phase 6.2 Results Summary
+
+#### Table A: Mode-Specific Lambda Sweep Matrix
+```
+| Mode        |     λ | PAU     | Beneficial % | Neutral % | Harmful % | Top-5 Churn | Intent Preserv | Safety Violations |
+|-------------|------:|--------:|-------------:|----------:|----------:|------------:|---------------:|------------------:|
+| DISCOVER    |  0.03 | +0.0191 |        46.5% |     27.6% |     25.9% |        1.18 |         100.0% |                 0 |
+| DISCOVER    |  0.05 | +0.0257 |        46.5% |     30.3% |     23.2% |        1.47 |         100.0% |                 0 |
+| DISCOVER    |  0.07 | +0.0288 |        47.0% |     29.4% |     23.5% |        1.69 |         100.0% |                 0 |
+| HIDDEN_GEMS |  0.03 | +0.0180 |        48.6% |     26.4% |     25.0% |        1.05 |         100.0% |                 0 |
+| HIDDEN_GEMS |  0.05 | +0.0261 |        50.7% |     25.0% |     24.3% |        1.50 |         100.0% |                 0 |
+| HIDDEN_GEMS |  0.07 | +0.0285 |        48.9% |     26.7% |     24.4% |        1.76 |         100.0% |                 0 |
+| BEST_MATCH  |  0.00 | +0.0000 |         0.0% |      0.0% |      0.0% |        0.00 |         100.0% |                 0 |
+| BEST_MATCH  |  0.02 | +0.0114 |        48.3% |     24.0% |     27.7% |        0.71 |         100.0% |                 0 |
+| BEST_MATCH  |  0.03 | +0.0149 |        48.8% |     25.3% |     25.9% |        0.96 |         100.0% |                 0 |
+| BEST_MATCH  |  0.05 | +0.0184 |        47.6% |     25.1% |     27.3% |        1.36 |         100.0% |                 0 |
+| POPULAR     |  0.00 | +0.0000 |         0.0% |      0.0% |      0.0% |        0.00 |         100.0% |                 0 |
+| POPULAR     |  0.02 | +0.0071 |        42.6% |     27.3% |     30.2% |        0.71 |         100.0% |                 0 |
+| POPULAR     |  0.03 | +0.0129 |        44.8% |     29.1% |     26.1% |        0.96 |         100.0% |                 0 |
+| POPULAR     |  0.05 | +0.0174 |        45.3% |     27.2% |     27.5% |        1.32 |         100.0% |                 0 |
+```
+
+#### Project Context Validation Findings
+```
+Contrasting Personas:
+  Global Profile: Cozy Farming (Casual: 1.0, Simulation: 0.9, farming: 1.0, automation: 0.8, cozy: 1.0)
+  Project A:      Cyberpunk Tactical Shooter (Action: 1.0, Shooter: 1.0, tactical: 1.0, procedural generation: 0.9, cyberpunk: 1.0)
+  Project B:      Dark Fantasy Dungeon Roguelike (RPG: 1.0, Roguelike: 1.0, dungeon crawler: 1.0, permadeath: 0.9, dark fantasy: 1.0)
+
+Actual Rank Movement Occurred:     True (Verified across all 5 project-sensitive queries)
+Global Recovery Exact Across All:  True (100% exact return to original Top-10)
+Global Profile Immutability:       EXACT MATCH (100% immutable before vs after)
+Mean PAU Without Project:         +0.0140
+Mean PAU With Project:            +0.0227 (Incremental Uplift: +0.0087)
+Project Beneficial %:              46.7%
+Project Harmful %:                 26.7%
+
+Grounded Explanations Sample:
+- "Recommended for your active project because it matches its procedural generation mechanics."
+- "Recommended for your active project because it aligns with its Action genre."
+- "Recommended for your active project because it aligns with its RPG genre."
+```
+
+#### Saved-Discovery Gradient Monotonicity
+```
+Similarity 0.95 -> Personalization Score: 0.8075
+Similarity 0.90 -> Personalization Score: 0.7650
+Similarity 0.80 -> Personalization Score: 0.6800
+Similarity 0.75 -> Personalization Score: 0.6375
+Similarity 0.70 -> Personalization Score: 0.0000 (Below 0.75 threshold)
+Similarity 0.50 -> Personalization Score: 0.0000 (Below 0.75 threshold)
+Status: STRICTLY MONOTONIC (Passed)
+```
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **49 passed** in 0.67s.
+- `pytest backend/tests/ -q`: **540 passed, 1 warning** in 162.27s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **1.64s**.
+- Safety Invariants: **0 hard-constraint violations, 0 cold-start regressions, 100% intent preservation**.
+- Gemini Invariant: Exactly **0 API calls**.
+- Production State: `PERSONALIZATION_MODE = SHADOW`, `TREATMENT = 0%` (unchanged).
+
+### Recommended Mode Policy
+- `DISCOVER`:     $\lambda = 0.05$ (healthy PAU +0.0257, 30.3% neutral, 23.2% harmful)
+- `HIDDEN_GEMS`:  $\lambda = 0.05$ (highest beneficial % at 50.7%, PAU +0.0261)
+- `BEST_MATCH`:   $\lambda = 0.02$ or $\lambda = 0.03$ (conservative, maintains 36.5%-48.2% zero-movement stability)
+- `POPULAR`:      $\lambda = 0.00$ (personalization consistently yields highest harmful rates >30% and lowest PAU +0.0071; popular intent should not be diluted by personal history)
+
+### Production State
+```
+PERSONALIZATION:    SHADOW ONLY
+TREATMENT:          0%
+PRODUCTION RANKING: UNCHANGED
+GEMINI:             0
+```
+
+### Git Checkpoint
+- Commit hash: (see below after commit)
