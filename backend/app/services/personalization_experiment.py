@@ -203,13 +203,13 @@ def _classify_change(
 # Cohort assignment
 # ---------------------------------------------------------------------------
 
-def _user_in_treatment_cohort(user_id: str, treatment_pct: int) -> bool:
+def _user_in_treatment_cohort(user_id: Optional[str], treatment_pct: int) -> bool:
     """
     Deterministic, stable treatment cohort assignment.
     Uses hashlib.sha256(user_id) % 100 so the same user always receives
     the same cohort assignment regardless of request order or server restart.
     """
-    if treatment_pct <= 0:
+    if treatment_pct <= 0 or not user_id:
         return False
     if treatment_pct >= 100:
         return True
@@ -236,6 +236,7 @@ class PersonalizationExperimentService:
     - On any exception: fall back to base result, record safety event.
     - Attach grounded personalization explanations to TREATMENT results.
     """
+    user_in_treatment_cohort = staticmethod(_user_in_treatment_cohort)
 
     def __init__(self) -> None:
         self._explanation_service = PersonalizationExplanationService()
@@ -514,8 +515,8 @@ class PersonalizationExperimentService:
                     "score": result.score,
                 }
                 try:
-                    p_reasons = self._explanation_service.generate_reasons(
-                        candidate=candidate_dict,
+                    p_reasons = self._explanation_service.explain(
+                        candidate=result,
                         effective_profile=effective_profile,
                     )
                     reasons = [r.text for r in p_reasons]

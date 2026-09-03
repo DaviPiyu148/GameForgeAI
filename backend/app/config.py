@@ -104,8 +104,8 @@ class Settings(BaseSettings):
     #   OFF       — no personalization computation
     #   SHADOW    — compute personalized ranking in background; return BASE result
     #   TREATMENT — apply personalized ranking for users in the treatment cohort
-    # Phase 6.1 active setting: SHADOW (observation only, zero user-visible change).
-    PERSONALIZATION_MODE: str = "SHADOW"
+    # Phase 7 active setting: TREATMENT (5% controlled treatment cohort).
+    PERSONALIZATION_MODE: str = "TREATMENT"
 
     # Lambda for the additive re-ranking formula:
     #   personalized_score = base_score + (PERSONALIZATION_LAMBDA * personalization_score)
@@ -114,8 +114,8 @@ class Settings(BaseSettings):
 
     # Percentage of authenticated users assigned to the TREATMENT cohort (0–100).
     # Deterministic assignment is based on hash(user_id) % 100.
-    # 0 means no users receive treatment even when PERSONALIZATION_MODE=TREATMENT.
-    PERSONALIZATION_TREATMENT_PCT: int = 0
+    # Phase 7: 5% controlled treatment experiment.
+    PERSONALIZATION_TREATMENT_PCT: int = 5
 
     # Phase 6.3 Mode-Specific Lambdas for shadow experiment:
     # DISCOVER: 0.05, HIDDEN_GEMS: 0.05, BEST_MATCH: 0.02, POPULAR: 0.00

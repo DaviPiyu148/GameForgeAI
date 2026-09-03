@@ -1044,3 +1044,223 @@ class TestPhase62ProjectContextAndSafety:
         # Threshold: < 0.75 gets zero boost
         assert scores[-2] == 0.0
         assert scores[-1] == 0.0
+
+
+class TestPhase7ControlledTreatment:
+    """Phase 7: Focused unit tests for controlled 5% treatment cohort rollout."""
+
+    POLICY = {
+        "DISCOVER": 0.05,
+        "HIDDEN_GEMS": 0.05,
+        "BEST_MATCH": 0.02,
+        "POPULAR": 0.00,
+    }
+
+    @staticmethod
+    def _find_cohort_users():
+        """Helper to find deterministic user IDs in and out of the 5% cohort."""
+        svc = _make_service()
+        treat_user = None
+        ctrl_user = None
+        for i in range(1000):
+            uid = f"user_test_cohort_{i}"
+            if svc.user_in_treatment_cohort(uid, 5) and treat_user is None:
+                treat_user = uid
+            elif not svc.user_in_treatment_cohort(uid, 5) and ctrl_user is None:
+                ctrl_user = uid
+            if treat_user and ctrl_user:
+                break
+        return treat_user, ctrl_user
+
+    def test_off_mode_returns_base(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.85, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+        profile = _warm_profile()
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="any_user",
+            mode=PERSONALIZATION_MODE_OFF,
+            mode_lambdas=self.POLICY,
+        )
+        assert resp.personalized is False
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+        assert diag.mode == PERSONALIZATION_MODE_OFF
+
+    def test_shadow_mode_returns_base_response_identity(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.85, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+        profile = _warm_profile()
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_SHADOW,
+            mode_lambdas=self.POLICY,
+        )
+        # Even for treatment-eligible user, SHADOW returns base response
+        assert resp.personalized is False
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+        assert diag.mode == PERSONALIZATION_MODE_SHADOW
+        assert diag.lambda_ == 0.05
+
+    def test_treatment_control_cohort_receives_base_response(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.85, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+        profile = _warm_profile()
+
+        _, ctrl_user = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=ctrl_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            mode_lambdas=self.POLICY,
+        )
+        # Control user must receive exact base response, unpersonalized
+        assert resp.personalized is False
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+        for r in resp.results:
+            assert len(r.personalization_reasons) == 0
+
+    def test_treatment_treatment_cohort_receives_personalized_response(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.805, ["Puzzle"])
+        r2 = _make_result("g2", "Strategy Game", 0.800, ["Strategy"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+        profile = _warm_profile()  # Strategy = 0.90 affinity
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            mode_lambdas=self.POLICY,
+        )
+        # Treatment user receives personalized response with flipped order (g2 boosted over g1)
+        assert resp.personalized is True
+        assert [r.game.id for r in resp.results] == ["g2", "g1"]
+        assert diag.lambda_ == 0.05
+        assert diag.candidates_moved == 2
+        assert diag.mean_abs_rank_delta == 1.0
+        # Grounded explanation attached to moved game
+        assert len(resp.results[0].personalization_reasons) > 0
+
+    def test_popular_mode_treatment_cohort_exact_base_identity(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.805, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.800, ["Action"])
+        base = _make_base_response([r1, r2], mode="POPULAR")
+        profile = _warm_profile()
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            mode_lambdas=self.POLICY,
+        )
+        # POPULAR has lambda = 0.00 -> zero churn, exact base identity
+        assert diag.lambda_ == 0.00
+        assert diag.top5_churn == 0
+        assert diag.candidates_moved == 0
+        assert diag.preference_alignment_uplift == 0.0
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+
+    def test_best_match_mode_treatment_cohort_lambda_02(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.95, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="BEST_MATCH")
+        profile = _warm_profile()
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            mode_lambdas=self.POLICY,
+        )
+        assert diag.lambda_ == 0.02
+        assert diag.discovery_mode == "BEST_MATCH"
+        # High score difference preserved at lambda=0.02
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+
+    def test_cold_start_user_in_treatment_is_noop(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Puzzle Game", 0.85, ["Puzzle"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+        cold_profile = EffectivePreferenceProfile(user_id="cold_treat_user")
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=cold_profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            mode_lambdas=self.POLICY,
+        )
+        # Cold start must produce zero movement, zero explanations, exact base
+        assert diag.candidates_moved == 0
+        assert diag.top5_churn == 0
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+        for r in resp.results:
+            assert len(r.personalization_reasons) == 0
+
+    def test_stable_cohort_assignment(self):
+        svc = _make_service()
+        treat_user, ctrl_user = self._find_cohort_users()
+
+        # Invariant: stable across repeated evaluations, queries, and times
+        for _ in range(10):
+            assert svc.user_in_treatment_cohort(treat_user, 5) is True
+            assert svc.user_in_treatment_cohort(ctrl_user, 5) is False
+
+        # Anonymous user (empty or None) always gets control
+        assert svc.user_in_treatment_cohort("", 5) is False
+        assert svc.user_in_treatment_cohort(None, 5) is False
+
+    def test_safety_fallback_reverts_to_base_response(self):
+        svc = _make_service()
+        r1 = _make_result("g1", "Horror Game", 0.85, ["Horror"])
+        r2 = _make_result("g2", "Action Game", 0.80, ["Action"])
+        base = _make_base_response([r1, r2], mode="DISCOVER")
+
+        # Profile with explicit avoidance of Horror
+        profile = EffectivePreferenceProfile(
+            user_id="user_avoid",
+            genres={"Action": 0.9},
+            explicit_avoidances=["Horror"],
+        )
+
+        treat_user, _ = self._find_cohort_users()
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id=treat_user,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=5,
+            latency_budget_ms=0.0001,  # Force latency budget trigger
+            mode_lambdas=self.POLICY,
+        )
+        # Safety fallback must return base response
+        assert diag.safety_fallback_triggered is True
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]

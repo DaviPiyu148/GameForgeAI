@@ -169,12 +169,13 @@ class PersonalizationExplanationService:
 
         # 6. Priority 2: Explicit Global Preferences
         # Explains long-term developer preferences without using project language
-        if global_profile and global_profile.total_signal_count > 0:
+        g_prof = global_profile or eff
+        if g_prof and getattr(g_prof, "total_signal_count", 1) > 0:
             # A. Global Genres
             for genre in sorted(c_genres):
                 if genre.lower() in avoid_set:
                     continue
-                score = global_profile.genres.get(genre, 0.0)
+                score = g_prof.genres.get(genre, 0.0)
                 if score >= self.min_global_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -190,7 +191,7 @@ class PersonalizationExplanationService:
             for mech in sorted(c_mechanics):
                 if mech.lower() in avoid_set:
                     continue
-                score = global_profile.mechanics.get(mech, 0.0)
+                score = g_prof.mechanics.get(mech, 0.0)
                 if score >= self.min_global_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -206,7 +207,7 @@ class PersonalizationExplanationService:
             for theme in sorted(c_themes):
                 if theme.lower() in avoid_set:
                     continue
-                score = global_profile.themes.get(theme, 0.0)
+                score = g_prof.themes.get(theme, 0.0)
                 if score >= self.min_global_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -222,7 +223,7 @@ class PersonalizationExplanationService:
             for mode in sorted(c_modes):
                 if mode.lower() in avoid_set:
                     continue
-                score = global_profile.modes.get(mode, 0.0)
+                score = g_prof.modes.get(mode, 0.0)
                 if score >= self.min_global_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(

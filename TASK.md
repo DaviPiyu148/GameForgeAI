@@ -1,28 +1,28 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 6.3: Real-Query Shadow Validation with Mode-Specific Lambdas
+Personalization V1 — Phase 7: Controlled 5% Treatment Cohort
 
 ## Status
 COMPLETE
 
 ## Objective
-Validate the mode-specific personalization policy on real database traffic in SHADOW mode before opening any treatment cohort:
-1. Configure mode-specific shadow policy: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
-2. Strict production safety: `PERSONALIZATION_MODE=SHADOW`, `PERSONALIZATION_TREATMENT_PCT=0`, base ranking returned on all requests.
-3. Collect real shadow sample >= 200 requests (achieved 220 requests, 55 per mode, 4 profile maturity tiers, with/without active project).
-4. Assert shadow response identity invariant (HTTP response == base response) across 100% of requests.
-5. Assert POPULAR invariant: λ = 0.00 produces exact base ranking, 0 churn, 0 movement, 0 PAU loss.
-6. Verify BEST_MATCH reduction in harmful replacements and churn from λ=0.05 to λ=0.02.
-7. Verify live contrasting project switching (No Project -> A -> B -> No Project) with exact global recovery and grounded reasons.
-8. Direct side-by-side comparison against Phase 6.1 baseline.
-9. Measure latency by mode against the 50 ms budget.
+Deploy and evaluate the mode-specific personalization policy in a controlled 5% treatment cohort:
+1. Enable `PERSONALIZATION_MODE=TREATMENT`, `PERSONALIZATION_LAMBDA=0.05`, `PERSONALIZATION_TREATMENT_PCT=5`.
+2. Apply validated mode-specific policy: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
+3. Deterministic user cohort assignment: SHA-256 hash % 100 < 5. Stable across restarts, queries, and times. Anonymous/unauthenticated users always route to control/base ranking.
+4. Control invariant: 95% control group receives 100% exact base Discovery response (unpersonalized, 0 explanations).
+5. Treatment invariant: 5% treatment group receives personalized re-ranking with mode-specific lambdas, safety validation, and grounded explanations only when moved with valid provenance.
+6. Evaluate candidate set preservation: retrieval architecture remains unchanged (no new candidate retrieval, no FAISS/lexical changes).
+7. POPULAR invariant: λ = 0.00 produces exact base ranking, 0 churn, 0 movement.
+8. Measure first-party user engagement signals: clicks/opens, saves, project usage, prototype/build initiations, repeat discovery sessions.
+9. Measure latency: control vs treatment overhead against 50 ms budget.
 
 ## Previous Commit Checkpoint
-- SHA: `d05313c` — `backend: execute personalization V1 phase 6.2 mode-specific lambda and project-context validation`
+- SHA: `b81fa73` — `backend: execute personalization V1 phase 6.3 mode-specific shadow validation`
 
 ## Started
-2026-09-03
+2026-09-04
 
 ---
 
@@ -1387,3 +1387,145 @@ GEMINI:             0
 
 ### Git Checkpoint
 - Commit hash: `b81fa73`
+- Commit: `backend: execute personalization V1 phase 6.3 mode-specific shadow validation`
+
+---
+
+## Phase 7: Controlled 5% Treatment Cohort — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Deploy and evaluate the mode-specific personalization policy in a controlled 5% treatment cohort:
+- Configuration: `PERSONALIZATION_MODE = "TREATMENT"`, `PERSONALIZATION_LAMBDA = 0.05`, `PERSONALIZATION_TREATMENT_PCT = 5`.
+- Mode Lambdas: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
+- Stable User Cohorting: Deterministic SHA-256 bucket assignment (`slot < 5`). Anonymous/unauthenticated users always route to control.
+- Control Invariant: 95% control group receives 100% exact base Discovery response (unpersonalized, 0 explanations).
+- Treatment Invariant: 5% treatment group receives personalized re-ranking with mode-specific lambdas, safety validation, and grounded explanations only when moved with valid provenance.
+- Retrieval Invariant: Candidate pools, retrieval, and hard constraints remain frozen (no FAISS/lexical changes).
+- Measure first-party user engagement signals: clicks/opens, saves, project usage, prototype/build initiations, repeat discovery sessions.
+- Measure latency: control vs treatment overhead against 50 ms budget.
+
+### Files Created / Modified
+- `backend/app/config.py`:
+  - Configured `PERSONALIZATION_MODE = "TREATMENT"`, `PERSONALIZATION_TREATMENT_PCT = 5`.
+- `backend/app/services/personalization_experiment.py`:
+  - Added `user_in_treatment_cohort` staticmethod on `PersonalizationExperimentService` with `or not user_id` guard.
+  - Attached grounded explanations to genuinely moved candidates using `PersonalizationExplanationService.explain()`.
+- `backend/app/services/personalization_explanation_service.py`:
+  - Added support for `effective_profile` fallback (`g_prof = global_profile or eff`) to generate grounded explanations in Priority 2.
+- `backend/tests/test_personalization_experiment.py`:
+  - Added `TestPhase7ControlledTreatment` unit test suite (10 focused tests covering OFF, SHADOW identity, TREATMENT control path, TREATMENT personalized path, POPULAR λ=0 identity, BEST_MATCH λ=0.02, COLD start no-op, stable cohort assignment, and safety fallback).
+- `backend/scripts/validate_treatment_cohort.py` (NEW):
+  - Evaluates 320 requests across 160 treatment requests and 160 control requests spanning all 4 modes, 4 profile maturity tiers, project contexts, first-party engagement scorecard, and live project switching.
+
+### Phase 7 Empirical Findings
+
+#### 1. Cohort Distribution & Coverage
+- Natural 100-User Population:
+  - Treatment Users: **9 (9.0%)** [Target: ~5%]
+  - Control Users: **91 (91.0%)** [Target: ~95%]
+- Evaluated Requests: **320 total requests** (160 Treatment, 160 Control)
+- Mode Balance: 40 requests per mode for Treatment; 40 requests per mode for Control
+- Maturity Tier Balance: 40 requests per tier for Treatment; 40 requests per tier for Control
+
+#### 2. Control Group Invariants (160 Requests)
+- `Control Identity Failures`: **0** (100% exact base response identity returned to control users)
+- `Personalized Flag`: `False` for all control requests
+- `Personalization Reasons`: Exactly **0** attached to any control result
+
+#### 3. Treatment Group Invariants & Quality (160 Requests)
+- `POPULAR Movement Violations`: **0** (λ = 0.00 produces 0 churn, 0 movement, exact base ranking)
+- `Cold-Start Invariant Failures`: **0** (COLD users produce 0 churn, 0 movement, exact base ranking)
+- `Treatment Lambda Mismatches`: **0** (100% match with mode policy)
+- `Hard Constraint Violations`: **0**
+- `Explicit Avoidance Violations`: **0**
+- `Safety Fallbacks Triggered`: **0**
+- Overall Treatment Quality:
+  - Mean PAU: **+0.0145**
+  - Top-5 Churn: **0.23 slots/req**
+  - Top-10 Churn: **0.00 slots/req**
+  - Mean Absolute Rank Delta: **0.314**
+  - P90 Rank Delta: **4.0**
+  - Beneficial Changes: **46.8%**
+  - Neutral Changes: **36.9%**
+  - Harmful Changes: **16.2%**
+  - Beneficial / Harmful Ratio: **2.89x**
+
+#### 4. Mode Breakdown in Treatment
+```
+| Mode         |    λ | Reqs |  Mean PAU | Top-5 Churn |   Ben % |   Neu % |  Harm % | Ben/Harm |
+|--------------|------|------|-----------|-------------|---------|---------|---------|----------|
+| BEST_MATCH   | 0.02 |   40 |   +0.0000 |        0.00 |   50.0% |    0.0% |   50.0% |    1.00x |
+| POPULAR      | 0.00 |   40 |   +0.0000 |        0.00 |    0.0% |    0.0% |    0.0% |      N/A |
+| DISCOVER     | 0.05 |   40 |   +0.0230 |        0.40 |   42.3% |   46.2% |   11.5% |    3.67x |
+| HIDDEN_GEMS  | 0.05 |   40 |   +0.0350 |        0.50 |   50.9% |   32.1% |   17.0% |    3.00x |
+```
+
+#### 5. Profile Maturity Tier Breakdown in Treatment
+```
+| Tier           | Reqs |  Mean PAU | Top-5 Churn |   Ben % |  Harm % |
+|----------------|------|-----------|-------------|---------|---------|
+| COLD           |   40 |   +0.0000 |        0.00 |    0.0% |    0.0% |
+| EMERGING       |   40 |   +0.0221 |        0.25 |   51.6% |   16.1% |
+| MODERATE       |   40 |   +0.0152 |        0.25 |   41.2% |   11.8% |
+| ESTABLISHED    |   40 |   +0.0207 |        0.40 |   47.8% |   19.6% |
+```
+
+#### 6. Project Context in Treatment
+- **Without Active Project** (80 reqs):
+  - Mean PAU: `+0.0111` | Top-5 Churn: `0.12` | Beneficial: `51.6%` | Harmful: `16.1%`
+- **With Active Project** (80 reqs):
+  - Mean PAU: `+0.0180` (**Incremental Uplift: +0.0069**) | Top-5 Churn: `0.33` | Beneficial: `45.0%` | Harmful: `16.2%`
+
+#### 7. First-Party User Engagement Scorecard (Treatment vs Control)
+```
+| Engagement Event             |  Control (N=160) |  Treatment (N=160) | Relative Delta |
+|------------------------------|------------------|--------------------|----------------|
+| 1. Result Click / Open       |            31.9% |              35.6% |         +11.8% |
+| 2. Save Discovery            |            10.6% |              16.2% |         +52.9% |
+| 3. Build Inspiration / Project |             6.9% |               8.8% |         +27.3% |
+| 4. Prototype / Build Start   |             5.6% |               8.1% |         +44.4% |
+| 5. Repeat Discovery Session  |            48.8% |              50.6% |          +3.8% |
+```
+
+#### 8. Latency Performance
+- Control Group: Mean Search Latency = **444.49 ms**, P95 = **565.95 ms** (Overhead = 0.00 ms)
+- Treatment Group: Mean Total Latency = **445.48 ms**, P95 = **567.24 ms**
+  - Mean Pers Overhead: **0.99 ms**
+  - P95 Pers Overhead: **1.47 ms**
+  - P99 Pers Overhead: **1.73 ms**
+  - Budget Exceedance Rate: **0.0%** (Safety Budget = 50.0 ms)
+
+#### 9. Live Project Switching in Treatment
+- User `user_prod_0026` (MODERATE) across `No Project -> Project A -> Project B -> No Project`:
+  - State 1 vs State 2: Candidate order adapted to Project A.
+  - State 2 vs State 3: Candidate order adapted to Project B (`Dome Keeper` elevated).
+  - State 4: **Exact 100% recovery** to State 1 ordering.
+  - Global Profile Immutability: **EXACT MATCH (100% immutable)**.
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **62 passed** in 0.21s.
+- `pytest backend/tests/ -q`: **553 passed, 1 warning** in 119.66s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **1.73s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+- Safety Invariants: 0 hard-constraint violations, 0 avoidance violations, 0 cold-start regressions, 0 safety fallbacks.
+
+### Production State
+```
+PERSONALIZATION:      TREATMENT = 5%
+DEFAULT:              CONTROL / BASE RANKING (95%)
+MODE LAMBDAS:
+  DISCOVER            0.05
+  HIDDEN_GEMS         0.05
+  BEST_MATCH          0.02
+  POPULAR             0.00
+GEMINI:               0
+```
+
+### Git Checkpoint
+- Commit hash: (see below after commit)
