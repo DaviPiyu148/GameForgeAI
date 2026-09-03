@@ -1475,3 +1475,93 @@ class TestPhase72StatisticalIntegrity:
         assert ci_lower < 0 < ci_upper
         z_stat = delta / se
         assert z_stat < 1.96  # p > 0.05 (two-tailed)
+
+
+class TestPhase73ExpandedStatisticalValidation:
+    """
+    Phase 7.3: Statistical Rigor & Scale Validation:
+    1. Newcombe hybrid score confidence interval for difference in proportions.
+    2. Holm-Bonferroni multiple testing correction for primary endpoints.
+    3. Expanded population SHA-256 deterministic cohorting (>= 1,000 treatment users at N=20,000).
+    """
+
+    def test_newcombe_hybrid_score_interval_math(self):
+        """
+        Verify Newcombe hybrid score confidence interval (Newcombe 1998):
+        Uses Wilson score bounds [l1, u1] and [l2, u2] to construct:
+        L = (p1 - p2) - sqrt((p1 - l1)^2 + (u2 - p2)^2)
+        U = (p1 - p2) + sqrt((u1 - p1)^2 + (p2 - l2)^2)
+        """
+        import math
+        from typing import Tuple
+
+        def wilson_score_interval(x: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+            if n == 0:
+                return (0.0, 0.0)
+            p = x / n
+            denom = 1.0 + (z * z) / n
+            center = (p + (z * z) / (2.0 * n)) / denom
+            radius = (z * math.sqrt((p * (1.0 - p) / n) + (z * z) / (4.0 * n * n))) / denom
+            return (max(0.0, center - radius), min(1.0, center + radius))
+
+        def newcombe_interval(x1: int, n1: int, x2: int, n2: int, z: float = 1.96) -> Tuple[float, float, float]:
+            p1 = x1 / n1
+            p2 = x2 / n2
+            delta = p1 - p2
+            l1, u1 = wilson_score_interval(x1, n1, z)
+            l2, u2 = wilson_score_interval(x2, n2, z)
+            lower = delta - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+            upper = delta + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+            return delta, lower, upper
+
+        # Test with N=1000 per group: 436 vs 340 (Save Discovery)
+        delta, lower, upper = newcombe_interval(436, 1000, 340, 1000)
+        assert round(delta, 3) == 0.096
+        # Strictly positive, narrower than Wald interval
+        assert lower > 0.05
+        assert upper < 0.15
+        assert lower < delta < upper
+
+    def test_holm_bonferroni_adjustment(self):
+        """
+        Verify Holm-Bonferroni step-down adjustment:
+        For 3 endpoints with sorted raw p-values [p1, p2, p3]:
+        adj_p1 = min(3 * p1, 1.0)
+        adj_p2 = min(max(adj_p1, 2 * p2), 1.0)
+        adj_p3 = min(max(adj_p2, 1 * p3), 1.0)
+        """
+        raw_p = [0.0018, 0.0078, 0.0443]  # Save, Return 24h, Prototype
+        # Sorted indices
+        sorted_p = sorted(raw_p)
+        k = len(sorted_p)
+        adj = []
+        cum_max = 0.0
+        for i, p in enumerate(sorted_p):
+            mult = k - i
+            val = min(1.0, p * mult)
+            cum_max = max(cum_max, val)
+            adj.append(cum_max)
+
+        # First two remain statistically significant (adj_p < 0.05)
+        assert adj[0] == round(0.0018 * 3, 4)  # 0.0054 < 0.05
+        assert adj[1] == round(0.0078 * 2, 4)  # 0.0156 < 0.05
+        # Third endpoint at 0.0443 * 1 = 0.0443
+        assert adj[2] == 0.0443
+
+    def test_expanded_population_scale_and_deterministic_sha256(self):
+        """
+        Verify that evaluated population of 20,000 developers yields >= 1,000 treatment users
+        with 100% deterministic reproducibility.
+        """
+        from app.services.personalization_experiment import personalization_experiment_service
+        treat_users = []
+        for i in range(20000):
+            uid = f"dev_user_{i:05d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 5):
+                treat_users.append(uid)
+
+        # 5% of 20,000 is ~1,000
+        assert len(treat_users) >= 1000
+        # Re-check first 100 users for 100% stable assignment
+        for uid in treat_users[:100]:
+            assert personalization_experiment_service.user_in_treatment_cohort(uid, 5) is True
