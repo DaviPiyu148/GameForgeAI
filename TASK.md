@@ -1,30 +1,18 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 4: Grounded Deterministic Personalization Explanations
+Personalization V1 — Phase 6: Shadow Mode, Feature Flag & Controlled A/B Integration
 
 ## Status
 COMPLETE
 
 ## Objective
-Implement grounded, deterministic, template-based personalization explanations using existing profile provenance and active project context without altering ranking:
-1. Audit existing `DiscoverySearchResult` schema and reuse `personalization_reasons: List[str]`.
-2. Define structured `PersonalizationReason` in `backend/app/schemas/developer_profile.py`.
-3. Implement `PersonalizationExplanationService` in `backend/app/services/personalization_explanation_service.py`:
-   - Active project evidence prioritized (Priority 1: theme, mechanic, genre, mode).
-   - Global developer preferences (Priority 2: genre, mechanic, theme, mode).
-   - Saved-discovery similarity (Priority 3: concrete saved game anchor, cosine similarity >= 0.75).
-   - Absolute groundedness: explains ONLY existing facts, returns [] on cold start / no match.
-   - Absolute avoidance safety: never produces reasons contradicting explicit avoidances.
-   - Suppressed game guard: never generates personalized reasons for suppressed/disliked games.
-   - Maximum 2 reasons per candidate with deterministic tie-breaking.
-4. Extend `backend/scripts/audit_preference_profile.py` with sample catalog candidate explanation auditing.
-5. Create comprehensive test suite `backend/tests/test_personalization_explanation_service.py` (12 unit tests).
-6. Strict invariant: Discovery retrieval and ranking remain completely FROZEN; zero Gemini calls (`0`).
+Integrate the Phase 5 personalization re-ranker behind a feature flag (OFF/SHADOW/TREATMENT),
+first in shadow mode (compute but don't change response), then through a controlled A/B experiment,
+without making personalization the default production behavior. Default remains OFF.
 
 ## Previous Commit Checkpoint
-- SHA: `22215226547f87ff9c734cb9c01321985079f4d0` (`2221522`)
-- Message: `feat(discovery): promote reviewed-only discover with confidence floor`
+- SHA: `6639a9f` — `backend: add personalization V1 phases 1-5 (aggregator, blender, explanations, offline benchmark)`
 
 ## Started
 2026-09-03
@@ -902,5 +890,79 @@ All approved signals   | 88.2%    | 100.0%         | 33.5%   | 0.44
 - BROWSER TESTING: NOT PERFORMED (offline benchmark only, no frontend changes).
 
 ### Git Checkpoint
-- Commit hash: (see below after commit)
+- Commit hash: `6639a9f`
 - All Phase 1–5 personalization files committed as one logical unit.
+
+---
+
+## Phase 6: Shadow Mode, Feature Flag & Controlled A/B Integration — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Integrate the Phase 5 personalization re-ranker behind a feature flag with three explicit modes
+(OFF / SHADOW / TREATMENT), first as shadow-only computation, then as a controlled cohort A/B
+experiment. Production default remains OFF. No Gemini calls. Discovery retrieval frozen.
+
+### Files Created / Modified
+- `backend/app/config.py`:
+  - Added `PERSONALIZATION_MODE: str = "OFF"` (default: OFF)
+  - Added `PERSONALIZATION_LAMBDA: float = 0.05`
+  - Added `PERSONALIZATION_TREATMENT_PCT: int = 0`
+  - Added `PERSONALIZATION_LATENCY_BUDGET_MS: float = 50.0`
+- `backend/app/services/personalization_experiment.py` (NEW):
+  - `PersonalizationExperimentService` — single integration point
+  - OFF: returns base result untouched, zero computation
+  - SHADOW: computes personalized ranking, records diagnostics, returns BASE
+  - TREATMENT: applies personalized ranking for deterministically-assigned cohort users
+  - `ExperimentDiagnostics` dataclass: mode, lambda, profile tier, moved, top5/10 churn, mean delta, max delta, new/left top5, Preference Alignment Uplift, intent/avoidance violations, cold regression, beneficial/neutral/harmful changes, latency, safety fallback
+  - `_compute_profile_alignment()`: deterministic LLM-free alignment score [0,1] across genre/mechanic/theme/mode
+  - `_classify_change()`: BENEFICIAL / NEUTRAL / HARMFUL per Top-5 change
+  - `_user_in_treatment_cohort()`: sha256(user_id) % 100 for stable, restart-safe assignment
+  - Safety fallback: any exception OR latency budget exceeded → base result + event recorded
+  - Grounded explanations attached to TREATMENT results that actually moved rank
+- `backend/app/api/discovery.py`:
+  - Integrated experiment service post-ranking, pre-HTTP-response
+  - Profile built once per request (global + optional project context)
+  - Outer exception guard ensures base response always returned on experiment failure
+- `backend/tests/test_personalization_experiment.py` (NEW, 32 tests):
+  - Feature modes: OFF / SHADOW / TREATMENT / invalid
+  - Lambda=0 identity: exact base ordering confirmed
+  - Cold start: cold profile and None profile both return base
+  - Cohort stability: same user same assignment; 0% → none; 100% → all; ~50% distribution
+  - Avoidance safety: avoided genre preserved
+  - Shadow diagnostics: metrics populated, response body unchanged
+  - Failure fallback: exception → base; latency budget 0ms → base
+  - Alignment uplift: zero for cold, positive for match, higher for better match
+  - Change classification: BENEFICIAL / NEUTRAL / HARMFUL thresholds
+  - Churn tracking: zero at lambda=0, tracked when reorder occurs
+  - Empty results guard
+  - Project context: active_project flag in diagnostics
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **32 passed** in 0.41s.
+- `pytest backend/tests/ -q`: **523 passed, 1 warning** in 145.85s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **1.56s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+- BROWSER TESTING: NOT PERFORMED (no frontend route changes).
+- Default state confirmed: `PERSONALIZATION_MODE = OFF` — no user sees personalized results without operator configuration.
+
+### Production Decision
+`KEEP PERSONALIZATION IN SHADOW MODE.`
+The feature flag defaults to OFF. To activate shadow monitoring, set `PERSONALIZATION_MODE=SHADOW` in the environment. No users are exposed to personalized results until `PERSONALIZATION_MODE=TREATMENT` and `PERSONALIZATION_TREATMENT_PCT > 0` are both set.
+
+### Final State
+```
+PERSONALIZATION:   FEATURE-FLAGGED / EXPERIMENTAL
+DEFAULT:           OFF
+DEFAULT DISCOVERY: UNCHANGED
+GEMINI:            0
+```
+
+### Git Checkpoint
+- Commit hash: (see below after commit)
+- 4 files: config.py, personalization_experiment.py, discovery.py, test_personalization_experiment.py

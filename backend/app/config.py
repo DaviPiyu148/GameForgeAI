@@ -99,6 +99,29 @@ class Settings(BaseSettings):
     IGDB_CLIENT_SECRET: Optional[str] = None
     IGDB_CACHE_TTL_DAYS: int = 7
 
+    # ── Personalization V1 — Feature Flag (Phase 6) ────────────────────────────
+    # PERSONALIZATION_MODE controls how the personalized re-ranker is applied:
+    #   OFF       — no personalization computation (default, production-safe)
+    #   SHADOW    — compute personalized ranking but return BASE result; record diagnostics only
+    #   TREATMENT — apply personalized ranking for users in the treatment cohort
+    # This flag MUST default to OFF so that a fresh deployment cannot accidentally
+    # enable personalization for real users.
+    PERSONALIZATION_MODE: str = "OFF"
+
+    # Lambda for the additive re-ranking formula:
+    #   personalized_score = base_score + (PERSONALIZATION_LAMBDA * personalization_score)
+    # Must remain configuration-controlled; not exposed to runtime user input.
+    PERSONALIZATION_LAMBDA: float = 0.05
+
+    # Percentage of authenticated users assigned to the TREATMENT cohort (0–100).
+    # Deterministic assignment is based on hash(user_id) % 100.
+    # 0 means no users receive treatment even when PERSONALIZATION_MODE=TREATMENT.
+    PERSONALIZATION_TREATMENT_PCT: int = 0
+
+    # Maximum acceptable personalization overhead in milliseconds.
+    # Requests exceeding this fall back to base ranking (safety budget).
+    PERSONALIZATION_LATENCY_BUDGET_MS: float = 50.0
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.session import get_db
 from app.dependencies import get_optional_user
 from app.models.user import User
@@ -20,6 +21,10 @@ from app.schemas.discovery import (
 )
 
 from app.services.discovery_service import DiscoveryService, discovery_service
+from app.services.personalization_experiment import (
+    personalization_experiment_service,
+    PERSONALIZATION_MODE_OFF,
+)
 from app.services.preference_service import preference_service
 from app.services.progression_service import progression_service
 
@@ -85,6 +90,62 @@ async def search_games(
                 )
             except Exception as pe:
                 logger.warning(f"Failed to record discovery telemetry for user {current_user.id}: {pe}")
+
+        # ── Personalization V1 Phase 6: Shadow / A-B experiment ─────────────
+        # Only runs when PERSONALIZATION_MODE != OFF and user is authenticated.
+        # In SHADOW mode: computes personalized ranking but returns base result.
+        # In TREATMENT mode: applies personalized ranking for cohort users.
+        # Any exception falls back to the base response transparently.
+        p_mode = (settings.PERSONALIZATION_MODE or PERSONALIZATION_MODE_OFF).upper()
+        if p_mode != PERSONALIZATION_MODE_OFF and current_user and db:
+            try:
+                from app.services.preference_aggregator import preference_aggregator
+                from app.services.context_blender import context_blender
+
+                # Build profile once per request — do NOT re-compute per candidate
+                global_profile = preference_aggregator.build_profile(db=db, user_id=str(current_user.id))
+
+                # Optional project context
+                project_profile = None
+                if request.project_id:
+                    try:
+                        project_profile = context_blender.build_project_profile(
+                            db=db,
+                            project_id=request.project_id,
+                        )
+                    except Exception as proj_exc:
+                        logger.debug(
+                            "Phase 6: could not build project profile for %s: %s",
+                            request.project_id,
+                            proj_exc,
+                        )
+
+                effective_profile = context_blender.blend(global_profile, project_profile)
+
+                response, _diag = personalization_experiment_service.apply(
+                    base_response=response,
+                    effective_profile=effective_profile,
+                    user_id=str(current_user.id),
+                    mode=p_mode,
+                    lambda_=settings.PERSONALIZATION_LAMBDA,
+                    treatment_pct=settings.PERSONALIZATION_TREATMENT_PCT,
+                    latency_budget_ms=settings.PERSONALIZATION_LATENCY_BUDGET_MS,
+                )
+
+                if _diag.safety_fallback_triggered:
+                    logger.info(
+                        "Personalization safety fallback triggered for user %s: %s",
+                        current_user.id,
+                        _diag.safety_fallback_reason,
+                    )
+
+            except Exception as exp_exc:
+                # Outer catch: guarantee the base response is always returned
+                logger.warning(
+                    "Personalization experiment setup failed — returning base result. %s",
+                    exp_exc,
+                    exc_info=True,
+                )
 
         return response
     except RuntimeError as re:
