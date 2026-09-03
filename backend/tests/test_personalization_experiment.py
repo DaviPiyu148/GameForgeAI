@@ -1629,3 +1629,55 @@ class TestPhase74ExtendedLongitudinalValidation:
         delta_b, lower_b, upper_b = newcombe_interval(235, 1000, 210, 1000)
         assert delta_b > 0
         assert lower_b < 0 < upper_b  # Crosses zero -> Not statistically significant!
+
+
+class TestPhase8TenPercentControlledExpansion:
+    """
+    Phase 8: Controlled 10% Treatment Expansion Tests:
+    1. Configuration audit (PERSONALIZATION_TREATMENT_PCT == 10, mode frozen).
+    2. Cohort transition audit (5% -> 10% preserves existing treatment users,
+       newly treats buckets 5-9, keeps >=10 as control).
+    3. Mode-specific lambdas frozen (DISCOVER=0.05, HIDDEN_GEMS=0.05, BEST_MATCH=0.02, POPULAR=0.00).
+    """
+
+    def test_config_ten_percent_treatment_pct(self):
+        """Verify settings reflect 10% treatment cohort."""
+        from app.config import settings
+        assert settings.PERSONALIZATION_TREATMENT_PCT == 10
+        assert settings.PERSONALIZATION_MODE == "TREATMENT"
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["POPULAR"] == 0.00
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["BEST_MATCH"] == 0.02
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["DISCOVER"] == 0.05
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["HIDDEN_GEMS"] == 0.05
+
+    def test_cohort_transition_audit_5_to_10_percent(self):
+        """
+        Verify cohort transition invariants when moving from 5% to 10%:
+        1. Users in treatment at 5% MUST still be in treatment at 10%.
+        2. Users with hash bucket [5..9] become treatment.
+        3. Users with hash bucket >= 10 remain control.
+        4. Zero previous treatment users are demoted to control.
+        """
+        import hashlib
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        for i in range(10000):
+            uid = f"dev_user_{i:05d}"
+            in_5 = personalization_experiment_service.user_in_treatment_cohort(uid, 5)
+            in_10 = personalization_experiment_service.user_in_treatment_cohort(uid, 10)
+
+            # Compute hash bucket directly matching _user_in_treatment_cohort
+            digest = hashlib.sha256(uid.encode("utf-8")).hexdigest()
+            h_int = int(digest[:8], 16) % 100
+
+            if in_5:
+                # Invariant 1 & 4: Old treatment users remain treatment
+                assert in_10 is True
+                assert h_int < 5
+            elif 5 <= h_int < 10:
+                # Invariant 2: Hash bucket 5-9 becomes treatment
+                assert in_10 is True
+            else:
+                # Invariant 3: Bucket >= 10 remains control
+                assert in_10 is False
+                assert h_int >= 10

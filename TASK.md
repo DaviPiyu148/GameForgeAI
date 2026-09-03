@@ -1,29 +1,28 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 7.4: Extended 5% Longitudinal Validation
+Personalization V1 — Phase 8: Controlled 10% Treatment Expansion
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute extended longitudinal statistical validation of the 5% treatment cohort across N=2,000 developers per group:
-1. Preserve frozen configuration: `PERSONALIZATION_MODE=TREATMENT`, `PERSONALIZATION_LAMBDA=0.05`, `PERSONALIZATION_TREATMENT_PCT=5`.
+Execute controlled 10% treatment expansion and scale validation:
+1. Update treatment cohort: `PERSONALIZATION_TREATMENT_PCT = 10` (expanded from 5%).
 2. Preserve frozen mode-specific policy: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
-3. Expand evaluated population to 40,000 authenticated developers yielding 2,076 treatment users and 37,924 control users via deterministic SHA-256 partitioning.
+3. Cohort transition audit across 40,000 developers: verify 100% retention of 5% cohort (2,076 users), addition of buckets 5-9 (2,066 newly treated users), and 0 demotions.
 4. Primary inferential dataset: 2,000 treatment developers vs 2,000 randomly sampled control developers (seed 2026).
 5. Document sample selection: ITT population, random sampling from eligible controls, no artificial balancing.
-6. Evaluate longitudinal request traffic: >= 4,000 treatment requests (4,400 evaluated) alongside 4,400 control requests across multi-turn sessions (8,800 total).
-7. Pre-register primary endpoints (K=3): 1. Save Discovery, 2. Return within 24h, 3. Prototype / Build Start.
-8. Resolve the core build-start question: Evaluate whether Prototype / Build Start separates cleanly from zero at N=2,000.
-9. Apply statistical rigor: Newcombe hybrid score confidence intervals (Wilson-based), Holm-Bonferroni multiple testing correction, Cohen's h effect size.
-10. Verify request-level ranking quality (PAU with 95% CI, Top-5 set churn vs positional changes, Ben/Harm ratio).
-11. Profile maturity segmentation: Verify COLD invariant (0 churn, 0 movement, 0 PAU) and active tiers.
-12. Observational project context & live A -> B -> None regression verification.
-13. Invariant safety & latency enforcement (0 violations, 0 fallbacks, 0 Gemini calls, SLA < 50 ms).
+6. Evaluate longitudinal request traffic: 4,400 treatment requests alongside 4,400 control requests across multi-turn sessions (8,800 total).
+7. Pre-registered primary endpoints (K=3): 1. Save Discovery, 2. Return within 24h, 3. Prototype / Build Start.
+8. Apply statistical rigor: Newcombe hybrid score confidence intervals (Wilson-based), Holm-Bonferroni multiple testing correction, Cohen's h effect size.
+9. Diagnostic Heterogeneous Treatment Effects: analyze differences across modes, maturity tiers, and project context without tuning.
+10. Stability analysis: compare Phase 7.4 vs Phase 8 primary outcomes and ranking quality.
+11. Profile maturity segmentation: verify COLD invariant (0 churn, 0 movement, 0 PAU).
+12. Invariant safety & latency enforcement (0 violations, 0 fallbacks, 0 Gemini calls, SLA < 50 ms).
 
 ## Previous Commit Checkpoint
-- SHA: `94ef4ad` — `backend: execute personalization V1 phase 7.3 expanded cohort statistical validation`
+- SHA: `19961d1` — `backend: execute personalization V1 phase 7.4 extended longitudinal validation`
 
 ## Started
 2026-09-04
@@ -2148,3 +2147,202 @@ DECISION:             1. Expand to 10%
 
 ### Git Checkpoint
 - Commit hash: `19961d1`
+- Commit: `backend: execute personalization V1 phase 7.4 extended longitudinal validation`
+
+---
+
+## Phase 8: Controlled 10% Treatment Expansion — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Execute controlled 10% treatment expansion and scale validation:
+- Configuration updated: `PERSONALIZATION_TREATMENT_PCT = 10` (expanded from 5%) in `backend/app/config.py`.
+- Mode lambdas preserved: `DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`, `BEST_MATCH = 0.02`, `POPULAR = 0.00`.
+- Cohort transition audit across 40,000 developers: verified 100% retention of 5% cohort (2,076 users), addition of buckets 5-9 (2,066 newly treated users), and 0 demotions.
+- Primary inferential dataset: 2,000 treatment developers vs 2,000 randomly sampled control developers (seed 2026).
+- Documented sample selection: ITT population, SRS without replacement from eligible controls, no artificial balancing.
+- Evaluated longitudinal traffic: 4,400 treatment requests evaluated across multi-turn sessions alongside 4,400 control requests (8,800 total).
+- Pre-registered primary endpoints (K=3):
+  1. Save Discovery (user saved >= 1 game)
+  2. Return within 24h (user returned within 24h)
+  3. Prototype / Build Start (user started >= 1 build/prototype)
+- Applied statistical rigor:
+  - Newcombe hybrid score confidence intervals (Wilson-based) for difference in proportions.
+  - Holm-Bonferroni step-down multiple testing correction for primary endpoints (reporting raw p and adj p).
+  - Cohen's h effect sizes.
+- Diagnostic Heterogeneous Treatment Effects: analyzed differences across modes, maturity tiers, and project context without tuning.
+- Stability analysis: compared Phase 7.4 vs Phase 8 primary outcomes and ranking quality.
+- Profile maturity segmentation: verified COLD invariant (0 churn, 0 movement, 0 PAU).
+- Invariant safety & latency enforcement: 0 violations, 0 fallbacks, 0 Gemini calls, SLA < 50 ms.
+
+### Files Created / Modified
+- `backend/app/config.py`:
+  - Updated `PERSONALIZATION_TREATMENT_PCT: int = 10`.
+- `backend/tests/test_personalization_experiment.py`:
+  - Added `TestPhase8TenPercentControlledExpansion` test class with 2 unit tests:
+    - `test_config_ten_percent_treatment_pct`: verifies configuration update and frozen mode lambdas.
+    - `test_cohort_transition_audit_5_to_10_percent`: verifies transition invariants (100% retention, addition of buckets 5-9, 0 demotions).
+- `backend/scripts/run_phase8_ten_percent_expansion.py` (NEW):
+  - Comprehensive 10% expansion runner evaluating 8,800 requests across 2,000 treatment and 2,000 control developers with transition auditing, heterogeneous effects, and stability comparison.
+
+### Phase 8 Empirical Findings
+
+#### 1. Cohort Expansion & Transition Audit
+- Total Eligible Developer Population: **40,000 developers**
+- Previous 5% Cohort Available: **2,076 developers (5.19%)**
+- Current 10% Cohort Available: **4,142 developers (10.36%)**
+- Newly Treated Developers (Bucket 5..9): **2,066 developers (5.17%)**
+- Retained Treatment Developers: **2,076 developers (100.0% of previous cohort)**
+- Control Population Remaining: **35,858 developers (89.65%)**
+- Cohort Transition Invariant: **100.0% PASSED** (Zero previous treatment users demoted to control)
+
+#### 2. Primary Inferential Dataset Sample Selection
+- Sample: **2,000 Treatment Developers** vs **2,000 Control Developers** (SRS without replacement, seed 2026)
+- Exposure: 2,000 users with >= 1 request (100%), 1,500 with >= 3 requests (75.0%), 940 with >= 5 requests (47.0%)
+- Evaluated Traffic: **4,400 Treatment Requests** + **4,400 Control Requests** = **8,800 Requests**
+
+#### 3. User-Level Primary Endpoints (N=2,000 per cohort, Newcombe 95% CI, Holm-Bonferroni Correction)
+```
+| Metric                   |        Control |      Treatment |   Absolute Δ |   Relative Δ |    95% CI (Newcombe) |     Raw p |  Holm Adj p |  Cohen h |
+|--------------------------|----------------|----------------|--------------|--------------|----------------------|-----------|-------------|----------|
+| Save Discovery           | 689/2000 (34.4%) | 861/2000 (43.0%) |        +8.6% |       +25.0% |      [+5.6%, +11.6%] |    0.0000 |      0.0000 |    0.177 |
+| Return within 24h        | 1144/2000 (57.2%) | 1323/2000 (66.1%) |        +9.0% |       +15.6% |      [+5.9%, +11.9%] |    0.0000 |      0.0000 |    0.184 |
+| Prototype / Build Start  | 403/2000 (20.2%) | 503/2000 (25.1%) |        +5.0% |       +24.8% |       [+2.4%, +7.6%] |    0.0002 |      0.0002 |    0.120 |
+```
+*Inference Insight*:
+- All three pre-registered primary endpoints remain **statistically positive and significant at $p < 0.001$** after Holm-Bonferroni family-wise error rate control!
+- Prototype / Build Start shows robust separation from zero ($+5.0\%$, 95% CI `[+2.4%, +7.6%]`, Holm-adjusted $p = 0.0002$).
+
+#### 4. User-Level Secondary Endpoints (N=2,000 per group, Exploratory)
+```
+| Metric                 |        Control |      Treatment |   Absolute Δ |   Relative Δ |    95% CI (Newcombe) |     Raw p |
+|------------------------|----------------|----------------|--------------|--------------|----------------------|-----------|
+| Click / Open           | 1588/2000 (79.4%)| 1566/2000 (78.3%)|       -1.1% |        -1.4% |       [-3.6%, +1.4%] |    0.3943 |
+| Build Inspiration      | 465/2000 (23.2%) | 551/2000 (27.6%) |       +4.3% |       +18.5% |       [+1.6%, +7.0%] |    0.0018 |
+| Repeat Discovery       | 1444/2000 (72.2%)| 1537/2000 (76.8%)|       +4.6% |        +6.4% |       [+1.9%, +7.3%] |    0.0007 |
+| Return within 7d       | 807/2000 (40.4%) | 853/2000 (42.6%) |       +2.3% |        +5.7% |       [-0.8%, +5.3%] |    0.1399 |
+| Multi-session          | 1337/2000 (66.8%)| 1463/2000 (73.2%)|       +6.3% |        +9.4% |       [+3.5%, +9.1%] |    0.0000 |
+| Save -> Project        |  277/689 (40.2%) |  335/861 (38.9%) |       -1.3% |        -3.2% |       [-6.2%, +3.6%] |    0.6043 |
+| Save -> Prototype      |  181/689 (26.3%) |  307/861 (35.7%) |       +9.4% |       +35.7% |      [+4.8%, +13.9%] |    0.0001 |
+```
+
+#### 5. Request-Level Ranking Quality (N=4,400 Treatment Requests)
+- **Preference Alignment Uplift (PAU)**:
+  - Mean PAU: **+0.0148**
+  - Median PAU: **+0.0000**
+  - Std Deviation: **0.0376**
+  - Standard Error: **0.0006**
+  - **95% Confidence Interval**: **[+0.0137, +0.0159]** (Excludes 0 -> Statistically positive)
+- **Top-5 Set Churn (`new_in_top5`)**: **0.23 candidates / request** (external entries)
+- **Top-5 Positional Slot Changes**: **0.71 positions / request** (slot re-orderings)
+- **Top-10 Set Churn**: **0.00 candidates / request**
+- **Positional Slot Classification Quality**:
+  - Beneficial Changes ($\ge +0.05$): **46.4%** (1,446 positions)
+  - Neutral Changes ($-0.02 < \Delta < +0.05$): **38.3%** (1,195 positions)
+  - Harmful Changes ($\le -0.02$): **15.3%** (477 positions)
+  - **Beneficial / Harmful Ratio**: **3.03:1**
+
+#### 6. Mode Breakdown (Request-Level)
+```
+| Mode         |    λ |   Reqs |  Mean PAU |  Set Churn |  Pos Changes |   Ben % |   Neu % |  Harm % | Ben/Harm |
+|--------------|------|--------|-----------|------------|--------------|---------|---------|---------|----------|
+| BEST_MATCH   | 0.02 |   1068 |   +0.0000 |       0.00 |         0.18 |   50.0% |    0.0% |   50.0% |    1.00x |
+| POPULAR      | 0.00 |   1126 |   +0.0000 |       0.00 |         0.00 |    0.0% |    0.0% |    0.0% | Consensus |
+| DISCOVER     | 0.05 |   1063 |   +0.0218 |       0.38 |         1.30 |   40.1% |   48.7% |   11.2% |    3.57x |
+| HIDDEN_GEMS  | 0.05 |   1143 |   +0.0367 |       0.52 |         1.35 |   51.6% |   33.9% |   14.6% |    3.53x |
+```
+
+#### 7. Profile Maturity Segmentation (Request-Level)
+```
+| Tier           |   Reqs |  Mean PAU | Top-5 Set Churn | Candidates Moved | Invariant Status     |
+|----------------|--------|-----------|-----------------|------------------|----------------------|
+| COLD           |   1099 |   +0.0000 |            0.00 |             0.00 | 0 Movement Invariant |
+| EMERGING       |   1083 |   +0.0234 |            0.26 |             1.84 | Active Personalization |
+| MODERATE       |   1117 |   +0.0171 |            0.28 |             2.42 | Active Personalization |
+| ESTABLISHED    |   1101 |   +0.0187 |            0.36 |             2.64 | Active Personalization |
+```
+
+#### 8. Observational Project Context & Live Switching Regression
+- Without Active Project (3,283 reqs): Mean PAU = `+0.0140`
+- With Active Project (1,117 reqs): Mean PAU = `+0.0171`
+- Live Project Switching Regression:
+  - State 1 (Project A 'Space Odyssey'): grounds project-specific reasons.
+  - State 2 (Project B 'Cyberpunk Rogue'): grounds cyberpunk action reasons without project A leakage.
+  - State 3 (Cleared / None): restores global developer DNA immutably.
+
+#### 9. Diagnostic Heterogeneous Treatment Effects
+```
+1. Heterogeneity by Discovery Mode:
+| Mode         |  Users |  Mean PAU | Top-5 Churn |  Beneficial % |  Harmful % |
+|--------------|--------|-----------|-------------|---------------|------------|
+| BEST_MATCH   |   1068 |   +0.0000 |        0.00 |         50.0% |      50.0% |
+| POPULAR      |   1126 |   +0.0000 |        0.00 |          0.0% |       0.0% |
+| DISCOVER     |   1063 |   +0.0218 |        0.38 |         40.1% |      11.2% |
+| HIDDEN_GEMS  |   1143 |   +0.0367 |        0.52 |         51.6% |      14.6% |
+
+2. Heterogeneity by Profile Maturity Tier:
+| Tier           |  Users |  Mean PAU | Top-5 Churn |  Beneficial % |  Harmful % |
+|----------------|--------|-----------|-------------|---------------|------------|
+| COLD           |   1099 |   +0.0000 |        0.00 |          0.0% |       0.0% |
+| EMERGING       |   1083 |   +0.0234 |        0.26 |         53.8% |      17.6% |
+| MODERATE       |   1117 |   +0.0171 |        0.28 |         41.6% |      11.0% |
+| ESTABLISHED    |   1101 |   +0.0187 |        0.36 |         45.0% |      17.2% |
+
+3. Heterogeneity by Project Context:
+| Context            |  Users |  Mean PAU | Top-5 Churn |  Beneficial % |  Harmful % |
+|--------------------|--------|-----------|-------------|---------------|------------|
+| Without Project    |   3283 |   +0.0140 |        0.21 |         48.7% |      17.4% |
+| With Project       |   1117 |   +0.0171 |        0.28 |         41.6% |      11.0% |
+```
+*Diagnostic Note*: Zero ranking tuning performed based on these segments.
+
+#### 10. Stability Comparison (Phase 7.4 vs Phase 8)
+```
+| Metric Dimension           |    Phase 7.4 (5% Cohort) |     Phase 8 (10% Cohort) | Stability Status   |
+|----------------------------|--------------------------|--------------------------|--------------------|
+| Save Discovery Uplift      | +10.9% (CI: +7.9, +13.9) |  +8.6% (CI: +5.6, +11.6) | Stable & Positive  |
+| 24h Return Uplift          |  +8.2% (CI: +5.1, +11.2) |  +9.0% (CI: +5.9, +11.9) | Stable & Positive  |
+| Prototype Start Uplift     |   +3.3% (CI: +0.7, +5.9) |   +5.0% (CI: +2.4, +7.6) | Stable & Positive  |
+| Mean PAU                   |                  +0.0144 |                  +0.0148 | Stable & Positive  |
+| Beneficial / Harmful Ratio |                    2.94x |                    3.03x | Stable & Healthy   |
+| Mean Latency Overhead      |                  0.91 ms |                  0.90 ms | Within SLA         |
+```
+
+#### 11. Safety & Latency Invariants Across 8,800 Evaluated Requests
+- Control Identity Failures: **0 / 4,400** (100.0% Exact Base Identity)
+- POPULAR Mode Violations: **0 / 1,126** (Zero movement, zero churn)
+- Cold-Start Regressions: **0 / 1,099** (Zero movement, zero churn)
+- Hard Constraint Violations: **0**
+- Explicit Avoidance Violations: **0**
+- Safety Fallbacks Triggered: **0**
+- External Gemini API Calls: Exactly **0**
+- Latency Performance:
+  - Mean Personalization Overhead: **0.90 ms**
+  - P95 Personalization Overhead: **1.36 ms**
+  - P99 Personalization Overhead: **1.78 ms**
+  - Budget Exceedance Rate (> 50 ms): **0.0%**
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **74 passed** in 0.63s.
+- `pytest backend/tests/ -q`: **565 passed, 1 warning** in 115.38s.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: built in **1.78s**.
+
+### Production State
+```
+PERSONALIZATION:      TREATMENT = 10%
+DEFAULT:              CONTROL / BASE RANKING (90%)
+MODE LAMBDAS:
+  DISCOVER            0.05
+  HIDDEN_GEMS         0.05
+  BEST_MATCH          0.02
+  POPULAR             0.00
+GEMINI:               0
+DECISION:             2. Keep 10%
+```
+
+### Git Checkpoint
+- Commit hash: (see below after commit)
