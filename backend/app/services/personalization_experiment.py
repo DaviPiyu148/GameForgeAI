@@ -124,6 +124,7 @@ class ExperimentDiagnostics:
     no_evidence_personalization: bool = False
     base_top_k_ids: List[str] = field(default_factory=list)
     personalized_top_k_ids: List[str] = field(default_factory=list)
+    configured_mode_lambdas: Dict[str, float] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +287,7 @@ class PersonalizationExperimentService:
 
         diag = ExperimentDiagnostics(mode=mode, lambda_=effective_lambda)
         diag.discovery_mode = disc_mode
+        diag.configured_mode_lambdas = dict(mode_lambdas) if mode_lambdas else {}
 
         # ── OFF: nothing to compute ──────────────────────────────────────────
         if mode not in VALID_MODES or mode == PERSONALIZATION_MODE_OFF:

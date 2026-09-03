@@ -130,6 +130,7 @@ async def search_games(
                     lambda_=settings.PERSONALIZATION_LAMBDA,
                     treatment_pct=settings.PERSONALIZATION_TREATMENT_PCT,
                     latency_budget_ms=settings.PERSONALIZATION_LATENCY_BUDGET_MS,
+                    mode_lambdas=getattr(settings, "PERSONALIZATION_MODE_LAMBDAS", None),
                 )
 
                 if _diag.safety_fallback_triggered:

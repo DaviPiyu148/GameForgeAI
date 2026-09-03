@@ -813,6 +813,95 @@ class TestModeLambdas:
         assert diag.discovery_mode == "HIDDEN_GEMS"
 
 
+class TestPhase63ModeSpecificShadow:
+    """Phase 6.3: Formal regression tests for mode-specific shadow policy and invariants."""
+
+    POLICY = {
+        "DISCOVER": 0.05,
+        "HIDDEN_GEMS": 0.05,
+        "BEST_MATCH": 0.02,
+        "POPULAR": 0.00,
+    }
+
+    def test_policy_resolution_all_modes(self):
+        svc = _make_service()
+        results = [_make_result("g1", "Action Game", 0.90, ["Action"])]
+        profile = _warm_profile()
+
+        for mode_name, expected_lambda in self.POLICY.items():
+            base = _make_base_response(results, mode=mode_name)
+            resp, diag = svc.apply(
+                base_response=base,
+                effective_profile=profile,
+                user_id="u",
+                mode=PERSONALIZATION_MODE_SHADOW,
+                mode_lambdas=self.POLICY,
+            )
+            assert diag.discovery_mode == mode_name
+            assert diag.lambda_ == expected_lambda
+            assert diag.configured_mode_lambdas == self.POLICY
+            # Shadow invariant: public response is identical to base
+            assert resp.results[0].game.id == base.results[0].game.id
+
+    def test_popular_lambda_zero_produces_exact_identity(self):
+        svc = _make_service()
+        c1 = _make_result("g1", "Generic Game", 0.90, ["Strategy"])
+        c2 = _make_result("g2", "Favored Action", 0.89, ["Action"])
+        base = _make_base_response([c1, c2], mode="POPULAR")
+        profile = _warm_profile()  # has Action=1.0
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="u",
+            mode=PERSONALIZATION_MODE_SHADOW,
+            mode_lambdas=self.POLICY,
+        )
+        assert diag.lambda_ == 0.00
+        assert diag.top5_churn == 0
+        assert diag.top10_churn == 0
+        assert diag.candidates_moved == 0
+        assert diag.preference_alignment_uplift == 0.0
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+
+    def test_best_match_lambda_02_preserves_shadow_identity(self):
+        svc = _make_service()
+        c1 = _make_result("g1", "Generic Game", 0.90, ["Strategy"])
+        c2 = _make_result("g2", "Favored Action", 0.89, ["Action"])
+        base = _make_base_response([c1, c2], mode="BEST_MATCH")
+        profile = _warm_profile()
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="u",
+            mode=PERSONALIZATION_MODE_SHADOW,
+            mode_lambdas=self.POLICY,
+        )
+        assert diag.lambda_ == 0.02
+        assert resp.results[0].game.id == "g1"
+        assert resp.results[1].game.id == "g2"
+
+    def test_no_accidental_cross_mode_leakage(self):
+        svc = _make_service()
+        results = [_make_result("g1", "Action Game", 0.90, ["Action"])]
+        profile = _warm_profile()
+
+        # Run multiple interleaved requests across different modes
+        modes_to_test = ["POPULAR", "DISCOVER", "BEST_MATCH", "HIDDEN_GEMS", "POPULAR", "BEST_MATCH"]
+        for m in modes_to_test:
+            base = _make_base_response(results, mode=m)
+            _, diag = svc.apply(
+                base_response=base,
+                effective_profile=profile,
+                user_id="u",
+                mode=PERSONALIZATION_MODE_SHADOW,
+                mode_lambdas=self.POLICY,
+            )
+            assert diag.discovery_mode == m
+            assert diag.lambda_ == self.POLICY[m]
+
+
 class TestPhase62ProjectContextAndSafety:
     """Phase 6.2: Formal regression tests for project-context sensitivity and safety invariants."""
 

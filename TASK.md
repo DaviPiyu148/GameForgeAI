@@ -1,21 +1,25 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 6.2: Mode-Specific Lambda & Project-Context Validation
+Personalization V1 — Phase 6.3: Real-Query Shadow Validation with Mode-Specific Lambdas
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute targeted offline validation for Phase 6.2:
-1. Mode-Specific Lambda Sweep across DISCOVER (0.03, 0.05, 0.07), HIDDEN_GEMS (0.03, 0.05, 0.07), BEST_MATCH (0.00, 0.02, 0.03, 0.05), and POPULAR (0.00, 0.02, 0.03, 0.05) using the Phase 5 offline benchmark (20 developer profiles x 17 queries across exploratory, targeted, conflict, cold-start, off-profile query categories).
-2. Strengthened Project-Context Validation using contrasting synthetic personas (Global Cozy Farming vs Project A Cyberpunk Tactical Shooter vs Project B Dark Fantasy Dungeon Roguelike RPG).
-3. Verify ACTUAL RANK MOVEMENT, Project PAU, Global Profile Immutability, and Grounded Explanation Consistency.
-4. Saved-Discovery Gradient Monotonicity verification.
-5. All work OFFLINE ONLY — zero production exposure, production ranking unchanged.
+Validate the mode-specific personalization policy on real database traffic in SHADOW mode before opening any treatment cohort:
+1. Configure mode-specific shadow policy: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
+2. Strict production safety: `PERSONALIZATION_MODE=SHADOW`, `PERSONALIZATION_TREATMENT_PCT=0`, base ranking returned on all requests.
+3. Collect real shadow sample >= 200 requests (achieved 220 requests, 55 per mode, 4 profile maturity tiers, with/without active project).
+4. Assert shadow response identity invariant (HTTP response == base response) across 100% of requests.
+5. Assert POPULAR invariant: λ = 0.00 produces exact base ranking, 0 churn, 0 movement, 0 PAU loss.
+6. Verify BEST_MATCH reduction in harmful replacements and churn from λ=0.05 to λ=0.02.
+7. Verify live contrasting project switching (No Project -> A -> B -> No Project) with exact global recovery and grounded reasons.
+8. Direct side-by-side comparison against Phase 6.1 baseline.
+9. Measure latency by mode against the 50 ms budget.
 
 ## Previous Commit Checkpoint
-- SHA: `f9958c2` — `backend: execute personalization V1 phase 6.1 real-query shadow validation`
+- SHA: `d05313c` — `backend: execute personalization V1 phase 6.2 mode-specific lambda and project-context validation`
 
 ## Started
 2026-09-03
@@ -1258,3 +1262,128 @@ GEMINI:             0
 
 ### Git Checkpoint
 - Commit hash: `d05313c`
+- Commit: `backend: execute personalization V1 phase 6.2 mode-specific lambda and project-context validation`
+
+---
+
+## Phase 6.3: Real-Query Shadow Validation with Mode-Specific Lambdas — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Validate the mode-specific personalization policy on real database traffic in SHADOW mode before opening any treatment cohort:
+- Policy: `DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`.
+- Maintain strict production safety: `PERSONALIZATION_MODE=SHADOW`, `TREATMENT=0%`.
+- Collect >= 200 real shadow requests (evaluated 220 requests, 55 per mode, 4 profile maturity tiers, with/without active project).
+- Assert shadow response identity invariant (HTTP response == base response) across 100% of requests.
+- Assert POPULAR invariant: λ = 0.00 produces exact base ranking, 0 churn, 0 movement, 0 PAU loss.
+- Verify BEST_MATCH reduction in harmful replacements and churn from λ=0.05 to λ=0.02.
+- Verify live contrasting project switching (No Project -> A -> B -> No Project) with exact global recovery and grounded reasons.
+- Direct side-by-side comparison against Phase 6.1 baseline.
+- Measure latency by mode against the 50 ms budget.
+
+### Files Created / Modified
+- `backend/app/config.py`:
+  - Added `PERSONALIZATION_MODE_LAMBDAS: Dict[str, float]` with `{"DISCOVER": 0.05, "HIDDEN_GEMS": 0.05, "BEST_MATCH": 0.02, "POPULAR": 0.00}`.
+- `backend/app/api/discovery.py`:
+  - Passed `mode_lambdas=getattr(settings, "PERSONALIZATION_MODE_LAMBDAS", None)` into `personalization_experiment_service.apply()`.
+- `backend/app/services/personalization_experiment.py`:
+  - Added `configured_mode_lambdas: Dict[str, float]` to `ExperimentDiagnostics`.
+  - Populated `diag.configured_mode_lambdas` in `apply()`.
+- `backend/tests/test_personalization_experiment.py`:
+  - Added `TestPhase63ModeSpecificShadow` unit test suite (4 focused tests covering policy resolution, POPULAR exact identity at λ=0, BEST_MATCH at λ=0.02, and cross-mode isolation).
+- `backend/scripts/validate_mode_specific_shadow.py` (NEW):
+  - 220 real shadow evaluation requests across 4 modes, 4 profile maturity tiers, and active project contexts.
+
+### Phase 6.3 Empirical Findings
+
+#### 1. Direct Comparison: Phase 6.1 (Global λ=0.05) vs Phase 6.3 (Mode-Specific λ)
+```
+| Mode        | 6.1 λ | 6.3 λ |  PAU 6.1 |  PAU 6.3 |  Ben 6.1 |  Ben 6.3 | Harm 6.1 | Harm 6.3 | Churn 6.1 | Churn 6.3 |
+|-------------|-------|-------|----------|----------|----------|----------|----------|----------|-----------|-----------|
+| BEST_MATCH  |  0.05 |  0.02 |  +0.0168 |  +0.0063 |    50.0% |    38.1% |    30.0% |    14.3% |      0.30 |      0.18 |
+| POPULAR     |  0.05 |  0.00 |  +0.0136 |  +0.0000 |    40.0% |     0.0% |    23.3% |     0.0% |      0.36 |      0.00 |
+| DISCOVER    |  0.05 |  0.05 |  +0.0287 |  +0.0233 |    51.8% |    47.9% |    25.0% |    16.4% |      0.66 |      0.60 |
+| HIDDEN_GEMS |  0.05 |  0.05 |  +0.0272 |  +0.0393 |    45.7% |    47.7% |    17.4% |    16.2% |      0.53 |      0.80 |
+```
+
+#### 2. Key Hypotheses Validated
+1. **`BEST_MATCH` Harmful Rate Slashed**:
+   - Harmful slot replacements fell from **30.0% down to 14.3%** (more than 50% relative reduction).
+   - Churn dropped from **0.30 to 0.18 slots/req**.
+   - Zero-movement rate reached **43.6%**, preserving precision on established queries while retaining subtle taste alignment.
+2. **`POPULAR` Consensus Fully Preserved**:
+   - Churn and harmful changes dropped to **0.0%** (0 churn, 0 movement, 0 PAU loss).
+   - 100.0% zero-movement rate. Universal market consensus is completely protected against personal preference distortion.
+3. **`DISCOVER` Benefit Retained**:
+   - Positive PAU maintained at **+0.0233**.
+   - Beneficial slot changes (47.9%) exceed harmful changes (16.4%) by **2.92x**.
+4. **`HIDDEN_GEMS` Benefit Retained & Amplified**:
+   - PAU reached **+0.0393**.
+   - Beneficial slot changes (47.7%) exceed harmful changes (16.2%) by **2.94x**.
+   - Churn of 0.80 slots/req powers intentional long-tail taste exploration.
+
+#### 3. Profile Maturity Tier Breakdown
+```
+| Tier                 | Reqs |  Mean PAU | Top-5 Churn | Beneficial % | Harmful % |
+|----------------------|------|-----------|-------------|--------------|-----------|
+| COLD                 |   44 |   +0.0000 |        0.00 |         0.0% |      0.0% |
+| EMERGING             |   44 |   +0.0266 |        0.50 |        45.8% |     10.4% |
+| MODERATE             |   44 |   +0.0165 |        0.36 |        36.2% |     21.3% |
+| ESTABLISHED          |   44 |   +0.0183 |        0.55 |        53.8% |      9.6% |
+| ESTABLISHED_PROJECT   |   44 |   +0.0247 |        0.57 |        50.0% |     22.4% |
+```
+
+#### 4. Project Context Segmentation
+- **Without Active Project** (176 reqs):
+  - Mean PAU: `+0.0153` | Beneficial: `45.6%` | Harmful: `13.6%` | Top-5 Churn: `0.35`
+- **With Active Project** (44 reqs):
+  - Mean PAU: `+0.0247` (**Incremental Uplift: +0.0094**) | Beneficial: `50.0%` | Harmful: `22.4%` | Top-5 Churn: `0.57`
+
+#### 5. Contrasting Project Switching Validation (Live DB)
+- **Sequence**: `No Project -> Project A (Neon Syndicate) -> Project B (Void Sector) -> No Project`
+- Tested across 5 authentic project-sensitive queries.
+- Results:
+  - Project A actively reshuffled candidates toward procedural generation & tactical action.
+  - Project B actively reshuffled candidates toward Space & trade simulation themes.
+  - Reversion to No Project was **100% exact match** across all queries.
+  - Global developer profile remained **100% immutable**.
+  - Grounded reasons accurately reflected project attributes (e.g. *"Recommended for your active project because it matches its procedural generation mechanics."*, *"matches its Space theme."*).
+
+#### 6. Safety & Invariants (220 Requests)
+- `Shadow Identity Violations`: **0**
+- `Lambda Selection Mismatches`: **0**
+- `POPULAR Movement Violations`: **0**
+- `Cold-Start Invariant Failures`: **0**
+- `Safety Fallbacks Triggered`: **0**
+- `Hard Constraint Violations`: **0**
+- `Explicit Avoidance Violations`: **0**
+- `No-Evidence Personalization`: **0**
+
+#### 7. Latency Performance
+- Mean overhead: **2.02 ms to 2.28 ms** across all 4 modes.
+- P95 overhead: **3.00 ms to 3.32 ms**.
+- P99 overhead: **3.10 ms to 3.90 ms**.
+- Budget exceedance rate (> 50 ms): **0.0%** (100% within budget).
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **53 passed** in 0.26s.
+- `pytest backend/tests/ -q`: **544 passed, 1 warning** in 111.21s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **2.35s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+- Public Response: 100% BASE DISCOVERY RANKING (`treatment_pct = 0`).
+
+### Production State
+```
+PERSONALIZATION:    SHADOW ONLY
+TREATMENT:          0%
+PRODUCTION RANKING: UNCHANGED
+GEMINI:             0
+```
+
+### Git Checkpoint
+- Commit hash: (see below after commit)

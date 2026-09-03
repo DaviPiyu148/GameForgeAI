@@ -1,5 +1,5 @@
 import os
-from typing import List, Union, Optional
+from typing import Dict, List, Union, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -116,6 +116,15 @@ class Settings(BaseSettings):
     # Deterministic assignment is based on hash(user_id) % 100.
     # 0 means no users receive treatment even when PERSONALIZATION_MODE=TREATMENT.
     PERSONALIZATION_TREATMENT_PCT: int = 0
+
+    # Phase 6.3 Mode-Specific Lambdas for shadow experiment:
+    # DISCOVER: 0.05, HIDDEN_GEMS: 0.05, BEST_MATCH: 0.02, POPULAR: 0.00
+    PERSONALIZATION_MODE_LAMBDAS: Dict[str, float] = {
+        "DISCOVER": 0.05,
+        "HIDDEN_GEMS": 0.05,
+        "BEST_MATCH": 0.02,
+        "POPULAR": 0.00,
+    }
 
     # Maximum acceptable personalization overhead in milliseconds.
     # Requests exceeding this fall back to base ranking (safety budget).
