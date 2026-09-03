@@ -1812,4 +1812,4 @@ DECISION:             1. Keep 5% and continue longitudinal observation
 ```
 
 ### Git Checkpoint
-- Commit hash: (see below after commit)
+- Commit hash: `575a6a3`
