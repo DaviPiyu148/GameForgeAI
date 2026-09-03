@@ -102,12 +102,52 @@ class PersonalizationExplanationService:
 
         # 5. Priority 1: Active Project Evidence
         # Only fire if project is genuinely active and context is present
-        if project_profile and eff.active_project_id:
+        proj_themes: Dict[str, float] = {}
+        proj_mechanics: Dict[str, float] = {}
+        proj_genres: Dict[str, float] = {}
+        proj_modes: Dict[str, float] = {}
+
+        if project_profile:
+            proj_themes = project_profile.themes
+            proj_mechanics = project_profile.mechanics
+            proj_genres = project_profile.genres
+            proj_modes = project_profile.modes
+        elif eff.active_project_id:
+            # Reconstruct project evidence directly from blended_details or evidence on eff
+            if getattr(eff, "blended_details", None):
+                for b_item in eff.blended_details:
+                    if getattr(b_item, "project_score", 0.0) > 0:
+                        dim = getattr(b_item, "dimension", None)
+                        term = getattr(b_item, "value", None) or getattr(b_item, "term", None)
+                        if dim == "theme" and term:
+                            proj_themes[term] = b_item.project_score
+                        elif dim == "mechanic" and term:
+                            proj_mechanics[term] = b_item.project_score
+                        elif dim == "genre" and term:
+                            proj_genres[term] = b_item.project_score
+                        elif dim == "mode" and term:
+                            proj_modes[term] = b_item.project_score
+            if getattr(eff, "evidence", None):
+                for ev in eff.evidence:
+                    if str(getattr(ev, "source", "")).lower() == "project":
+                        dim = getattr(ev, "dimension", None)
+                        val = getattr(ev, "value", None)
+                        contrib = getattr(ev, "contribution", 1.0)
+                        if dim == "theme" and val and val not in proj_themes:
+                            proj_themes[val] = contrib
+                        elif dim == "mechanic" and val and val not in proj_mechanics:
+                            proj_mechanics[val] = contrib
+                        elif dim == "genre" and val and val not in proj_genres:
+                            proj_genres[val] = contrib
+                        elif dim == "mode" and val and val not in proj_modes:
+                            proj_modes[val] = contrib
+
+        if eff.active_project_id and (proj_themes or proj_mechanics or proj_genres or proj_modes):
             # A. Project Themes
             for theme in sorted(c_themes):
                 if theme.lower() in avoid_set:
                     continue
-                score = project_profile.themes.get(theme, 0.0)
+                score = proj_themes.get(theme, 0.0)
                 if score >= self.min_project_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -123,7 +163,7 @@ class PersonalizationExplanationService:
             for mech in sorted(c_mechanics):
                 if mech.lower() in avoid_set:
                     continue
-                score = project_profile.mechanics.get(mech, 0.0)
+                score = proj_mechanics.get(mech, 0.0)
                 if score >= self.min_project_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -139,7 +179,7 @@ class PersonalizationExplanationService:
             for genre in sorted(c_genres):
                 if genre.lower() in avoid_set:
                     continue
-                score = project_profile.genres.get(genre, 0.0)
+                score = proj_genres.get(genre, 0.0)
                 if score >= self.min_project_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(
@@ -155,7 +195,7 @@ class PersonalizationExplanationService:
             for mode in sorted(c_modes):
                 if mode.lower() in avoid_set:
                     continue
-                score = project_profile.modes.get(mode, 0.0)
+                score = proj_modes.get(mode, 0.0)
                 if score >= self.min_project_affinity:
                     candidate_reasons.append(
                         PersonalizationReason(

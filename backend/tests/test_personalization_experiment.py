@@ -1264,3 +1264,47 @@ class TestPhase7ControlledTreatment:
         # Safety fallback must return base response
         assert diag.safety_fallback_triggered is True
         assert [r.game.id for r in resp.results] == ["g1", "g2"]
+
+    def test_project_evidence_extracted_from_effective_profile_blended_details(self):
+        """Phase 7.1 QA: Project evidence must not be overpowered by global evidence."""
+        from app.services.personalization_explanation_service import PersonalizationExplanationService
+        expl_svc = PersonalizationExplanationService()
+        r = _make_result("g_space", "Stellar Tactics", 0.85, ["Strategy"])
+        r.game.tags = ["Space", "procedural generation"]
+
+        from app.schemas.developer_profile import BlendedPreferenceItem
+        eff = EffectivePreferenceProfile(
+            user_id="treat_user_proj",
+            active_project_id="proj_space_odyssey",
+            active_project_title="Space Odyssey",
+            genres={"Strategy": 0.8, "Action": 0.9},
+            themes={"space": 1.0},
+            mechanics={"procedural generation": 1.0},
+            blended_details=[
+                BlendedPreferenceItem(
+                    dimension="theme",
+                    value="space",
+                    global_score=0.2,
+                    project_score=1.0,
+                    effective_score=0.8,
+                    was_global=True,
+                    was_project=True,
+                ),
+                BlendedPreferenceItem(
+                    dimension="genre",
+                    value="Strategy",
+                    global_score=0.8,
+                    project_score=0.9,
+                    effective_score=0.88,
+                    was_global=True,
+                    was_project=True,
+                ),
+            ],
+            total_signal_count=10,
+        )
+
+        reasons = expl_svc.explain(candidate=r, effective_profile=eff)
+        assert len(reasons) > 0
+        # Priority 1: Must generate PROJECT reason, not just GLOBAL Action
+        assert any("active project" in reason.text for reason in reasons)
+        assert any("Strategy" in reason.text for reason in reasons)
