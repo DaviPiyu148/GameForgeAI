@@ -372,6 +372,8 @@ class Ranker:
         user_liked_vector: Optional[np.ndarray] = None,
         user_disliked_vector: Optional[np.ndarray] = None,
         index_manager: Optional[Any] = None,
+        single_channel_damping: float = 0.0,
+        low_review_confidence_floor: Optional[float] = None,
     ) -> List[DiscoverySearchResult]:
         """Execute the Discovery Intelligence V1 multi-signal ranking and diversity pipeline."""
         candidate_pool: Dict[str, Dict[str, Any]] = {}
@@ -452,7 +454,13 @@ class Ranker:
             # Core Relevance: RRF + Weighted Direct
             r_sem = sem_ranks.get(gid, 200)
             r_lex = lex_ranks.get(gid, 200)
-            rrf_score = (1.0 / (RRF_K + r_sem)) + (1.0 / (RRF_K + r_lex))
+
+            # Lexical RRF contribution with optional single-channel damping for candidates absent from dense Top-50
+            lex_rrf_contrib = 1.0 / (RRF_K + r_lex)
+            if single_channel_damping > 0.0 and gid not in sem_ranks:
+                lex_rrf_contrib *= (1.0 - single_channel_damping)
+
+            rrf_score = (1.0 / (RRF_K + r_sem)) + lex_rrf_contrib
 
             s_sem = sem_scores.get(gid, 0.0)
             s_lex = lex_scores.get(gid, 0.0)
@@ -580,8 +588,23 @@ class Ranker:
         selected_candidates.sort(key=lambda x: (x[2], x[1]), reverse=True)
 
         # 5. Format Results
+        ordered_candidates = selected_candidates
+        if low_review_confidence_floor is not None and mode == "DISCOVER":
+            eligible_for_top5: List[Tuple[str, float, bool]] = []
+            deferred_candidates: List[Tuple[str, float, bool]] = []
+            for item in selected_candidates:
+                gid = item[0]
+                game = candidate_pool[gid]
+                reviews = int(game.get("total_reviews", 0))
+                pos_pct = float(game.get("positive_percent", 0.0))
+                if reviews < 100 and (pos_pct + 1e-6) < low_review_confidence_floor:
+                    deferred_candidates.append(item)
+                else:
+                    eligible_for_top5.append(item)
+            ordered_candidates = eligible_for_top5 + deferred_candidates
+
         results: List[DiscoverySearchResult] = []
-        for gid, raw_score, is_exact in selected_candidates:
+        for gid, raw_score, is_exact in ordered_candidates:
             calibrated = cls.calibrate_score(raw_score, q_type, is_exact_entity=is_exact)
 
             if calibrated < min_threshold and not is_exact:

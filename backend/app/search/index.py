@@ -137,7 +137,9 @@ class FAISSIndexManager:
                     idx_path = resolve_file_path(leg[0])
                     meta_path = resolve_file_path(leg[1])
                 else:
-                    logger.info(f"Designated index for pool {pool.value} not found at {idx_path}; falling back to primary index.")
+                    logger.warning(
+                        f"Discovery long-tail index unavailable for pool {pool.value} at {idx_path}; using fallback 20k index."
+                    )
                     return self._get_or_load_pool(DiscoveryCandidatePool.POPULAR_20K)
 
             try:

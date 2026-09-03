@@ -102,6 +102,9 @@ class DiscoveryService:
         request: DiscoverySearchRequest,
         user_id: Optional[str] = None,
         db: Optional[Any] = None,
+        candidate_pool_override: Optional[DiscoveryCandidatePool] = None,
+        single_channel_damping: float = 0.0,
+        low_review_confidence_floor: Optional[float] = None,
     ) -> DiscoverySearchResponse:
         """
         Execute deterministic hybrid discovery search combining lexical full-catalog matching
@@ -109,7 +112,7 @@ class DiscoveryService:
         """
         raw_prompt = request.prompt.strip()
         mode = request.mode or "BEST_MATCH"
-        candidate_pool = get_candidate_pool_for_mode(mode)
+        candidate_pool = candidate_pool_override or get_candidate_pool_for_mode(mode)
         if not raw_prompt:
             return DiscoverySearchResponse(
                 query=request.prompt,
@@ -194,6 +197,10 @@ class DiscoveryService:
                 logger.warning(f"Failed to load user preferences in discovery search: {ex}")
 
         # 5. Candidate Fusion & Multi-Signal Hybrid Ranking
+        effective_floor = low_review_confidence_floor
+        if effective_floor is None and mode == "DISCOVER":
+            effective_floor = 80.0
+
         results: List[DiscoverySearchResult] = Ranker.rank_hybrid(
             semantic_candidates=semantic_candidates,
             lexical_candidates=lexical_candidates,
@@ -207,6 +214,8 @@ class DiscoveryService:
             user_liked_vector=user_liked_vec,
             user_disliked_vector=user_disliked_vec,
             index_manager=self.index_manager,
+            single_channel_damping=single_channel_damping,
+            low_review_confidence_floor=effective_floor,
         )
 
         # 6. Generate grounded Why These summary

@@ -11,12 +11,12 @@ class DiscoveryCandidatePool(str, Enum):
 
 # Mode -> Candidate Pool Policy
 # BEST_MATCH / POPULAR: 20k acclaimed head for precision search
-# DISCOVER: 20k acclaimed head (retaining high-signal universe pending dedicated validation)
-# HIDDEN_GEMS: 87,890 reviewed-only long tail for discovery with 0% unreviewed noise
+# DISCOVER: 87,890 reviewed-only long tail with 80% low-review confidence floor
+# HIDDEN_GEMS: 87,890 reviewed-only long tail for discovery with 0% unreviewed noise (T150)
 MODE_CANDIDATE_POOLS: Dict[str, DiscoveryCandidatePool] = {
     "BEST_MATCH": DiscoveryCandidatePool.POPULAR_20K,
     "POPULAR": DiscoveryCandidatePool.POPULAR_20K,
-    "DISCOVER": DiscoveryCandidatePool.POPULAR_20K,
+    "DISCOVER": DiscoveryCandidatePool.REVIEWED_ONLY,
     "HIDDEN_GEMS": DiscoveryCandidatePool.REVIEWED_ONLY,
 }
 

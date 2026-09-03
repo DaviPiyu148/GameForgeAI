@@ -1,0 +1,535 @@
+{
+  "benchmark_version": "1.0",
+  "description": "Deterministic Discovery Intelligence V2 Dedicated Exploratory Suite for DISCOVER mode across adjacent concepts, cross-genre ideas, unusual mechanics, negative constraints, and similarity variants.",
+  "queries": [
+    {
+      "id": "disc01",
+      "query": "cozy automation with trains",
+      "expected_type": "CONCEPT",
+      "category": "Adjacent Concepts",
+      "acceptable_genres": [
+        "Simulation",
+        "Strategy",
+        "Casual",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Automation",
+        "Trains",
+        "Building",
+        "Relaxing",
+        "Management"
+      ],
+      "description": "Logistics network construction combined with cozy low-stress aesthetics"
+    },
+    {
+      "id": "disc02",
+      "query": "cyberpunk detective game without heavy combat",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Adventure",
+        "RPG",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Cyberpunk",
+        "Detective",
+        "Noir",
+        "Mystery",
+        "Story Rich",
+        "Point & Click"
+      ],
+      "hard_negative_terms": [
+        "action",
+        "fps",
+        "combat"
+      ],
+      "must_not_contain_genres": [
+        "Action"
+      ],
+      "description": "Noir investigative cyber-mystery emphasizing deduction without action combat"
+    },
+    {
+      "id": "disc03",
+      "query": "turn-based strategy with unusual diplomacy",
+      "expected_type": "CONCEPT",
+      "category": "Uncommon Mechanics",
+      "acceptable_genres": [
+        "Strategy",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Turn-Based",
+        "Diplomacy",
+        "4X",
+        "Grand Strategy",
+        "Politics"
+      ],
+      "description": "4X turn-based tactical management focusing on negotiation and political maneuvering"
+    },
+    {
+      "id": "disc04",
+      "query": "relaxing exploration with survival elements",
+      "expected_type": "CONCEPT",
+      "category": "Moods & Atmosphere",
+      "acceptable_genres": [
+        "Adventure",
+        "Simulation",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Exploration",
+        "Survival",
+        "Relaxing",
+        "Atmospheric",
+        "Open World"
+      ],
+      "description": "Low-pressure open-world wandering with gentle resource harvesting"
+    },
+    {
+      "id": "disc05",
+      "query": "deckbuilder with base building",
+      "expected_type": "CONCEPT",
+      "category": "Cross-Genre",
+      "acceptable_genres": [
+        "Strategy",
+        "Indie",
+        "Simulation"
+      ],
+      "acceptable_tags": [
+        "Deckbuilding",
+        "Card Battler",
+        "Base Building",
+        "City Builder",
+        "Resource Management"
+      ],
+      "description": "Card-driven progression tied to physical settlement or base expansion"
+    },
+    {
+      "id": "disc06",
+      "query": "space game focused on discovery rather than combat",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Adventure",
+        "Simulation",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Space",
+        "Exploration",
+        "Sci-fi",
+        "Atmospheric",
+        "Relaxing"
+      ],
+      "hard_negative_terms": [
+        "shooter",
+        "combat"
+      ],
+      "must_not_contain_genres": [],
+      "description": "Cosmic planetary and galactic exploration with peaceful or contemplative pacing"
+    },
+    {
+      "id": "disc07",
+      "query": "co-op survival without zombies",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Adventure",
+        "Simulation",
+        "Action",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Survival",
+        "Co-op",
+        "Multiplayer",
+        "Open World",
+        "Crafting"
+      ],
+      "hard_negative_terms": [
+        "zombies",
+        "undead",
+        "zombie"
+      ],
+      "description": "Multiplayer environmental or wilderness survival free of undead tropes"
+    },
+    {
+      "id": "disc08",
+      "query": "minimalist puzzle game with atmospheric storytelling",
+      "expected_type": "CONCEPT",
+      "category": "Moods & Atmosphere",
+      "acceptable_genres": [
+        "Puzzle",
+        "Indie",
+        "Casual",
+        "Adventure"
+      ],
+      "acceptable_tags": [
+        "Minimalist",
+        "Puzzle",
+        "Atmospheric",
+        "Story Rich",
+        "Great Soundtrack"
+      ],
+      "description": "Sparse visual design paired with narrative depth and ambient audio"
+    },
+    {
+      "id": "disc09",
+      "query": "tactical RPG with unusual progression",
+      "expected_type": "CONCEPT",
+      "category": "Uncommon Mechanics",
+      "acceptable_genres": [
+        "RPG",
+        "Strategy",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Tactical RPG",
+        "Turn-Based Tactics",
+        "Character Customization",
+        "Party-Based RPG"
+      ],
+      "description": "Grid or squad-based combat with non-standard leveling or skill trees"
+    },
+    {
+      "id": "disc10",
+      "query": "farming game with exploration and mystery",
+      "expected_type": "CONCEPT",
+      "category": "Cross-Genre",
+      "acceptable_genres": [
+        "Simulation",
+        "RPG",
+        "Adventure",
+        "Casual",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Farming Sim",
+        "Exploration",
+        "Mystery",
+        "Story Rich",
+        "Life Sim"
+      ],
+      "description": "Agricultural life-sim intertwined with deeper lore, ruins, and investigative mystery"
+    },
+    {
+      "id": "disc11",
+      "query": "space exploration without PvP",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Adventure",
+        "Simulation",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Space",
+        "Exploration",
+        "Singleplayer",
+        "Open World",
+        "Sci-fi"
+      ],
+      "hard_negative_terms": [
+        "pvp",
+        "mmo"
+      ],
+      "must_not_contain_modes": [
+        "PvP",
+        "Online PvP"
+      ],
+      "description": "Solo or peaceful space travel explicitly avoiding hostile player vs player combat"
+    },
+    {
+      "id": "disc12",
+      "query": "farming without horror",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Simulation",
+        "Casual",
+        "RPG",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Farming Sim",
+        "Relaxing",
+        "Cute",
+        "Life Sim",
+        "Agriculture"
+      ],
+      "hard_negative_terms": [
+        "horror",
+        "psychological horror"
+      ],
+      "must_not_contain_genres": [],
+      "description": "Cozy wholesome agrarian simulation avoiding creepypasta or dark horror twists"
+    },
+    {
+      "id": "disc13",
+      "query": "strategy without real-time combat",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Strategy",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Turn-Based Strategy",
+        "Turn-Based",
+        "Tactics",
+        "Management"
+      ],
+      "hard_negative_terms": [
+        "rts",
+        "real-time"
+      ],
+      "description": "Deliberative tactical strategy strictly avoiding APM-heavy real-time execution"
+    },
+    {
+      "id": "disc14",
+      "query": "games like Stardew Valley but more exploratory",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Stardew Valley",
+      "category": "Similarity Variants",
+      "acceptable_genres": [
+        "Simulation",
+        "RPG",
+        "Adventure",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Farming Sim",
+        "Exploration",
+        "Adventure",
+        "Life Sim",
+        "Crafting"
+      ],
+      "description": "Life-sim rooted in Stardew Valley template but branching into wilderness wandering"
+    },
+    {
+      "id": "disc15",
+      "query": "games like Dark Souls but less combat-focused",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Dark Souls",
+      "category": "Similarity Variants",
+      "acceptable_genres": [
+        "Adventure",
+        "RPG",
+        "Action",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Dark Fantasy",
+        "Atmospheric",
+        "Exploration",
+        "Lore-Rich",
+        "Difficult"
+      ],
+      "description": "Moody interconnected dark fantasy world prioritizing environmental discovery over reflex combat"
+    },
+    {
+      "id": "disc16",
+      "query": "something like Civilization with shorter sessions",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Civilization",
+      "category": "Similarity Variants",
+      "acceptable_genres": [
+        "Strategy",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "4X",
+        "Turn-Based Strategy",
+        "Hex Grid",
+        "Quick",
+        "Board Game"
+      ],
+      "description": "Empire building capturing 4X mechanics distilled into 30-to-60-minute matches"
+    },
+    {
+      "id": "disc17",
+      "query": "games like Hades with turn-based combat",
+      "expected_type": "SIMILARITY",
+      "target_entity": "Hades",
+      "category": "Similarity Variants",
+      "acceptable_genres": [
+        "RPG",
+        "Strategy",
+        "Indie",
+        "Action"
+      ],
+      "acceptable_tags": [
+        "Roguelike",
+        "Turn-Based Combat",
+        "Mythology",
+        "Story Rich"
+      ],
+      "description": "Mythological roguelite character progression paired with tactical turn-based battle"
+    },
+    {
+      "id": "disc18",
+      "query": "underwater survival exploration",
+      "expected_type": "CONCEPT",
+      "category": "Thematic Depth",
+      "acceptable_genres": [
+        "Adventure",
+        "Simulation",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Underwater",
+        "Survival",
+        "Exploration",
+        "Submarine",
+        "Crafting",
+        "Open World"
+      ],
+      "description": "Sub-surface aquatic habitat construction and deep-sea benthic exploration"
+    },
+    {
+      "id": "disc19",
+      "query": "physics puzzle platformer with time manipulation",
+      "expected_type": "CONCEPT",
+      "category": "Mechanic Combinations",
+      "acceptable_genres": [
+        "Puzzle",
+        "Platformer",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Physics",
+        "Time Manipulation",
+        "Puzzle Platformer",
+        "2D",
+        "Mechanics"
+      ],
+      "description": "Kinetic spatial puzzle-solving involving rewinding, recording, or looping time"
+    },
+    {
+      "id": "disc20",
+      "query": "medieval tavern management and brewing",
+      "expected_type": "CONCEPT",
+      "category": "Niche Player Experiences",
+      "acceptable_genres": [
+        "Simulation",
+        "Management",
+        "Indie",
+        "Strategy"
+      ],
+      "acceptable_tags": [
+        "Management",
+        "Medieval",
+        "Cooking",
+        "Crafting",
+        "Economy",
+        "Relaxing"
+      ],
+      "description": "Hospitality commerce focused on brewing ale, servicing patrons, and innkeeping"
+    },
+    {
+      "id": "disc21",
+      "query": "stealth puzzle game with terminal hacking",
+      "expected_type": "CONCEPT",
+      "category": "Cross-Genre",
+      "acceptable_genres": [
+        "Strategy",
+        "Puzzle",
+        "Indie",
+        "Action"
+      ],
+      "acceptable_tags": [
+        "Hacking",
+        "Stealth",
+        "Cyberpunk",
+        "Turn-Based Tactics",
+        "Puzzle"
+      ],
+      "description": "Infiltration relying on network intrusion, security cameras, and logical evasion"
+    },
+    {
+      "id": "disc22",
+      "query": "procedural mystery investigation in winter",
+      "expected_type": "CONCEPT",
+      "category": "Moods & Atmosphere",
+      "acceptable_genres": [
+        "Adventure",
+        "Indie",
+        "RPG"
+      ],
+      "acceptable_tags": [
+        "Detective",
+        "Mystery",
+        "Atmospheric",
+        "Snow",
+        "Procedural Generation"
+      ],
+      "description": "Snowbound sleuthing featuring randomized crime scenes or shifting clues"
+    },
+    {
+      "id": "disc23",
+      "query": "zen city builder without natural disasters",
+      "expected_type": "CONCEPT",
+      "category": "Negative Constraints",
+      "acceptable_genres": [
+        "Simulation",
+        "Strategy",
+        "Casual",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "City Builder",
+        "Relaxing",
+        "Building",
+        "Sandbox",
+        "Minimalist"
+      ],
+      "hard_negative_terms": [
+        "disasters",
+        "combat",
+        "destruction"
+      ],
+      "description": "Wholesome town construction emphasizing aesthetic layout without catastrophe events"
+    },
+    {
+      "id": "disc24",
+      "query": "merchant shop simulator with dungeon crawling",
+      "expected_type": "CONCEPT",
+      "category": "Cross-Genre",
+      "acceptable_genres": [
+        "RPG",
+        "Adventure",
+        "Simulation",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Management",
+        "Dungeon Crawler",
+        "Economy",
+        "Roguelite",
+        "Pixel Art"
+      ],
+      "description": "Daytime retail shopkeeping supplied by nighttime underworld loot foraging"
+    },
+    {
+      "id": "disc25",
+      "query": "automation programming game with conveyor belts",
+      "expected_type": "CONCEPT",
+      "category": "Niche Player Experiences",
+      "acceptable_genres": [
+        "Simulation",
+        "Strategy",
+        "Indie"
+      ],
+      "acceptable_tags": [
+        "Automation",
+        "Programming",
+        "Logic",
+        "Building",
+        "Resource Management"
+      ],
+      "description": "Factory engineering demanding logic-gate optimization and automated conveyor routing"
+    }
+  ]
+}
