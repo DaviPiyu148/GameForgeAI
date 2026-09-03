@@ -1308,3 +1308,170 @@ class TestPhase7ControlledTreatment:
         # Priority 1: Must generate PROJECT reason, not just GLOBAL Action
         assert any("active project" in reason.text for reason in reasons)
         assert any("Strategy" in reason.text for reason in reasons)
+
+
+class TestPhase72StatisticalIntegrity:
+    """
+    Phase 7.2: Rigorous verification of experiment-metric integrity:
+    1. Distinction between Set Churn (new_in_top5) vs Positional Slot Changes.
+    2. Resolving the BEST_MATCH case: internal swap yields set_churn == 0, but positional_changes == 2 (50% Ben, 50% Harm).
+    3. External candidate entry yields set_churn > 0.
+    4. Exact ordering preservation yields set_churn == 0 and positional_changes == 0.
+    5. Statistical confidence interval and significance testing math.
+    """
+
+    def test_internal_swap_yields_zero_set_churn_but_two_positional_changes(self):
+        """
+        Proof of BEST_MATCH phenomenon:
+        Two games already in Top-5 swap positions (Rank 1 <-> Rank 2).
+        - Set churn (new_in_top5) MUST be 0 (no new game entered from outside).
+        - Positional changes MUST be 2 (slot 0 and slot 1 changed occupant).
+        - Beneficial changes = 1 (slot 0 gained alignment).
+        - Harmful changes = 1 (slot 1 lost alignment).
+        - Ratio = 50% Beneficial, 50% Harmful.
+        """
+        svc = _make_service()
+        # g1 has base 0.802 (Puzzle), g2 has base 0.800 (Strategy) - close enough for lambda=0.02
+        r1 = _make_result("g1", "Puzzle Game", 0.802, ["Puzzle"])
+        r2 = _make_result("g2", "Strategy Game", 0.800, ["Strategy"])
+        r3 = _make_result("g3", "Sim Game", 0.700, ["Simulation"])
+        r4 = _make_result("g4", "RPG Game", 0.600, ["RPG"])
+        r5 = _make_result("g5", "Action Game", 0.500, ["Action"])
+        base = _make_base_response([r1, r2, r3, r4, r5], mode="BEST_MATCH")
+
+        # Profile with high Strategy affinity -> boosts g2 over g1
+        profile = EffectivePreferenceProfile(
+            user_id="user_swap",
+            genres={"Strategy": 0.90, "Puzzle": 0.10},
+            total_signal_count=10,
+        )
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="treat_user_001",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            lambda_=0.02,
+            treatment_pct=100,
+            mode_lambdas={"BEST_MATCH": 0.02},
+        )
+
+        # Result: g2 and g1 swap places at rank 1 and 2; g3, g4, g5 remain unchanged
+        assert [r.game.id for r in resp.results] == ["g2", "g1", "g3", "g4", "g5"]
+        # Set churn MUST be exactly 0 (no game entered from Rank 6+)
+        assert diag.top5_churn == 0
+        assert diag.new_in_top5 == 0
+        assert diag.left_top5 == 0
+        # Positional slot changes MUST be exactly 2 (slots 0 and 1)
+        assert diag.top5_positional_changes == 2
+        # Slot 0: gained Strategy (+0.90 vs +0.10 -> Delta = +0.80 >= +0.05 -> BENEFICIAL)
+        assert diag.beneficial_changes == 1
+        # Slot 1: lost Strategy (+0.10 vs +0.90 -> Delta = -0.80 <= -0.02 -> HARMFUL)
+        assert diag.harmful_changes == 1
+        assert diag.neutral_changes == 0
+        # Exactly 50% Beneficial, 50% Harmful
+        tot_classified = diag.beneficial_changes + diag.harmful_changes
+        assert diag.beneficial_changes / tot_classified == 0.50
+        assert diag.harmful_changes / tot_classified == 0.50
+
+    def test_external_entry_yields_positive_set_churn_and_positional_change(self):
+        """
+        External candidate from Rank 6+ enters the Top-5.
+        - Set churn (new_in_top5) MUST be 1.
+        - Positional slot changes MUST be >= 1.
+        """
+        svc = _make_service()
+        r1 = _make_result("g1", "G1", 0.90, ["Puzzle"])
+        r2 = _make_result("g2", "G2", 0.85, ["Puzzle"])
+        r3 = _make_result("g3", "G3", 0.80, ["Puzzle"])
+        r4 = _make_result("g4", "G4", 0.75, ["Puzzle"])
+        r5 = _make_result("g5", "G5", 0.70, ["Puzzle"])
+        r6 = _make_result("g6", "G6 Strategy", 0.69, ["Strategy"])
+        base = _make_base_response([r1, r2, r3, r4, r5, r6], mode="DISCOVER")
+
+        # Huge Strategy affinity pulls g6 into top 5
+        profile = EffectivePreferenceProfile(
+            user_id="user_external",
+            genres={"Strategy": 1.0},
+            total_signal_count=20,
+        )
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="treat_user_002",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            lambda_=0.05,
+            treatment_pct=100,
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+
+        # g6 entered top 5
+        assert "g6" in [r.game.id for r in resp.results[:5]]
+        assert diag.top5_churn == 1
+        assert diag.new_in_top5 == 1
+        assert diag.left_top5 == 1
+        assert diag.top5_positional_changes >= 1
+
+    def test_exact_ordering_yields_zero_churn_and_zero_positional_changes(self):
+        """
+        POPULAR mode or zero lambda yields exact ordering:
+        - top5_churn == 0
+        - top5_positional_changes == 0
+        - beneficial == 0, harmful == 0, neutral == 0
+        """
+        svc = _make_service()
+        r1 = _make_result("g1", "G1", 0.90, ["Strategy"])
+        r2 = _make_result("g2", "G2", 0.80, ["Puzzle"])
+        base = _make_base_response([r1, r2], mode="POPULAR")
+
+        profile = EffectivePreferenceProfile(
+            user_id="user_pop",
+            genres={"Puzzle": 1.0},
+            total_signal_count=10,
+        )
+
+        resp, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="treat_user_003",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=100,
+            mode_lambdas={"POPULAR": 0.00},
+        )
+
+        assert [r.game.id for r in resp.results] == ["g1", "g2"]
+        assert diag.top5_churn == 0
+        assert diag.top5_positional_changes == 0
+        assert diag.beneficial_changes == 0
+        assert diag.harmful_changes == 0
+        assert diag.neutral_changes == 0
+
+    def test_two_proportion_confidence_interval_math(self):
+        """
+        Verify statistical two-proportion confidence interval computation:
+        Delta = p_treat - p_ctrl
+        SE = sqrt(p_treat*(1-p_treat)/n_treat + p_ctrl*(1-p_ctrl)/n_ctrl)
+        CI = Delta +- 1.96 * SE
+        Crucial finding: at N=2100 with p_c=11.38% and p_t=13.24%,
+        the 95% CI covers [-0.0013, +0.0385], which includes zero!
+        This confirms why statistical caution is mandatory.
+        """
+        import math
+
+        # Example: Save rate in treatment (13.24%, N=2100) vs control (11.38%, N=2100)
+        p_c = 0.1138
+        p_t = 0.1324
+        n_c = 2100
+        n_t = 2100
+
+        delta = p_t - p_c
+        se = math.sqrt((p_t * (1 - p_t) / n_t) + (p_c * (1 - p_c) / n_c))
+        ci_lower = delta - 1.96 * se
+        ci_upper = delta + 1.96 * se
+
+        assert round(delta, 4) == 0.0186
+        # Confidence interval covers zero -> not statistically significant at alpha=0.05
+        assert ci_lower < 0 < ci_upper
+        z_stat = delta / se
+        assert z_stat < 1.96  # p > 0.05 (two-tailed)

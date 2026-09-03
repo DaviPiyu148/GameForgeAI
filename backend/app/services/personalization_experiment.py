@@ -102,7 +102,8 @@ class ExperimentDiagnostics:
     discovery_mode: str = "BEST_MATCH"             # BEST_MATCH / DISCOVER / HIDDEN_GEMS / POPULAR
     candidates_evaluated: int = 0
     candidates_moved: int = 0
-    top5_churn: int = 0                             # number of positions changed in Top-5
+    top5_churn: int = 0                             # Set churn: candidates entering Top-5 set from rank >= 6 (new_in_top5)
+    top5_positional_changes: int = 0                # Positional changes: indices 0..4 where occupant changed
     top10_churn: int = 0
     mean_abs_rank_delta: float = 0.0
     max_rank_delta: int = 0
@@ -112,9 +113,9 @@ class ExperimentDiagnostics:
     intent_violations: int = 0
     avoidance_violations: int = 0
     cold_regression: int = 0
-    beneficial_changes: int = 0
-    neutral_changes: int = 0
-    harmful_changes: int = 0
+    beneficial_changes: int = 0                     # positional changes with alignment delta >= +0.05
+    neutral_changes: int = 0                        # positional changes with -0.02 < delta < +0.05
+    harmful_changes: int = 0                        # positional changes with alignment delta <= -0.02
     personalization_latency_ms: float = 0.0
     base_latency_ms: float = 0.0
     total_latency_ms: float = 0.0
@@ -426,10 +427,13 @@ class PersonalizationExperimentService:
         pers_alignment = _mean_alignment(pers_results, effective_profile)
         diag.preference_alignment_uplift = round(pers_alignment - base_alignment, 4)
 
-        # ── Classify Top-5 slot replacements ──────────────────────────────────
-        # Compare personalized result vs base result at each Top-5 position that changed
+        # ── Classify Top-5 positional slot changes ───────────────────────────
+        # Compare personalized result vs base result at each Top-5 position that changed.
+        # Note: An internal swap between two Top-5 items yields top5_churn == 0 (set churn),
+        # but top5_positional_changes == 2 (e.g. 1 beneficial upgrade + 1 harmful downgrade).
         for i in range(min(5, len(pers_results), len(base_results))):
             if pers_results[i].game.id != base_results[i].game.id:
+                diag.top5_positional_changes += 1
                 pa = _compute_profile_alignment(pers_results[i], effective_profile)
                 ba = _compute_profile_alignment(base_results[i], effective_profile)
                 cls = _classify_change(ba, pa)
