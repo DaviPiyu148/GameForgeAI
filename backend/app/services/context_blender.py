@@ -73,13 +73,20 @@ class ContextBlender:
 
     def build_project_profile(
         self,
-        project: Project,
+        project: Any,
         embedder: Optional[Any] = None,
+        db: Optional[Any] = None,
     ) -> ProjectPreferenceProfile:
         """
-        Extract structured preference DNA from a persisted Project model.
+        Extract structured preference DNA from a persisted Project model or ID.
         Derived strictly from structured metadata: genre, modules, design_spec, world_mode.
         """
+        if isinstance(project, str) and db is not None:
+            proj_entity = db.query(Project).filter(Project.id == project).first()
+            if not proj_entity:
+                raise ValueError(f"Project with ID '{project}' not found.")
+            project = proj_entity
+
         now = datetime.now(timezone.utc)
         evidence: List[PreferenceEvidence] = []
 
@@ -351,6 +358,7 @@ class ContextBlender:
             user_id=global_profile.user_id,
             active_project_id=project_profile.project_id,
             active_project_title=project_profile.title,
+            confidence_tier=global_profile.confidence_tier,
             genres=effective_genres,
             mechanics=effective_mechanics,
             themes=effective_themes,
@@ -506,6 +514,7 @@ class ContextBlender:
             user_id=global_profile.user_id,
             active_project_id=None,
             active_project_title=None,
+            confidence_tier=global_profile.confidence_tier,
             genres=dict(global_profile.genres),
             mechanics=dict(global_profile.mechanics),
             themes=dict(global_profile.themes),
@@ -555,6 +564,7 @@ class ContextBlender:
             user_id=user_id,
             active_project_id=project_profile.project_id,
             active_project_title=project_profile.title,
+            confidence_tier="MODERATE",
             genres=dict(project_profile.genres),
             mechanics=dict(project_profile.mechanics),
             themes=dict(project_profile.themes),

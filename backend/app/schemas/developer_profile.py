@@ -157,6 +157,7 @@ class EffectivePreferenceProfile(BaseModel):
     user_id: str
     active_project_id: Optional[str] = None
     active_project_title: Optional[str] = None
+    confidence_tier: ConfidenceTier = Field(default="COLD", description="Profile maturity tier inherited from global developer DNA")
 
     # Blended categorical affinities (normalized 0.0 - 1.0)
     genres: Dict[str, float] = Field(default_factory=dict)

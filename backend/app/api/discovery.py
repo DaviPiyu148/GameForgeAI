@@ -110,8 +110,8 @@ async def search_games(
                 if request.project_id:
                     try:
                         project_profile = context_blender.build_project_profile(
+                            project=request.project_id,
                             db=db,
-                            project_id=request.project_id,
                         )
                     except Exception as proj_exc:
                         logger.debug(

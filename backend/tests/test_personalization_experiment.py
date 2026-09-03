@@ -405,19 +405,75 @@ class TestShadowDiagnostics:
 
     def test_shadow_response_body_identical_to_base(self):
         svc = _make_service()
-        results = [_make_result("g1", "Game A", 0.9)]
+        results = [
+            _make_result("g1", "Game A", 0.95, ["Action"]),
+            _make_result("g2", "Game B", 0.85, ["Strategy"]),
+            _make_result("g3", "Game C", 0.75, ["RPG"]),
+        ]
         base = _make_base_response(results)
         profile = _warm_profile()
 
-        final, _ = svc.apply(
+        final, diag = svc.apply(
             base_response=base,
             effective_profile=profile,
             user_id="u1",
             mode=PERSONALIZATION_MODE_SHADOW,
         )
 
+        # Phase 6.1 Section 3: Exhaustive response identity check
         assert final.personalized is False
-        assert [r.game.id for r in final.results] == ["g1"]
+        assert final.query == base.query
+        assert final.match_count == base.match_count
+        assert final.mode == base.mode
+        assert len(final.results) == len(base.results)
+        for r_base, r_final in zip(base.results, final.results):
+            assert r_final.game.id == r_base.game.id
+            assert r_final.score == r_base.score
+            assert r_final.explanation == r_base.explanation
+            assert r_final.personalization_reasons == []
+
+    def test_shadow_diagnostic_schema_fields(self):
+        """Phase 6.1 Section 4: Verify all diagnostic schema fields are populated."""
+        svc = _make_service()
+        svc.clear_history()
+        results = [
+            _make_result("g1", "Game A", 0.90, ["Action"]),
+            _make_result("g2", "Game B", 0.89, ["Strategy"]),
+        ]
+        base = _make_base_response(results)
+        profile = _warm_profile()
+
+        final, diag = svc.apply(
+            base_response=base,
+            effective_profile=profile,
+            user_id="u1",
+            mode=PERSONALIZATION_MODE_SHADOW,
+            lambda_=0.05,
+        )
+
+        assert diag.mode == PERSONALIZATION_MODE_SHADOW
+        assert diag.lambda_ == 0.05
+        assert diag.discovery_mode == "BEST_MATCH"
+        assert diag.profile_confidence_tier in ("COLD", "EMERGING", "MODERATE", "ESTABLISHED")
+        assert isinstance(diag.active_project, bool)
+        assert diag.base_top_k_ids == ["g1", "g2"]
+        assert len(diag.personalized_top_k_ids) == 2
+        assert isinstance(diag.top5_churn, int)
+        assert isinstance(diag.top10_churn, int)
+        assert isinstance(diag.mean_abs_rank_delta, float)
+        assert isinstance(diag.max_rank_delta, int)
+        assert isinstance(diag.preference_alignment_uplift, float)
+        assert isinstance(diag.beneficial_changes, int)
+        assert isinstance(diag.neutral_changes, int)
+        assert isinstance(diag.harmful_changes, int)
+        assert isinstance(diag.safety_fallback_triggered, bool)
+        assert isinstance(diag.no_evidence_personalization, bool)
+        assert diag.personalization_latency_ms >= 0.0
+
+        # Ring buffer history
+        history = svc.get_history()
+        assert len(history) == 1
+        assert history[0].mode == PERSONALIZATION_MODE_SHADOW
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +568,28 @@ class TestAlignmentUplift:
         bad_result = _make_result("g2", "Action Game", 0.9, ["Action"])
 
         assert _compute_profile_alignment(good_result, profile) > _compute_profile_alignment(bad_result, profile)
+
+    @pytest.mark.parametrize(
+        "base_val, pers_val, expected_class",
+        [
+            (0.50, 0.4500, "HARMFUL"),     # delta = -0.050
+            (0.50, 0.4800, "HARMFUL"),     # delta = -0.020 (inclusive harmful threshold)
+            (0.50, 0.4801, "NEUTRAL"),     # delta = -0.0199
+            (0.50, 0.5000, "NEUTRAL"),     # delta =  0.000
+            (0.50, 0.5199, "NEUTRAL"),     # delta = +0.0199
+            (0.50, 0.5200, "NEUTRAL"),     # delta = +0.020
+            (0.50, 0.5201, "NEUTRAL"),     # delta = +0.0201
+            (0.50, 0.5499, "NEUTRAL"),     # delta = +0.0499
+            (0.50, 0.5500, "BENEFICIAL"),  # delta = +0.050 (inclusive beneficial threshold)
+            (0.50, 0.5501, "BENEFICIAL"),  # delta = +0.0501
+        ],
+    )
+    def test_classification_boundaries_exhaustive(self, base_val, pers_val, expected_class):
+        """
+        Phase 6.1 Section 1: Exhaustive boundary testing ensuring gap-free,
+        mutually exclusive partitioning across all requested thresholds.
+        """
+        assert _classify_change(base_val, pers_val) == expected_class
 
     def test_classify_change_beneficial(self):
         assert _classify_change(0.0, 0.2) == "BENEFICIAL"

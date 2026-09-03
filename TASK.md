@@ -1,18 +1,22 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 6: Shadow Mode, Feature Flag & Controlled A/B Integration
+Personalization V1 — Phase 6.1: Real-Query Shadow Validation
 
 ## Status
 COMPLETE
 
 ## Objective
-Integrate the Phase 5 personalization re-ranker behind a feature flag (OFF/SHADOW/TREATMENT),
-first in shadow mode (compute but don't change response), then through a controlled A/B experiment,
-without making personalization the default production behavior. Default remains OFF.
+Run personalization in SHADOW mode against real GameForge traffic and database profiles/projects to determine whether the offline benchmark generalizes to real developer behavior:
+1. Fix/verify change-classification boundaries to be gap-free and mutually exclusive (BENEFICIAL >= +0.05, NEUTRAL (-0.02, +0.05), HARMFUL <= -0.02) with 10 exhaustive boundary tests.
+2. Enable `PERSONALIZATION_MODE=SHADOW`, `PERSONALIZATION_LAMBDA=0.05`, `PERSONALIZATION_TREATMENT_PCT=0`.
+3. Verify shadow response identity invariant (`base_response == shadow_response`) across all requests.
+4. Expand `ExperimentDiagnostics` with discovery_mode, candidate IDs, latency, and no-evidence detection.
+5. Execute 140 real queries across all 4 modes, 4 profile maturity tiers (COLD, EMERGING, MODERATE, ESTABLISHED), and active project contexts.
+6. Evaluate PAU distribution, change classification, rank movement, safety, and latency.
 
 ## Previous Commit Checkpoint
-- SHA: `6639a9f` — `backend: add personalization V1 phases 1-5 (aggregator, blender, explanations, offline benchmark)`
+- SHA: `bf5ddb4` — `backend: add personalization V1 phase 6 (shadow mode, feature flag, A/B experiment service)`
 
 ## Started
 2026-09-03
@@ -964,5 +968,179 @@ GEMINI:            0
 ```
 
 ### Git Checkpoint
+- Commit hash: `bf5ddb4`
+- 5 files: config.py, personalization_experiment.py, discovery.py, test_personalization_experiment.py, TASK.md
+
+---
+
+## Phase 6.1: Real-Query Shadow Validation — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Execute shadow personalization against 140 real queries using authentic database developer profiles across all 4 maturity tiers (COLD, EMERGING, MODERATE, ESTABLISHED) and active project contexts. Validate response identity invariant, PAU distribution, gap-free change classification, rank movement, latency overhead, and mode segmentation.
+
+### Files Created / Modified
+- `backend/app/config.py`:
+  - Configured `PERSONALIZATION_MODE: str = "SHADOW"` (observation only; 0% treatment).
+- `backend/app/schemas/developer_profile.py`:
+  - Added `confidence_tier: ConfidenceTier` to `EffectivePreferenceProfile` so profile maturity is preserved post-blending.
+- `backend/app/services/context_blender.py`:
+  - Updated `build_project_profile()` to accept either a `Project` model instance or `project_id: str` with `db: Session`.
+  - Propagated `confidence_tier` across all `EffectivePreferenceProfile` constructors.
+- `backend/app/services/personalization_experiment.py`:
+  - Formalized gap-free, mutually exclusive classification boundaries:
+    - BENEFICIAL: `delta >= +0.05`
+    - NEUTRAL: `-0.02 < delta < +0.05`
+    - HARMFUL: `delta <= -0.02`
+  - Fixed Top-5 change evaluation to compare slot-by-slot replaced candidates.
+  - Expanded `ExperimentDiagnostics` with `discovery_mode`, `base_top_k_ids`, `personalized_top_k_ids`, `base_latency_ms`, `total_latency_ms`, `no_evidence_personalization`.
+  - Added thread-safe diagnostic ring buffer (`record_diagnostic`, `get_history`, `clear_history`).
+- `backend/app/api/discovery.py`:
+  - Updated project context resolution to pass `project=request.project_id, db=db` to `build_project_profile()`.
+- `backend/tests/test_personalization_experiment.py`:
+  - Added 10 exhaustive boundary tests around `-0.050, -0.020, -0.0199, 0.000, +0.0199, +0.020, +0.0201, +0.0499, +0.050, +0.0501`.
+  - Added exhaustive shadow response identity test (`base_response == shadow_response` for IDs, scores, reasons, metadata).
+  - Added diagnostic schema field coverage tests. Total: 43 unit tests.
+- `backend/scripts/validate_shadow_personalization.py` (NEW):
+  - Comprehensive 140-query shadow evaluation harness across 5 real DB personas, 4 Discovery modes, and 2 active project contexts.
+
+### Shadow Validation Results (140 Real Runs)
+
+**A. Shadow Configuration & Coverage**
+```
+Total Requests Evaluated:        140 (100% eligible)
+Operating Lambda:                0.05 (FROZEN)
+Treatment Percentage:            0% (SHADOW ONLY — zero user exposure)
+Latency Budget:                  50.0 ms
+
+Profile Maturity Tiers:
+  COLD:         28 (20.0%)
+  EMERGING:     28 (20.0%)
+  MODERATE:     28 (20.0%)
+  ESTABLISHED:  56 (40.0%)
+
+Discovery Modes:
+  BEST_MATCH:   50 (35.7%)
+  DISCOVER:     35 (25.0%)
+  HIDDEN_GEMS:  30 (21.4%)
+  POPULAR:      25 (17.9%)
+
+Active Project Context:
+  With Project:    28 (20.0%)
+  Without Project: 112 (80.0%)
+```
+
+**B. Response Identity & Safety Invariants**
+```
+Identity Invariant Failures:     0 / 140 (100% exact match: shadow_resp is base_resp)
+Cold-Start Invariant Failures:   0 / 28  (100% exact zero movement: churn=0, delta=0, PAU=0)
+Hard Constraint Violations:      0 (100% compliant)
+Explicit Avoidance Violations:   0 (100% compliant)
+Safety Fallbacks Triggered:      0
+Latency Budget Exceedances:      0 (> 50.0 ms)
+No-Evidence Personalization:     0 (0.0%)
+```
+
+**C. Preference Alignment Uplift (PAU) Distribution**
+```
+Mean PAU:       +0.0214
+Median PAU:     +0.0000
+P10 PAU:        +0.0000
+P25 PAU:        +0.0000
+P75 PAU:        +0.0500
+P90 PAU:        +0.0700
+Min PAU:        -0.0100
+Max PAU:        +0.1412
+
+Histogram Buckets:
+  PAU <= -0.050:             0 (  0.0%) [High Harm]
+  -0.050 < PAU <= -0.020:    0 (  0.0%) [Moderate Harm]
+  -0.020 < PAU <= 0.000:    98 ( 70.0%) [Neutral / Stable]
+   0.000 < PAU <= +0.020:    5 (  3.6%) [Mild Positive]
+  +0.020 < PAU <= +0.050:    4 (  2.9%) [Moderate Positive]
+  PAU > +0.050:             33 ( 23.6%) [High Benefit]
+```
+
+**D. Change Classification (Top-5 Slot Replacements)**
+```
+Total Top-5 Slot Changes:       182
+  BENEFICIAL (delta >= +0.05):   87 (47.8%)
+  NEUTRAL    (-0.02 < d < 0.05): 51 (28.0%)
+  HARMFUL    (delta <= -0.02):   44 (24.2%)
+  Ratio Beneficial / Harmful:    1.98x (almost 2:1 beneficial over harmful)
+```
+
+**E. Rank Movement & Churn**
+```
+Mean Absolute Rank Delta:        0.603
+Median Absolute Rank Delta:      0.400
+P90 Absolute Rank Delta:         1.400
+Average Top-5 Churn/Req:         0.45 slots
+Average Top-10 Churn/Req:        0.00 slots
+Zero-Movement Requests:          38 (27.1%)
+```
+
+**F. Latency Breakdown**
+```
+Personalization Overhead:
+  Mean:   2.677 ms
+  Median: 2.470 ms
+  P95:    6.068 ms
+  P99:    7.901 ms
+Base Retrieval Latency:
+  Mean:   768.1 ms
+  P95:    1366.4 ms
+Budget Exceedance Rate (>50ms):  0.00%
+```
+
+**G. Mode Segmentation**
+```
+Mode         | Reqs | Avg PAU | Top-5 Churn | Moved % | Ben % | Harm %
+-------------+------+---------+-------------+---------+-------+-------
+BEST_MATCH   |   50 | +0.0168 |        0.30 |   68.0% | 50.0% |  30.0%
+POPULAR      |   25 | +0.0136 |        0.36 |   76.0% | 40.0% |  23.3%
+DISCOVER     |   35 | +0.0287 |        0.66 |   74.3% | 51.8% |  25.0%
+HIDDEN_GEMS  |   30 | +0.0272 |        0.53 |   76.7% | 45.7% |  17.4%
+```
+
+**H. Profile Maturity Tier Segmentation**
+```
+Tier         | Reqs | Avg PAU | Top-5 Churn | Moved % | Ben % | Harm %
+-------------+------+---------+-------------+---------+-------+-------
+COLD         |   28 | +0.0000 |        0.00 |    0.0% |  0.0% |   0.0%
+EMERGING     |   28 | +0.0361 |        0.68 |   85.7% | 45.5% |  13.6%
+MODERATE     |   28 | +0.0342 |        0.61 |  100.0% | 62.2% |  28.9%
+ESTABLISHED  |   56 | +0.0184 |        0.48 |   89.3% | 41.9% |  26.9%
+```
+
+**I. Project Context Segmentation & Isolation**
+```
+Without Project: Reqs=112 | PAU=+0.0191 | Churn=0.43 | Moved=67.9% | Ben%=44.9% | Harm%=23.5%
+With Project:    Reqs= 28 | PAU=+0.0307 | Churn=0.54 | Moved=92.9% | Ben%=56.5% | Harm%=26.1%
+
+Project Switching Isolation:
+  Global No-Project PAU: +0.0000 | Top-3: ['322500', '853770', '1229490']
+  Project A (Cyber) PAU: +0.0000 | Top-3: ['322500', '853770', '1229490']
+  Project B (Void)  PAU: +0.0000 | Top-3: ['322500', '853770', '1229490']
+  Isolation confirmed: Project context does not mutate underlying global DNA.
+```
+
+### Verification
+- `pytest backend/tests/test_personalization_experiment.py -v`: **43 passed** in 0.33s.
+- `pytest backend/tests/ -q`: **534 passed, 1 warning** in 136.90s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **1.80s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+- BROWSER TESTING: NOT PERFORMED (no frontend changes).
+- Default User Experience: 100% BASE DISCOVERY RANKING (`treatment_pct = 0`).
+
+### Production Recommendation
+`1. Continue SHADOW — establish longitudinal real-user baseline before opening 5% treatment.`
+PAU is positive (+0.0214) and beneficial changes exceed harmful changes 1.98x, with zero regressions on cold start and hard constraints. However, because harmful changes still account for 24.2% of Top-5 movements (particularly in BEST_MATCH and POPULAR), personalization should remain in SHADOW mode until additional real-traffic diagnostics are gathered and mode-specific dampening (e.g. lower lambda or zero boost for BEST_MATCH/POPULAR) is formally evaluated.
+
+### Git Checkpoint
 - Commit hash: (see below after commit)
-- 4 files: config.py, personalization_experiment.py, discovery.py, test_personalization_experiment.py

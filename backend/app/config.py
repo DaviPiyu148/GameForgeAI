@@ -99,14 +99,13 @@ class Settings(BaseSettings):
     IGDB_CLIENT_SECRET: Optional[str] = None
     IGDB_CACHE_TTL_DAYS: int = 7
 
-    # ── Personalization V1 — Feature Flag (Phase 6) ────────────────────────────
+    # ── Personalization V1 — Feature Flag (Phase 6 / 6.1) ──────────────────────
     # PERSONALIZATION_MODE controls how the personalized re-ranker is applied:
-    #   OFF       — no personalization computation (default, production-safe)
-    #   SHADOW    — compute personalized ranking but return BASE result; record diagnostics only
+    #   OFF       — no personalization computation
+    #   SHADOW    — compute personalized ranking in background; return BASE result
     #   TREATMENT — apply personalized ranking for users in the treatment cohort
-    # This flag MUST default to OFF so that a fresh deployment cannot accidentally
-    # enable personalization for real users.
-    PERSONALIZATION_MODE: str = "OFF"
+    # Phase 6.1 active setting: SHADOW (observation only, zero user-visible change).
+    PERSONALIZATION_MODE: str = "SHADOW"
 
     # Lambda for the additive re-ranking formula:
     #   personalized_score = base_score + (PERSONALIZATION_LAMBDA * personalization_score)

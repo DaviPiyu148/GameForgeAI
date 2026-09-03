@@ -64,11 +64,19 @@ PERSONALIZATION_MODE_TREATMENT = "TREATMENT"
 VALID_MODES = {PERSONALIZATION_MODE_OFF, PERSONALIZATION_MODE_SHADOW, PERSONALIZATION_MODE_TREATMENT}
 
 # ---------------------------------------------------------------------------
-# Change classification thresholds
+# Change classification thresholds (Phase 6.1: Gap-Free & Mutually Exclusive)
 # ---------------------------------------------------------------------------
-
-_BENEFICIAL_MIN_ALIGNMENT_GAIN = 0.05   # uplift in profile alignment for "BENEFICIAL"
-_HARMFUL_ALIGNMENT_LOSS = -0.02         # drop in alignment that classifies as "HARMFUL"
+# Partitioning of delta = (personalized_alignment - base_alignment):
+#   BENEFICIAL: delta >= +0.05        (Meaningful profile alignment gain)
+#   NEUTRAL:    -0.02 < delta < +0.05 (Negligible / acceptable movement without harm)
+#   HARMFUL:    delta <= -0.02        (Detectable alignment regression)
+#
+# Every real number delta belongs to exactly one interval:
+#   (-inf, -0.02]  -> HARMFUL
+#   (-0.02, +0.05) -> NEUTRAL
+#   [+0.05, +inf)  -> BENEFICIAL
+_BENEFICIAL_MIN_ALIGNMENT_GAIN = 0.05
+_HARMFUL_ALIGNMENT_LOSS = -0.02
 
 # Dimension weights for Preference Alignment Score (same as re-ranker)
 _W_GENRE = 0.35
@@ -91,6 +99,7 @@ class ExperimentDiagnostics:
     lambda_: float = 0.0
     profile_confidence_tier: str = "COLD"          # COLD / EMERGING / MODERATE / ESTABLISHED
     active_project: bool = False
+    discovery_mode: str = "BEST_MATCH"             # BEST_MATCH / DISCOVER / HIDDEN_GEMS / POPULAR
     candidates_evaluated: int = 0
     candidates_moved: int = 0
     top5_churn: int = 0                             # number of positions changed in Top-5
@@ -107,9 +116,14 @@ class ExperimentDiagnostics:
     neutral_changes: int = 0
     harmful_changes: int = 0
     personalization_latency_ms: float = 0.0
+    base_latency_ms: float = 0.0
+    total_latency_ms: float = 0.0
     safety_fallback_triggered: bool = False
     safety_fallback_reason: str = ""
     user_in_treatment_cohort: bool = False
+    no_evidence_personalization: bool = False
+    base_top_k_ids: List[str] = field(default_factory=list)
+    personalized_top_k_ids: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -166,13 +180,22 @@ def _classify_change(
     base_alignment: float,
     pers_alignment: float,
 ) -> str:
-    """Classify a single Top-5 change as BENEFICIAL / NEUTRAL / HARMFUL."""
-    delta = pers_alignment - base_alignment
+    """
+    Classify a single Top-5 change as BENEFICIAL / NEUTRAL / HARMFUL.
+
+    Mutually exclusive, gap-free boundaries:
+      delta >= +0.05           -> BENEFICIAL
+      -0.02 < delta < +0.05    -> NEUTRAL
+      delta <= -0.02           -> HARMFUL
+    """
+    # Round delta to 6 decimal places to prevent IEEE 754 precision flutter
+    delta = round(pers_alignment - base_alignment, 6)
     if delta >= _BENEFICIAL_MIN_ALIGNMENT_GAIN:
         return "BENEFICIAL"
-    if delta <= _HARMFUL_ALIGNMENT_LOSS:
+    elif delta <= _HARMFUL_ALIGNMENT_LOSS:
         return "HARMFUL"
-    return "NEUTRAL"
+    else:
+        return "NEUTRAL"
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +238,19 @@ class PersonalizationExperimentService:
 
     def __init__(self) -> None:
         self._explanation_service = PersonalizationExplanationService()
+        self._history: List[ExperimentDiagnostics] = []
+
+    def record_diagnostic(self, diag: ExperimentDiagnostics) -> None:
+        """Store diagnostic in ring buffer (max 2000 entries)."""
+        self._history.append(diag)
+        if len(self._history) > 2000:
+            self._history.pop(0)
+
+    def get_history(self) -> List[ExperimentDiagnostics]:
+        return list(self._history)
+
+    def clear_history(self) -> None:
+        self._history.clear()
 
     # ------------------------------------------------------------------
     # Primary entry point
@@ -241,6 +277,7 @@ class PersonalizationExperimentService:
         Any exception falls back to base_response.
         """
         diag = ExperimentDiagnostics(mode=mode, lambda_=lambda_)
+        diag.discovery_mode = getattr(base_response, "mode", "BEST_MATCH") or "BEST_MATCH"
 
         # ── OFF: nothing to compute ──────────────────────────────────────────
         if mode not in VALID_MODES or mode == PERSONALIZATION_MODE_OFF:
@@ -250,6 +287,8 @@ class PersonalizationExperimentService:
         # ── Cold-start / missing profile: no-op regardless of mode ──────────
         if effective_profile is None:
             diag.cold_regression = len(base_response.results[:5])
+            if mode == PERSONALIZATION_MODE_SHADOW:
+                self.record_diagnostic(diag)
             return base_response, diag
 
         has_affinities = bool(
@@ -261,6 +300,8 @@ class PersonalizationExperimentService:
         if not has_affinities and effective_profile.preference_vector is None:
             # Truly cold profile — return base exactly
             diag.cold_regression = len(base_response.results[:5])
+            if mode == PERSONALIZATION_MODE_SHADOW:
+                self.record_diagnostic(diag)
             return base_response, diag
 
         # ── Cohort assignment (stable per user_id) ───────────────────────────
@@ -289,6 +330,8 @@ class PersonalizationExperimentService:
             )
             diag.safety_fallback_triggered = True
             diag.safety_fallback_reason = f"unhandled_exception: {type(exc).__name__}"
+            if mode == PERSONALIZATION_MODE_SHADOW:
+                self.record_diagnostic(diag)
             return base_response, diag
 
     # ------------------------------------------------------------------
@@ -311,6 +354,8 @@ class PersonalizationExperimentService:
             return base_response, diag
 
         diag.candidates_evaluated = len(base_results)
+        diag.discovery_mode = getattr(base_response, "mode", "BEST_MATCH") or "BEST_MATCH"
+        diag.base_top_k_ids = [r.game.id for r in base_results[:10]]
 
         # ── Personalization computation (timed) ──────────────────────────────
         t0 = time.perf_counter()
@@ -322,6 +367,9 @@ class PersonalizationExperimentService:
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         diag.personalization_latency_ms = round(elapsed_ms, 3)
 
+        # Detect whether profile had any matching evidence for this query's candidates
+        diag.no_evidence_personalization = all(t.personalization_score == 0.0 for t in traces)
+
         # ── Latency budget guard ──────────────────────────────────────────────
         if elapsed_ms > latency_budget_ms:
             logger.warning(
@@ -331,11 +379,14 @@ class PersonalizationExperimentService:
             )
             diag.safety_fallback_triggered = True
             diag.safety_fallback_reason = f"latency_budget_exceeded: {elapsed_ms:.1f}ms > {latency_budget_ms:.1f}ms"
+            if mode == PERSONALIZATION_MODE_SHADOW:
+                self.record_diagnostic(diag)
             return base_response, diag
 
         # ── Compute rank movement metrics ────────────────────────────────────
         base_ids = [r.game.id for r in base_results]
         pers_ids = [r.game.id for r in pers_results]
+        diag.personalized_top_k_ids = pers_ids[:10]
 
         base_rank: Dict[str, int] = {gid: idx for idx, gid in enumerate(base_ids)}
         pers_rank: Dict[str, int] = {gid: idx for idx, gid in enumerate(pers_ids)}
@@ -364,14 +415,12 @@ class PersonalizationExperimentService:
         pers_alignment = _mean_alignment(pers_results, effective_profile)
         diag.preference_alignment_uplift = round(pers_alignment - base_alignment, 4)
 
-        # ── Classify Top-5 changes ───────────────────────────────────────────
-        for new_gid in pers_top5 - base_top5:
-            # Find the result object
-            pers_r = next((r for r in pers_results[:5] if r.game.id == new_gid), None)
-            base_r = next((r for r in base_results if r.game.id == new_gid), None)
-            if pers_r and base_r:
-                pa = _compute_profile_alignment(pers_r, effective_profile)
-                ba = _compute_profile_alignment(base_r, effective_profile)
+        # ── Classify Top-5 slot replacements ──────────────────────────────────
+        # Compare personalized result vs base result at each Top-5 position that changed
+        for i in range(min(5, len(pers_results), len(base_results))):
+            if pers_results[i].game.id != base_results[i].game.id:
+                pa = _compute_profile_alignment(pers_results[i], effective_profile)
+                ba = _compute_profile_alignment(base_results[i], effective_profile)
                 cls = _classify_change(ba, pa)
                 if cls == "BENEFICIAL":
                     diag.beneficial_changes += 1
@@ -382,8 +431,10 @@ class PersonalizationExperimentService:
 
         # ── SHADOW: return base result, record diagnostics only ──────────────
         if mode == PERSONALIZATION_MODE_SHADOW:
+            self.record_diagnostic(diag)
             logger.debug(
-                "PERSONALIZATION SHADOW: uplift=%.4f top5_churn=%d moved=%d latency=%.1fms",
+                "PERSONALIZATION SHADOW: mode=%s uplift=%.4f top5_churn=%d moved=%d latency=%.1fms",
+                diag.discovery_mode,
                 diag.preference_alignment_uplift,
                 diag.top5_churn,
                 diag.candidates_moved,
