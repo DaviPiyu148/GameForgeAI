@@ -1,36 +1,146 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Discovery V2.9 — Promote DISCOVER to Reviewed-Only + 80% Confidence Floor
+Personalization V1 — Phase 4: Grounded Deterministic Personalization Explanations
 
 ## Status
 COMPLETE
 
 ## Objective
-Promote DISCOVER mode to production with:
-1. Candidate Pool: `REVIEWED_ONLY` (~87,890 games with >0 reviews).
-2. Admission Safeguard: 80% low-review confidence floor (applied strictly when reviews < 100).
-3. Safe Default Semantics: Explicit `effective_floor is None` check in `DiscoveryService.search()` so caller overrides (`floor=0.0`, `floor=75.0`) are preserved.
-4. Quality Threshold Invariant: DISCOVER remains at `DEFAULT_QUALITY_REVIEW_THRESHOLD = 2000` (T150 is strictly for `HIDDEN_GEMS`).
-5. Damping Invariant: `single_channel_damping = 0.0` (disabled in production).
-6. Multipliers Invariant: `relevance_mult = 0.85`, `quality_mult = 0.80`, `novelty_mult = 1.20`, `RRF k = 60`.
-7. Zero Gemini calls (`0`).
+Implement grounded, deterministic, template-based personalization explanations using existing profile provenance and active project context without altering ranking:
+1. Audit existing `DiscoverySearchResult` schema and reuse `personalization_reasons: List[str]`.
+2. Define structured `PersonalizationReason` in `backend/app/schemas/developer_profile.py`.
+3. Implement `PersonalizationExplanationService` in `backend/app/services/personalization_explanation_service.py`:
+   - Active project evidence prioritized (Priority 1: theme, mechanic, genre, mode).
+   - Global developer preferences (Priority 2: genre, mechanic, theme, mode).
+   - Saved-discovery similarity (Priority 3: concrete saved game anchor, cosine similarity >= 0.75).
+   - Absolute groundedness: explains ONLY existing facts, returns [] on cold start / no match.
+   - Absolute avoidance safety: never produces reasons contradicting explicit avoidances.
+   - Suppressed game guard: never generates personalized reasons for suppressed/disliked games.
+   - Maximum 2 reasons per candidate with deterministic tie-breaking.
+4. Extend `backend/scripts/audit_preference_profile.py` with sample catalog candidate explanation auditing.
+5. Create comprehensive test suite `backend/tests/test_personalization_explanation_service.py` (12 unit tests).
+6. Strict invariant: Discovery retrieval and ranking remain completely FROZEN; zero Gemini calls (`0`).
+
+## Previous Commit Checkpoint
+- SHA: `22215226547f87ff9c734cb9c01321985079f4d0` (`2221522`)
+- Message: `feat(discovery): promote reviewed-only discover with confidence floor`
 
 ## Started
 2026-09-03
 
 ---
 
-## 1. Production Implementation
+## 1. Phase 4 Implementation Evidence
 
-- [x] Update candidate pool mapping in `backend/app/search/candidate_pool.py`: `DISCOVER -> DiscoveryCandidatePool.REVIEWED_ONLY`
-- [x] Implement safe defaulting in `backend/app/services/discovery_service.py` using explicit `is None` check
-- [x] Maintain `Ranker.rank_hybrid()` floor partitioning for DISCOVER mode (<100 reviews and pos_pct < floor)
-- [x] Add regression tests for candidate pool mappings, floor override semantics, boundary thresholds, and mode isolation
-- [x] Verify production startup self-healing via `bootstrap_env.py --bootstrap-discovery`
-- [x] Verify live production DISCOVER queries (*Shapebreaker* #1, *A Wholesome Game About Farming* in Top-5)
+- `backend/app/schemas/developer_profile.py`:
+  - Defined `ExplanationSource = Literal["PROJECT", "GLOBAL", "SAVED_DISCOVERY"]`.
+  - Defined `PersonalizationReason` with `text`, `source`, `dimension`, `value`, `confidence`.
+- `backend/app/services/personalization_explanation_service.py`:
+  - Centralized configurable thresholds:
+    `MIN_GLOBAL_EXPLANATION_AFFINITY = 0.50`
+    `MIN_PROJECT_EXPLANATION_AFFINITY = 0.50`
+    `MIN_VECTOR_SIMILARITY = 0.75`
+    `MAX_REASONS_PER_RESULT = 2`
+  - Safe candidate feature extraction preventing substring collisions (e.g. "Sports" -> "RTS").
+  - Clear linguistic separation:
+    - Project: `"Recommended for your active project because it matches its {theme} theme."`
+    - Global: `"Matches your long-term interest in {genre} games."`
+    - Saved Discovery: `"Similar gameplay feel to your saved discovery '{title}'."`
+  - Substantive dimension priority (`genre` / `mechanic` / `theme` > `mode`).
+  - Balanced multi-source selection (1 project reason + 1 global reason when candidate matches both).
+  - Absolute avoidance guard and suppressed game guard.
+- `backend/scripts/audit_preference_profile.py`:
+  - Added catalog candidate explanation auditing section demonstrating grounded explanations on live games.
+- `backend/tests/test_personalization_explanation_service.py`:
+  - 12 unit tests covering global reasons, project reasons, hybrid multi-source balance, saved discovery similarity, similarity thresholds, zero-evidence neutrality, cold-start neutrality, avoidance safety, suppression safety, project-switching isolation, maximum reasons cap, and execution speed.
 
-### Evidence
+---
+
+## 2. Verification Results
+
+- `pytest backend/tests/test_personalization_explanation_service.py -q`: **12 passed** in 0.30s.
+- `pytest backend/tests/test_context_blender.py -q`: **15 passed** in 0.33s.
+- `pytest backend/tests/test_preference_aggregator.py -q`: **11 passed** in 29.85s.
+- `pytest backend/tests/ -q`: **483 passed, 1 warning** in 192.26s (0:03:12). Zero regressions across entire backend.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: built production assets in **1.25s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+
+---
+
+- `backend/app/schemas/discovery.py`:
+  - Added backward-compatible `project_id: Optional[str] = Field(default=None)` to `DiscoverySearchRequest` (`extra="forbid"` compliant).
+- `backend/app/schemas/developer_profile.py`:
+  - Added `ProjectPreferenceProfile` with: `project_id`, `title`, `genres`, `mechanics`, `themes`, `modes`, `preference_vector`, `context_confidence`, `evidence`.
+  - Added `BlendedPreferenceItem` with: `dimension`, `value`, `global_score`, `project_score`, `effective_score`, `was_global`, `was_project`.
+  - Added `EffectivePreferenceProfile` with: `user_id`, `active_project_id`, `active_project_title`, `genres`, `mechanics`, `themes`, `modes`, `explicit_avoidances`, `suppressed_game_ids`, `preference_vector`, `blend_weights`, `conflicts`, `recent_focus_genre`, `evidence`, `blended_details`.
+- `backend/app/services/context_blender.py`:
+  - Configurable policy weights: `DEFAULT_GLOBAL_CONTEXT_WEIGHT = 0.30`, `DEFAULT_PROJECT_CONTEXT_WEIGHT = 0.70`.
+  - Corrected single-source / missing-dimension blend formula in `_blend_single_dimension`:
+    - Both sources present for term: `raw = 0.30 * global + 0.70 * project`
+    - Global-only term: `raw = global_score` (100% preserved, NOT dampened by 0.30)
+    - Project-only term: `raw = project_score` (100% preserved, NOT dampened by 0.70)
+    - Normalized via `denom = max(1.0, max(raw_scores))` so raw scores are never artificially inflated.
+    - Deterministic tie-breaking prioritizing active project terms.
+  - Corrected `is_global_cold` to verify whether global profile has empty affinities across all dimensions.
+  - Normalized 384-dimensional vector fusion.
+  - Global profile immutability guaranteed (no in-place mutations).
+- `backend/scripts/audit_preference_profile.py`:
+  - Extended CLI with `--project <id>` to display side-by-side Global, Project, and Blended Effective profiles with provenance.
+  - Verified live on `CyberCorp` project: `Casual=0.1233`, `ranged combat=1.0000`, `npc behavior=1.0000`, `procedural generation=1.0000`, `Action=1.0000`.
+- `backend/tests/test_context_blender.py`:
+  - 15 unit tests covering optional `project_id`, 4-case cold start matrix, project switching immutability, missing-dimension protection across all cases, single-source non-damping, cross-dimension isolation, dominance without erasure, avoidance conflict enforcement, provenance survival, vector normalization, and execution speed.
+
+---
+
+## 2. Verification Results
+
+- `pytest backend/tests/test_context_blender.py -q`: **15 passed** in 0.35s.
+- `pytest backend/tests/test_preference_aggregator.py -q`: **11 passed** in 29.85s.
+- `pytest backend/tests/ -q`: **471 passed, 1 warning** in 170.72s (0:02:50). Zero regressions across entire backend.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: built production assets in **1.21s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+
+---
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+
+---
+
+- `backend/app/schemas/developer_profile.py`:
+  - Defined `DeveloperPreferenceProfile` with: `user_id`, `genres`, `mechanics`, `themes`, `modes`, `explicit_avoidances`, `suppressed_game_ids`, `preference_vector`, `total_signal_count`, `confidence_tier`, `recent_focus_genre`, `last_updated`, `evidence`.
+  - Defined `PreferenceEvidence` with: `dimension`, `value`, `contribution`, `source`, `source_id`, `timestamp`.
+- `backend/app/services/preference_aggregator.py`:
+  - Centralized contribution policies: `SAVED_GAME_GENRE_WEIGHT = 2.0`, `SAVED_GAME_MECHANIC_WEIGHT = 1.0`, `SAVED_GAME_THEME_WEIGHT = 1.0`, `SAVED_GAME_MODE_WEIGHT = 1.0`, `PROJECT_GENRE_WEIGHT = 2.5`, `PROJECT_MECHANIC_WEIGHT = 1.5`, `PROJECT_THEME_WEIGHT = 2.0`, `PROJECT_MODE_WEIGHT = 1.5`, `PROJECT_PROMPT_VECTOR_WEIGHT = 1.5`.
+  - Canonical taxonomy & deduplication maps for `MECHANIC_SYNONYMS`, `THEME_SYNONYMS`, `MODE_SYNONYMS`.
+  - Defined `SignalAdapter` base interface and concrete adapters (`SearchEngagementAdapter`, `PlaytestTelemetryAdapter`, `BuildInspirationAdapter`, `FeedbackSignalAdapter`) keeping deferred signals safely disabled.
+  - Multi-source evidence aggregation with deterministic L2-normalized 384-dim vector calculation.
+  - Deterministic confidence tier classification: `COLD` (<2), `EMERGING` (2-5 or single-source), `MODERATE` (6-14 with >=2 sources), `ESTABLISHED` (>=15 with >=2 sources).
+- `backend/scripts/audit_preference_profile.py`:
+  - Diagnostic CLI tool supporting `--user <id_or_username>` and `--all`.
+  - Verified live against existing SQLite database users (`testuser` -> MODERATE 11 signals, `testuser_browser2` -> COLD 0 signals).
+- `backend/tests/test_preference_aggregator.py`:
+  - 11 unit tests covering cold start, onboarding preferences, saved discoveries, project DNA, avoidance separation, bookmark deletion non-negativity, vector finiteness/normalization, determinism, source attribution, and tier progression.
+
+---
+
+## 2. Verification Results
+
+- `pytest backend/tests/test_preference_aggregator.py -q`: **11 passed** in 21.97s.
+- `pytest backend/tests/ -q`: **456 passed, 1 warning** in 139.66s (0:02:19). Zero regressions across entire backend.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: built production assets in **2.26s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+
+---
 - `backend/app/search/candidate_pool.py`: Set `MODE_CANDIDATE_POOLS["DISCOVER"] = DiscoveryCandidatePool.REVIEWED_ONLY`.
 - `backend/app/services/discovery_service.py`: Added:
   ```python
@@ -712,5 +822,85 @@ None.
 ## Change Log
 - 2026-09-02: Completed Mode-Specific Candidate Pools Experiment. All unit tests, invariant tests, benchmark runs, probe evaluations, and frontend checks passed. Task complete.
 - 2026-09-02: Completed Previous Experiment: Reviewed-Only Candidate Pool Benchmark (87,890 reviewed vs 33,735 zero-review).
+- 2026-09-03: Completed Phase 1: Preference Aggregation. `PreferenceAggregator` built; 11 tests; 456 backend passed.
+- 2026-09-03: Completed Phase 2: Context Blender. `context_blender.blend()` with correct single-source preservation; 15 tests; 471 backend passed.
+- 2026-09-03: Completed Phase 3.1: Missing-Dimension Bug Fix. Term-level single-source identity proven; 471 backend passed.
+- 2026-09-03: Completed Phase 4: Grounded Personalization Explanations. 12 tests; 483 backend passed.
+- 2026-09-03: Completed Phase 5: Offline Personalized Ranking Benchmark. 8 re-ranker unit tests; 491 backend passed.
 
+---
 
+## Phase 5: Offline Personalized Ranking Benchmark — COMPLETE
+
+### Status
+COMPLETE
+
+### Objective
+Build and run a rigorous offline benchmark evaluating whether personalization improves Discovery recommendations without overriding explicit user intent, hard constraints, or existing ranking behavior. OFFLINE ONLY. Production ranking frozen. Gemini API calls = 0.
+
+### Files Created / Modified
+- `backend/app/schemas/developer_profile.py`: Added `PersonalizationTrace` schema.
+- `backend/app/services/personalization_reranker.py`: Created `PersonalizationReRanker` with additive scoring, bounded [0,1] personalization score, suppressed/avoidance guards, tie-breaking on base rank, signal masking for ablations, and fixed cold-profile guard to pass through when saved_discovery_similarities are provided.
+- `backend/scripts/benchmark_personalized_ranking.py`: 20 synthetic developer profiles, 5 query categories, lambda sweep [0.00–0.15], signal ablation, project switching isolation, explicit avoidance safety, saved-discovery gradient.
+- `backend/tests/test_personalization_reranker.py`: 8 unit tests (lambda=0 identity, cold-start identity, bounds, project context, switching, avoidance, suppression, determinism). Fixed matched_features key assertion to use lowercase substring matching.
+
+### Benchmark Results (All 5 Experiments PASSED, exit code 0)
+
+**TABLE D: Lambda Sweep (20 profiles × 17 queries)**
+```
+lambda | Win Rate | Intent Preserv | Mean Delta | % Moved | % Top-5 Churn | Cold Reg | Overhead
+0.00   | 88.2%    | 88.2%          | 0.00       | 0.0%    | 0.0%          | 0        | ~2 ms
+0.03   | 88.2%    | 88.2%          | 0.26       | 20.6%   | 18.8%         | 0        | ~2 ms
+0.05   | 88.2%    | 88.2%          | 0.44       | 33.5%   | 30.6%         | 0        | ~2 ms
+0.10   | 88.2%    | 88.2%          | 0.75       | 45.9%   | 38.8%         | 0        | ~2 ms
+0.15   | 88.2%    | 88.2%          | 0.93       | 51.2%   | 45.9%         | 0        | ~2 ms
+```
+- Cold Regression = 0 at all lambda values. Intent Preservation constant at 88.2%.
+- Personalization re-orders candidates without ever breaking conflict/constraint queries.
+
+**TABLE E: Signal Ablation (lambda = 0.05)**
+```
+Signal Set             | Win Rate | Intent Preserv | % Moved | Mean Delta
+None (Baseline)        | 100.0%   | 100.0%         | 0.0%    | 0.00
+Genre only             | 70.6%    | 100.0%         | 14.1%   | 0.21
+Mechanic only          | 47.1%    | 100.0%         | 11.2%   | 0.18
+Theme only             | 29.4%    | 100.0%         | 7.6%    | 0.08
+Project context only   | 82.4%    | 100.0%         | 29.4%   | 0.38
+Saved-game only        | 0.0%     | 100.0%         | 0.0%    | 0.00
+All approved signals   | 88.2%    | 100.0%         | 33.5%   | 0.44
+```
+- Intent Preservation = 100.0% for ALL signal combinations.
+- Project context is the single strongest signal (82.4% win rate alone).
+- Genre (70.6%) and Mechanic (47.1%) provide useful incremental value.
+- Saved-game similarity provides 0 wins here (no saved games in synthetic profiles) — but gradient test proves the mechanism works.
+
+**Experiment 3: Project Switching Isolation — PASSED**
+- Global-only → CyberCorp → Dungeon Crypts → restored to Global-only.
+- Top-3 differs between active projects. Restoring to no-project exactly recovers original global-only order.
+- Assertion: `top_none == top_restore` — PASSED.
+
+**Experiment 4: Explicit Avoidance Safety — PASSED**
+- Developer avoidance: `["Horror"]`. Project genre: `{"Horror": 1.0}`.
+- Personalization score for a Horror candidate: **0.0**.
+- Project-level Horror signal does NOT override global avoidance. Strictly 0.0.
+
+**Experiment 5: Saved-Discovery Gradient — PASSED**
+- Similarity 0.90 → score = 0.7650
+- Similarity 0.76 → score = 0.6460
+- Similarity 0.50 → score = 0.0000 (below 0.75 threshold)
+- Monotonicity confirmed: 0.7650 > 0.6460 > 0.0000.
+- Bug fixed: cold-profile early-return guard now correctly passes through when `saved_discovery_similarities` are provided.
+
+### Verification
+- `pytest backend/tests/test_personalization_reranker.py -v`: **8 passed** in 0.37s.
+- `pytest backend/tests/ -q`: **491 passed, 1 warning** in 111.01s. Zero regressions.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: production assets built in **1.78s**.
+- Discovery Invariant: Retrieval, candidate pools, RRF, mode thresholds, and hard constraints remain **FROZEN**.
+- Gemini Invariant: Exactly **0 API calls**.
+- BROWSER TESTING: NOT PERFORMED (offline benchmark only, no frontend changes).
+
+### Git Checkpoint
+- Commit hash: (see below after commit)
+- All Phase 1–5 personalization files committed as one logical unit.

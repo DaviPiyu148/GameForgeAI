@@ -103,6 +103,10 @@ class DiscoverySearchRequest(BaseModel):
         default=None,
         description="Optional session-scoped context, refinements, and temporary negative preferences",
     )
+    project_id: Optional[str] = Field(
+        default=None,
+        description="Optional active project ID for project-context aware preference blending",
+    )
 
 
 
