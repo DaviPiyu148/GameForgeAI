@@ -290,10 +290,17 @@ export const SuccessStatusPage = () => {
 
         {/* 4. Collapsible Technical Build Log */}
         <div className="w-full border border-outline-variant bg-surface-container-low rounded-lg overflow-hidden mb-8 shadow-xl">
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setShowTechnicalLogs((prev) => !prev)}
-            className="w-full px-4 py-3 bg-terminal-header border-b border-outline-variant flex items-center justify-between font-mono text-xs text-on-surface hover:text-primary transition-colors cursor-pointer"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setShowTechnicalLogs((prev) => !prev);
+              }
+            }}
+            className="w-full px-4 py-3 bg-terminal-header border-b border-outline-variant flex items-center justify-between font-mono text-xs text-on-surface hover:text-primary transition-colors cursor-pointer select-none"
             aria-expanded={showTechnicalLogs}
           >
             <div className="flex items-center gap-2">
@@ -324,7 +331,7 @@ export const SuccessStatusPage = () => {
                 expand_more
               </span>
             </div>
-          </button>
+          </div>
 
           {showTechnicalLogs && (
             <div className="p-4 bg-terminal-bg font-mono text-xs max-h-72 overflow-y-auto space-y-1.5 border-t border-outline-variant/40 text-left">
