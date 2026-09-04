@@ -10,6 +10,7 @@ interface GameDetailsModalProps {
   onSave: () => void;
   onBuildSimilar: (result: DiscoverySearchResult) => void;
   onMoreLikeThis?: (gameId: string, title: string) => void;
+  onUseAsInspiration?: (result: DiscoverySearchResult) => void;
   isActionLoading?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
   onSave,
   onBuildSimilar,
   onMoreLikeThis,
+  onUseAsInspiration,
   isActionLoading = false,
 }) => {
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
@@ -408,6 +410,23 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                 </span>
                 <span>{isSaved ? 'Saved in Collection' : 'Save Game'}</span>
               </button>
+
+              {/* Use as Inspiration Button */}
+              {onUseAsInspiration && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClose();
+                    onUseAsInspiration(result);
+                  }}
+                  className="px-3.5 py-2.5 border border-tertiary/50 text-tertiary hover:bg-tertiary/10 font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Use this game as design inspiration for a project"
+                  aria-label={`Use ${game.display_title || game.title} as inspiration`}
+                >
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">lightbulb</span>
+                  <span>Use as Inspiration</span>
+                </button>
+              )}
 
               {/* Discover More Like This Action */}
               {onMoreLikeThis && (

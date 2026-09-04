@@ -6,6 +6,7 @@ import { GameDetailsModal } from '../components/Shared/GameDetailsModal';
 import { TuneRecommendationsModal } from '../components/Shared/TuneRecommendationsModal';
 import { GameComparisonModal } from '../components/Shared/GameComparisonModal';
 import { GameDNAOnboardingModal } from '../components/Shared/GameDNAOnboardingModal';
+import { InspirationAttachModal } from '../components/Shared/InspirationAttachModal';
 import type { DiscoverySearchResult } from '../types';
 
 const INITIAL_VISIBLE_RESULTS = 12;
@@ -25,6 +26,7 @@ const HomePage = () => {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [isTuneModalOpen, setIsTuneModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [inspirationTarget, setInspirationTarget] = useState<DiscoverySearchResult | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const navigate = useNavigate();
@@ -673,6 +675,19 @@ const HomePage = () => {
                         <span>{isSaved ? 'Saved' : 'Save'}</span>
                       </button>
 
+                      {/* Use as Inspiration Action */}
+                      <button
+                        type="button"
+                        onClick={() => setInspirationTarget(result)}
+                        aria-label={`Use ${result.game.display_title || result.game.title} as inspiration for a project`}
+                        className="flex-1 px-2 py-2 border border-tertiary/50 text-tertiary hover:bg-tertiary/10 font-mono text-[10px] sm:text-[11px] uppercase font-bold rounded flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        title="Use this game as design inspiration for a project"
+                        data-testid={`inspire-btn-${result.game.external_id || result.game.id}`}
+                      >
+                        <span className="material-symbols-outlined text-xs" aria-hidden="true">lightbulb</span>
+                        <span>Inspire</span>
+                      </button>
+
                       {/* Details Modal Action */}
                       <button
                         type="button"
@@ -845,6 +860,10 @@ const HomePage = () => {
             setSelectedGameForDetails(null);
             handleBuildSimilar(res);
           }}
+          onUseAsInspiration={(res) => {
+            setSelectedGameForDetails(null);
+            setInspirationTarget(res);
+          }}
           onMoreLikeThis={async (gameId, gameTitle) => {
             setSelectedGameForDetails(null);
             const res = await discoveryService.getSimilarGames(gameId, 24);
@@ -903,7 +922,38 @@ const HomePage = () => {
           }
         }}
       />
+
+      {/* 11. Discovery → Inspiration — Attach Modal (Step 1: session-local, no persistence yet) */}
+      {inspirationTarget && (
+        <InspirationAttachModal
+          result={inspirationTarget}
+          activeProject={
+            state.activeProjectId
+              ? (state.myGames.find((p) => p.id === state.activeProjectId) ?? null)
+              : null
+          }
+          allProjects={state.myGames}
+          onClose={() => setInspirationTarget(null)}
+          onAttach={(res, _projectId) => {
+            setInspirationTarget(null);
+            pushToast({
+              variant: 'info',
+              title: 'INSPIRATION NOTED',
+              description: `"${res.game.display_title ?? res.game.title}" attached as inspiration (session-local — persistence coming in the next step).`,
+            });
+          }}
+          onSelectProject={() => {
+            setInspirationTarget(null);
+            navigate('/dashboard');
+          }}
+          onCreateProject={() => {
+            setInspirationTarget(null);
+            navigate('/build');
+          }}
+        />
+      )}
     </div>
+
 
   );
 };

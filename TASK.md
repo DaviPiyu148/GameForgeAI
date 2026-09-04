@@ -1,6 +1,151 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 1: Discovery UI Action
+
+## Status
+IN_PROGRESS
+
+## Objective
+Implement "Use as Inspiration" on Discovery result cards and the GameDetailsModal,
+producing a DNA attachment preview modal grounded exclusively in real game metadata.
+No persistence, no LLM, no discovery ranking changes.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Personalization V1 — Phase 9: Controlled 25% Expansion
+Status: COMPLETE
+Commit: cf1bba9 / 272a173
+
+Discovery V1: FROZEN
+Personalization V1: FROZEN AT 25% EXPERIMENTAL EXPOSURE
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Read relevant documentation
+- [x] Inspected HomePage.tsx, GameDetailsModal.tsx, AppContext.tsx, types/index.ts
+- [x] Checked git status: clean working tree on fresh-main
+- [x] Confirmed no unrelated uncommitted changes
+
+### Evidence
+- git status: clean before implementation
+- Audit: game DNA fields available: genres, display_genres, tags, display_tags, player_modes, platforms, release_year, external_id, cover_image_url, hero_image_url, display_title
+- Audit: active project via state.activeProjectId + state.myGames.find(...)
+- Audit: project fields available for alignment: genre (single string)
+- Toast pattern: pushToast from toastBus
+- Modal pattern: useModalDialog hook (Escape key, focus trap, scroll lock, portal)
+
+---
+
+## 2. Implementation
+
+- [x] Create `src/utils/gameDna.ts` — pure extractGameDNA() and computeProjectAlignment()
+- [x] Create `src/components/Shared/InspirationAttachModal.tsx`
+  - Active project branch: DNA preview + alignment + deferred-persistence notice + Attach/Cancel
+  - No active project branch: Use existing / Create new / Cancel
+- [x] Modify `GameDetailsModal.tsx` — add optional onUseAsInspiration prop + button in footer
+- [x] Modify `HomePage.tsx` — add inspirationTarget state, Inspire button on cards, modal render, wire GameDetailsModal
+
+### Evidence (Files Modified/Created)
+- `gameforge-ai/src/utils/gameDna.ts` (NEW)
+- `gameforge-ai/src/components/Shared/InspirationAttachModal.tsx` (NEW)
+- `gameforge-ai/src/utils/__tests__/gameDna.test.ts` (NEW)
+- `gameforge-ai/src/components/Shared/GameDetailsModal.tsx` (MODIFIED: +onUseAsInspiration prop)
+- `gameforge-ai/src/pages/HomePage.tsx` (MODIFIED: +import, +state, +Inspire button, +modal render)
+
+---
+
+## 3. Verification
+
+- [x] Unit tests (gameDna.ts): 14 passed, 0 failed
+- [ ] Integration tests: not applicable (no new backend code)
+- [x] Browser tests: NOT PERFORMED (session-local UI step)
+- [x] TypeScript: 0 errors (npx tsc --noEmit)
+- [x] Production build: built in 1.12s (npm run build)
+- [x] oxlint: 0 warnings, 0 errors on 75 files
+- [ ] Backend regression: IN PROGRESS
+
+### Results
+```
+npx tsx src/utils/__tests__/gameDna.test.ts
+  14 passed, 0 failed
+
+npx tsc --noEmit
+  exit 0, 0 errors
+
+npx oxlint
+  Found 0 warnings and 0 errors. 75 files, 104 rules.
+
+npm run build
+  tsc -b && vite build
+  98 modules transformed
+  built in 1.12s
+  exit 0
+```
+BROWSER TESTING: NOT PERFORMED
+
+---
+
+## 4. Documentation
+
+- [ ] TASK.md updated (this file, IN_PROGRESS until git checkpoint)
+- [ ] No architecture doc changes required (Step 1 is pure UI, no new tables, no new APIs)
+
+---
+
+## 5. Git Checkpoint
+
+- [ ] git diff reviewed
+- [ ] git diff --stat reviewed
+- [ ] secrets checked
+- [ ] generated artifacts checked
+- [ ] commit created
+- [ ] working tree clean
+
+Commit: PENDING (awaiting backend regression)
+
+---
+
+## Remaining Work (This Step)
+- Await pytest backend/tests/ result
+- Create git commit
+- Verify clean working tree
+
+## Remaining Work (Future Steps)
+Step 2: Project Inspiration Data Model & API (persistence)
+Step 3: Studio Inspiration Deck
+Step 4: Deterministic DNA synthesis
+Step 5: Blueprint integration
+Step 6: Prototype integration
+
+## Blockers
+None
+
+## Personalization Boundary
+This feature is developer-selected inspiration, NOT personalization recommendation.
+Personalization remains responsible only for ranking Discovery results.
+"Use as Inspiration" is explicit developer intent.
+Discovery ranking: UNCHANGED.
+
+## Change Log
+- 2026-09-04: Step 1 implementation started and implemented.
+
+---
+
+---
+
+## Previous Phase Ledger (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Personalization V1 — Phase 9: Controlled 25% Expansion
 
 ## Status
@@ -2631,4 +2776,5 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
+
 
