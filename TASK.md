@@ -73,23 +73,35 @@ Commit: 2f1c0b8
 
 - [x] TypeScript check (`npx tsc --noEmit`): 0 errors
 - [x] Frontend lint check (`npx oxlint`): 0 warnings, 0 errors across 86 files
-- [x] Frontend unit tests (`npx tsx --test src/utils/__tests__/*.test.ts src/services/__tests__/*.test.ts`): 10 suites, 86 assertions passed
+- [x] Frontend unit tests (`npx tsx --test src/utils/__tests__/*.test.ts src/services/__tests__/*.test.ts`): **131 tests passed, 0 failed across 10 suites**:
+  - `progressionToasts.test.ts`: 11 passed
+  - `urlUtils.test.ts`: 34 passed
+  - `buildIntegration.test.ts`: 8 passed
+  - `discovery.test.ts`: 7 passed
+  - `gameDna.test.ts`: 14 passed
+  - `inspirationDeck.test.ts`: 11 passed
+  - `playtestRemixLoop.test.ts`: 8 passed
+  - `synergy.test.ts`: 8 passed
+  - `synthesisApply.test.ts`: 14 passed
+  - `synthesisProposal.test.ts`: 16 passed
 - [x] Frontend production build (`npm run build`): Vite build completed cleanly in 2.20s
 - [x] Backend regression tests (`pytest backend/tests/ -q`): 626 passed in 142.04s
-- [x] Concurrent race bug fixed: `project_inspiration_service.py` handles `InvalidRequestError` alongside `IntegrityError` (verified via `test_concurrent_api_duplicate_attachment_race` PASS)
-- [x] Live browser visual verification: All 12 items verified PASS in live Chrome session with DOM computed styles, layout dimensions, and user interaction tests by Browser QA agent:
-  - Item 1: Suggestion chips normalized to 32px (`h-8`), verified `genetics` Material Symbol ligature
-  - Item 2: Quick Mood Discovery 6-button responsive grid (no orphaned button), like/dislike untoggle to neutral with toast, hide card removal with undo toast (0 duplicate feedback)
-  - Item 3: GameDetailsModal footer buttons normalized to 40px (`h-10`) with close icon
-  - Item 4: SavedDiscoveries cover art hierarchy via `SavedDiscoveryCover.tsx` and interactive detail modal click in both Dashboard and Profile
-  - Item 5: Dashboard action bar normalized across PLAY, STUDIO, REMIX (36px `h-9`) with fixed 36x36px icon buttons
-  - Item 6: Dashboard 3-dots dropdown closes on outside click and Escape key without backdrop overlay bugs
-  - Item 7: Studio Version History typography updated from `font-sans` to `font-mono text-xs text-on-surface-variant` with semicolon-separated change tags
-  - Item 12: Profile `#account-settings` smooth scroll button, Username and Password cards matched at exactly 340px (`items-stretch`, `h-full`), submit buttons aligned at 36px (`h-9`)
-  - Item 13: 4 Profile stat boxes normalized to 96px height (`h-24 p-3`) with uniform `16px font-bold` typography
-  - Item 14: Builder header chips normalized to 24px (`h-6 font-mono text-[10px] uppercase font-bold`), Using Game DNA rendered with `genetics` icon and info hover tooltip
-  - Item 15: Removed redundant `border-t` at line 413 of `BuilderPage.tsx`, eliminating the double border between logic editor and output console
-  - Item 16: Non-shifting CSS animations in `styles/index.css` verified with zero layout shift and `@media (prefers-reduced-motion)` support
+- [x] Focused backend race regression: `project_inspiration_service.py` handles `InvalidRequestError` alongside `IntegrityError`:
+  - `pytest backend\tests\test_project_inspirations.py::test_concurrent_api_duplicate_attachment_race -vv -s`: 1 passed in 22.81s
+  - `pytest backend\tests\test_project_inspirations.py -v`: 16 passed in 19.11s
+- [x] Live browser visual verification: All 12 items individually verified PASS in live Chrome session with DOM computed styles, layout dimensions, and user interaction tests by Browser QA agent:
+  - **Item 1 (Home)**: Suggestion chips normalized to 32px height (`h-8`), verified `genetics` Material Symbol ligature
+  - **Item 2 (Home)**: Quick Mood Discovery 6-button responsive grid (32px height, 6-col desktop / 3-col tablet / 2-col mobile, 0 orphaned buttons), Like/Dislike untoggle to neutral with "Feedback Cleared" toast, Hide card removal with Undo toast (0 duplicate feedback requests)
+  - **Item 3 (Modal)**: GameDetailsModal footer buttons all measured at exactly 40px height (`h-10 font-mono text-xs uppercase font-bold`); CLOSE button verified with `<span className="material-symbols-outlined text-sm">close</span>` and baseline alignment; tested viewport wrapping at 1024px and 768px with clean 2-row wrapping and zero horizontal scrollbar or overflow
+  - **Item 4 (Dashboard & Profile)**: Saved Discoveries cover art hierarchy via `SavedDiscoveryCover.tsx` (persisted -> catalog -> Steam CDN -> placeholder) and interactive detail modal click in both Dashboard and Profile (including LikedGamesModal)
+  - **Item 5 (Dashboard)**: Dashboard project action bar normalized across PLAY, STUDIO, REMIX (36px height, `h-9`) with fixed 36x36px square icon buttons
+  - **Item 6 (Dashboard)**: Dashboard 3-dots dropdown closes on outside `mousedown` click and `Escape` key dismiss without backdrop overlay bugs
+  - **Item 7 (Studio)**: Version History revision summaries verified with computed `font-family: "JetBrains Mono", monospace` (`font-mono text-xs text-on-surface-variant`, 12px, NOT font-sans); semicolon-delimited change summaries split into distinct individual `<span>` badge chips (measured 21px height with independent `bg-surface-container` and `border-outline-variant/40`)
+  - **Item 12 (Profile)**: Profile `#account-settings` smooth-scroll button, Username and Password cards matched at exactly 340px height (`items-stretch`, `h-full`), submit buttons aligned at 36px height (`h-9`)
+  - **Item 13 (Profile)**: 4 Profile stat boxes (*Total XP*, *Milestones*, *Saved Items*, *Games Built*) normalized to 96px height (`h-24 p-3`) with uniform `16px font-bold` typography
+  - **Item 14 (Builder)**: Builder header chips normalized to 24px height (`h-6 font-mono text-[10px] uppercase font-bold`), Using Game DNA rendered with `genetics` icon and info hover tooltip
+  - **Item 15 (Builder)**: Removed redundant `border-t` at line 413 of `BuilderPage.tsx`, eliminating the double border between logic editor and output console (measured 0px double-seam)
+  - **Item 16 (Home)**: Non-shifting CSS animations in `styles/index.css` verified with zero layout shift and `@media (prefers-reduced-motion)` support
 - [x] Review git diff and git status
 - [x] Git checkpoint commit with clean working tree
 
