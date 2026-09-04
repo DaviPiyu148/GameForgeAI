@@ -2630,5 +2630,5 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 ```
 
 ### 5. Git Checkpoint
-- Commit hash: (see below after commit)
+- Commit hash: 6df1da1
 
