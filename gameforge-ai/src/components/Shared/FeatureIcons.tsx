@@ -2,68 +2,27 @@ import React from 'react';
 
 /**
  * Feature Card Icon 1: Understand Intent
- * Head/brain silhouette with an inner settings gear that rotates when hovering over the card
- * and stops when not hovering.
+ * 100% Authentic Google Material Symbol skull with cogwheel inside.
+ * The cogwheel rotates smoothly around its center on card hover and stops when not hovering.
  */
 export const BrainGearIcon: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
     <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      className={`w-7 h-7 text-primary ${className}`}
-      aria-label="Understand Intent - Brain with rotating settings gear"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      className={`w-7 h-7 text-primary select-none overflow-visible ${className}`}
+      fill="currentColor"
+      aria-label="Understand Intent - Cogwheel inside skull"
     >
-      {/* Human head silhouette with brain chamber */}
-      <path
-        d="M9.5 2C6.5 2 4.2 4.2 4 7.2c-.8.5-1.5 1.4-1.5 2.5 0 1.2.7 2.2 1.7 2.6.1 1.2.7 2.2 1.6 2.8v1.4c0 1.1.9 2 2 2h1.7v2.5h5V18.5c1.9 0 3.5-1.6 3.5-3.5v-3.8c0-5-3.8-9.2-8.5-9.2z"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="rgba(76, 224, 210, 0.08)"
-      />
-      {/* Brain convolution accents */}
-      <path
-        d="M6 7.5c1-1 2.5-1.5 4-1.5"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeOpacity="0.5"
-      />
-      <path
-        d="M5.5 11c1-.8 2-1 3.5-1"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeOpacity="0.5"
-      />
+      {/* Authentic Google Material Symbol Skull / Head Outline */}
+      <path d="M240-80v-172q-57-52-88.5-121.5T120-520q0-150 105-255t255-105q125 0 221.5 73.5T827-615l52 205q5 19-7 34.5T840-360h-80v120q0 33-23.5 56.5T680-160h-80v80h-80v-160h160v-200h108l-38-155q-23-91-98-148t-172-57q-116 0-198 81t-82 197q0 60 24.5 114t69.5 96l26 24v208h-80Z" />
 
-      {/* Setting/gear inside the brain: centered at (12, 9.5) */}
+      {/* Authentic Google Material Symbol Cogwheel / Gear: centered at (480px, -520px) */}
       <g
         className="brain-gear-spin"
-        style={{ transformOrigin: '12px 9.5px' }}
+        style={{ transformOrigin: '480px -520px' }}
       >
-        {/* Gear center axle */}
-        <circle
-          cx="12"
-          cy="9.5"
-          r="2.2"
-          strokeWidth="1.5"
-          fill="rgba(76, 224, 210, 0.25)"
-        />
-        <circle
-          cx="12"
-          cy="9.5"
-          r="0.8"
-          fill="currentColor"
-        />
-        {/* 8 Gear teeth radiating outward */}
-        <line x1="12" y1="6" x2="12" y2="7.3" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="12" y1="11.7" x2="12" y2="13" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="8.5" y1="9.5" x2="9.8" y2="9.5" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="14.2" y1="9.5" x2="15.5" y2="9.5" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="9.5" y1="7" x2="10.4" y2="7.9" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="13.6" y1="11.1" x2="14.5" y2="12" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="9.5" y1="12" x2="10.4" y2="11.1" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="13.6" y1="7.9" x2="14.5" y2="7" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M440-360h80l6-50q8-3 14.5-7t11.5-9l46 20 40-68-40-30q2-8 2-16t-2-16l40-30-40-68-46 20q-5-5-11.5-9t-14.5-7l-6-50h-80l-6 50q-8 3-14.5 7t-11.5 9l-46-20-40 68 40 30q-2 8-2 16t2 16l-40 30 40 68 46-20q5 5 11.5 9t14.5 7l6 50Zm40-100q-25 0-42.5-17.5T420-520q0-25 17.5-42.5T480-580q25 0 42.5 17.5T540-520q0 25-17.5 42.5T480-460Z" />
       </g>
     </svg>
   );
@@ -72,6 +31,7 @@ export const BrainGearIcon: React.FC<{ className?: string }> = ({ className = ''
 /**
  * Feature Card Icon 2: Multi-Signal Ranking
  * Target/goal with an arrow moving towards the goal on hover and stopping when not hovering.
+ * (Confirmed good by user)
  */
 export const TargetArrowIcon: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
@@ -79,7 +39,7 @@ export const TargetArrowIcon: React.FC<{ className?: string }> = ({ className = 
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      className={`w-7 h-7 text-secondary ${className}`}
+      className={`w-7 h-7 text-secondary select-none overflow-visible ${className}`}
       aria-label="Multi-Signal Ranking - Arrow moving towards goal"
     >
       {/* Target Goal (centered at 15, 12) */}
@@ -145,54 +105,59 @@ export const TargetArrowIcon: React.FC<{ className?: string }> = ({ className = 
 
 /**
  * Feature Card Icon 3: Build & Remix
- * Dynamic fire burning animation with multi-tiered flickering flame tongues and rising embers.
+ * Bonfire with crossed wooden logs at the base and dynamic burning flames rising upward.
+ * Styled in the clean amber outline aesthetic matching the other icons with zero dark square artifacts.
  */
 export const FireBurningIcon: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`w-7 h-7 ${className}`}
-      aria-label="Build & Remix - Burning fire animation"
+      fill="none"
+      stroke="currentColor"
+      className={`w-7 h-7 text-tertiary select-none overflow-visible ${className}`}
+      aria-label="Build & Remix - Bonfire with burning fire"
     >
-      {/* Outer Flame (burning orange-red) */}
-      <path
-        d="M12 2C10.5 4.5 9 6.5 9 9c0 1.2.4 2.3 1 3.2C8 11.5 7 10 7 8c-2 2.5-3 5.5-3 8 0 4.4 3.6 8 8 8s8-3.6 8-8c0-3.5-1.5-6.5-3.5-9-.5 1.5-1.5 2.5-2.5 3 0-2.5-1-5.5-2-8z"
-        fill="#ff5722"
-        className="fire-outer-flame"
-        style={{ transformOrigin: '12px 22px' }}
-      />
+      {/* Bonfire Base: Crossed Wooden Logs (anchored at base) */}
+      <g className="bonfire-logs" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        {/* Left log (slanted upward to the right) */}
+        <path d="M4 20.5L20 15.5" strokeOpacity="0.9" />
+        <ellipse cx="4" cy="20.5" rx="1.2" ry="0.8" fill="currentColor" fillOpacity="0.4" />
+        {/* Right log (slanted upward to the left, crossed over) */}
+        <path d="M20 20.5L4 15.5" strokeOpacity="0.9" />
+        <ellipse cx="20" cy="20.5" rx="1.2" ry="0.8" fill="currentColor" fillOpacity="0.4" />
+        {/* Embers bed beneath logs */}
+        <path d="M8 21.5h8" strokeOpacity="0.6" strokeWidth="1.2" strokeDasharray="1.5 1.5" />
+      </g>
 
-      {/* Middle Flame Tongue (warm golden amber) */}
-      <path
-        d="M12 6.5c-1 1.8-2 3.2-2 5 0 .9.3 1.6.7 2.3-.7-.5-1.5-1.4-1.5-2.8-.9 1.6-1.4 3.2-1.4 4.5 0 2.8 1.8 5 4.2 5s4.2-2.2 4.2-5c0-2-.7-3.8-1.8-5-.3.9-.9 1.6-1.4 2 0-1.6-.6-3.6-1-6z"
-        fill="#ffc24c"
-        className="fire-mid-flame"
-        style={{ transformOrigin: '12px 21px' }}
-      />
+      {/* Burning Fire: Leaping Flame Tongues Rising from the Logs */}
+      <g className="bonfire-flame-group">
+        {/* Outer Flame Tongue */}
+        <path
+          d="M12 3C10.5 5.5 8.5 7.5 8.5 11c0 2 1 3.5 1.5 4.5-.8-.5-1.5-1.5-1.5-3 0-1 .4-2 .8-2.8-2 2-2.8 4.3-2.8 6.3 0 3 2.5 5 5.5 5s5.5-2 5.5-5c0-2.2-1-4.5-2.8-6.3.4.8.8 1.8.8 2.8 0 1.5-.7 2.5-1.5 3 .5-1 1.5-2.5 1.5-4.5 0-3.5-2-5.5-3.5-8z"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="rgba(255, 194, 76, 0.12)"
+          className="bonfire-flame-outer"
+          style={{ transformOrigin: '12px 19px' }}
+        />
 
-      {/* Core Flame (bright hot golden core) */}
-      <path
-        d="M12 12.5c-.6 1-1.1 1.8-1.1 2.8 0 1.5.8 2.7 1.8 2.7s1.8-1.2 1.8-2.7c0-1-.5-1.8-1.2-2.5-.2.5-.5.8-.8 1 0-.6-.3-1.4-.5-1.9z"
-        fill="#fff9c4"
-        className="fire-core-flame"
-        style={{ transformOrigin: '12px 20px' }}
-      />
+        {/* Inner Flame Core (hotter inner dancing flame) */}
+        <path
+          d="M12 9c-.8 1.5-1.8 2.8-1.8 4.5 0 1.5.8 2.8 1.8 3.5 1-.7 1.8-2 1.8-3.5 0-1.7-1-3-1.8-4.5z"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="rgba(255, 194, 76, 0.35)"
+          className="bonfire-flame-inner"
+          style={{ transformOrigin: '12px 17px' }}
+        />
 
-      {/* Rising Embers / Sparks */}
-      <circle
-        cx="9"
-        cy="4"
-        r="0.75"
-        fill="#ffe082"
-        className="fire-ember-left"
-      />
-      <circle
-        cx="14.5"
-        cy="3.2"
-        r="0.65"
-        fill="#ffb74d"
-        className="fire-ember-right"
-      />
+        {/* Rising Bonfire Sparks / Embers */}
+        <circle cx="10" cy="5" r="0.75" fill="currentColor" className="bonfire-spark-1" />
+        <circle cx="14" cy="4" r="0.65" fill="currentColor" className="bonfire-spark-2" />
+        <circle cx="12" cy="1.5" r="0.5" fill="currentColor" className="bonfire-spark-3" />
+      </g>
     </svg>
   );
 };

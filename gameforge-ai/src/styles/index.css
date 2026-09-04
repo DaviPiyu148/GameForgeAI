@@ -571,9 +571,9 @@
 
 /* ─── Feature Card Interactive Icon Animations ─── */
 
-/* 1. Understand Intent: Setting Gear inside Brain (rotates on card hover, stops when not hovering) */
+/* 1. Understand Intent: Authentic Google Material Symbol Cogwheel inside Skull */
 .brain-gear-spin {
-  transform-origin: 12px 9.5px;
+  transform-origin: 480px -520px;
   transform: rotate(0deg);
   transition: transform 0.25s ease-out;
 }
@@ -648,115 +648,100 @@
   }
 }
 
-/* 3. Build & Remix: Fire Burning Animation */
-.fire-outer-flame {
-  transform-origin: 12px 22px;
-  animation: fireBurnOuter 1.3s ease-in-out infinite alternate;
-  filter: drop-shadow(0 -2px 6px rgba(255, 87, 34, 0.65));
+/* 3. Build & Remix: Bonfire with Burning Fire Animation (Zero square artifacts) */
+.bonfire-flame-outer {
+  transform-origin: 12px 19px;
+  animation: bonfireBurnOuter 1.2s ease-in-out infinite alternate;
 }
 
-@keyframes fireBurnOuter {
+@keyframes bonfireBurnOuter {
   0% {
     transform: scale(1, 1) skewX(-1.5deg);
-    filter: drop-shadow(0 -2px 6px rgba(255, 87, 34, 0.6));
-  }
-  35% {
-    transform: scale(1.05, 0.97) skewX(2deg);
-    filter: drop-shadow(0 -3px 9px rgba(255, 110, 0, 0.85));
-  }
-  70% {
-    transform: scale(0.97, 1.06) skewX(-2deg);
-    filter: drop-shadow(0 -4px 10px rgba(255, 60, 0, 0.9));
-  }
-  100% {
-    transform: scale(1.04, 1.02) skewX(1deg);
-    filter: drop-shadow(0 -2px 7px rgba(255, 87, 34, 0.75));
-  }
-}
-
-.fire-mid-flame {
-  transform-origin: 12px 21px;
-  animation: fireBurnMid 0.95s ease-in-out infinite alternate-reverse;
-  filter: drop-shadow(0 -1px 4px rgba(255, 194, 76, 0.8));
-}
-
-@keyframes fireBurnMid {
-  0% {
-    transform: scale(1, 1) skewX(2deg);
   }
   50% {
-    transform: scale(0.96, 1.07) skewX(-2deg);
+    transform: scale(1.06, 0.96) skewX(2deg);
   }
   100% {
-    transform: scale(1.06, 0.96) skewX(1.5deg);
+    transform: scale(0.97, 1.05) skewX(-1deg);
   }
 }
 
-.fire-core-flame {
-  transform-origin: 12px 20px;
-  animation: fireBurnCore 0.75s ease-in-out infinite alternate;
+.bonfire-flame-inner {
+  transform-origin: 12px 17px;
+  animation: bonfireBurnInner 0.85s ease-in-out infinite alternate-reverse;
 }
 
-@keyframes fireBurnCore {
+@keyframes bonfireBurnInner {
   0% {
-    transform: scale(0.94);
-    opacity: 0.9;
+    transform: scale(0.95, 0.95);
+    opacity: 0.75;
   }
   100% {
-    transform: scale(1.12);
-    opacity: 1;
-    filter: drop-shadow(0 0 4px #ffffff);
-  }
-}
-
-.fire-ember-left {
-  animation: emberRiseLeft 1.5s ease-out infinite;
-}
-
-.fire-ember-right {
-  animation: emberRiseRight 1.8s ease-out infinite 0.6s;
-}
-
-@keyframes emberRiseLeft {
-  0% {
-    transform: translate(0, 4px) scale(0.5);
-    opacity: 0;
-  }
-  30% {
+    transform: scale(1.12, 1.08);
     opacity: 1;
   }
-  100% {
-    transform: translate(-3px, -8px) scale(1.2);
-    opacity: 0;
-  }
 }
 
-@keyframes emberRiseRight {
+.bonfire-spark-1 {
+  animation: bonfireSparkRise1 1.4s ease-out infinite;
+}
+
+.bonfire-spark-2 {
+  animation: bonfireSparkRise2 1.7s ease-out infinite 0.5s;
+}
+
+.bonfire-spark-3 {
+  animation: bonfireSparkRise3 2.0s ease-out infinite 0.9s;
+}
+
+@keyframes bonfireSparkRise1 {
   0% {
-    transform: translate(0, 3px) scale(0.5);
+    transform: translate(0, 3px) scale(0.4);
     opacity: 0;
   }
-  30% {
+  40% {
     opacity: 1;
   }
   100% {
-    transform: translate(3px, -9px) scale(1.1);
+    transform: translate(-2px, -6px) scale(1.1);
     opacity: 0;
   }
 }
 
-.group:hover .fire-outer-flame {
-  animation-duration: 0.75s;
-  filter: drop-shadow(0 -4px 14px rgba(255, 60, 0, 1)) drop-shadow(0 0 18px rgba(255, 194, 76, 0.6));
+@keyframes bonfireSparkRise2 {
+  0% {
+    transform: translate(0, 3px) scale(0.4);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(2px, -7px) scale(1);
+    opacity: 0;
+  }
 }
 
-.group:hover .fire-mid-flame {
-  animation-duration: 0.55s;
-  filter: drop-shadow(0 -2px 8px rgba(255, 215, 64, 1));
+@keyframes bonfireSparkRise3 {
+  0% {
+    transform: translate(0, 2px) scale(0.3);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, -5px) scale(0.9);
+    opacity: 0;
+  }
 }
 
-.group:hover .fire-core-flame {
-  animation-duration: 0.45s;
+.group:hover .bonfire-flame-outer {
+  animation-duration: 0.7s;
+}
+
+.group:hover .bonfire-flame-inner {
+  animation-duration: 0.5s;
 }
 
 /* ─── Reduced Motion ─── */
@@ -792,11 +777,11 @@
   .brain-gear-spin,
   .arrow-moving-to-goal,
   .target-bullseye-pulse,
-  .fire-outer-flame,
-  .fire-mid-flame,
-  .fire-core-flame,
-  .fire-ember-left,
-  .fire-ember-right {
+  .bonfire-flame-outer,
+  .bonfire-flame-inner,
+  .bonfire-spark-1,
+  .bonfire-spark-2,
+  .bonfire-spark-3 {
     animation: none !important;
   }
 
