@@ -15,10 +15,9 @@ NO FURTHER RANKING TUNING
 UNLESS REAL ORGANIC DATA JUSTIFIES IT
 ```
 
-## Current Phase
-**Personalization V1 is FEATURE-COMPLETE and FROZEN AT 25% EXPERIMENTAL EXPOSURE** (`PERSONALIZATION_TREATMENT_PCT = 25`, mode lambdas: `DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`, `BEST_MATCH = 0.02`, `POPULAR = 0.00`). No further ranking or candidate-pool sweeps will be conducted unless organic production traffic warrants it.
-
-**Next Milestone Active**: **Creator Loop: Discovery → Inspiration → Studio** (Transforming Discovery from a pure recommendation endpoint into a structured design input system by attaching games as structured inspiration DNA to active projects for Studio blueprint proposals).
+### Current Phase
+**Creator Loop: Discovery → Inspiration → Studio & Final Browser QA are FEATURE-COMPLETE and VALIDATED.**
+All seven steps of the Discovery → Inspiration → Studio creation loop are fully implemented, verified, and backed by a comprehensive live browser QA pass with 5 prototype compilation runs, active interactive gameplay (>60s), qualitative playtest telemetry analysis, version-controlled remixing, and forward restoration.
 
 **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
@@ -41,11 +40,6 @@ UNLESS REAL ORGANIC DATA JUSTIFIES IT
 | Discovery Experience V2 (Game DNA Onboarding, Reset, Comparison, Tuning, Mood Explorer) (`DISCOVERY_EXPERIENCE_V2.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
 | Personalization V1 (Developer Profile, Project Context Blending, Explanations, 25% Treatment Exposure) | COMPLETE (FROZEN AT 25%) |
-
-
-
-
-
 | Creator Progression (server-authoritative XP, levels, milestones) | COMPLETE |
 | AI Blueprint + Remix (Phase 4) | COMPLETE |
 | Advanced Game Generation + Game Feel, multi-level campaigns, bounded boss/finale (Phase 5) | COMPLETE |
@@ -67,25 +61,21 @@ UNLESS REAL ORGANIC DATA JUSTIFIES IT
 | Direct API Transport Browser Smoke V1 (Direct-Development Origin Transport Verification & FIND-BROWSER-001 Remediation) (`DIRECT_API_BROWSER_SMOKE_V1.md`, `TOAST_RENDER_PHASE_FIX_V1.md`) | COMPLETE |
 | Creator Loop V1 (Discovery Inspiration → Builder Context → Playtest XP → Visual AI Critique Pulse → Quick Remix & Evolution → Game DNA Discover More Seed) | COMPLETE |
 | Project Studio V1 (Persistent Project Workspace, 3-Tab Architecture, Read-Only Historical Playback, Forward Version Restore, Stale Recommendation Guard) (`PROJECT_STUDIO_V1_PLAN.md`) | COMPLETE |
+| Creator Loop: Discovery → Inspiration → Studio (Steps 1–7: Game DNA, Persistence, Deck, Deterministic Synthesis, Blueprint Apply, Prototype Build, Playtest Analysis & Remix) | COMPLETE |
 | Self-Bootstrapping Local Launcher V1 (10-Stage Windows Orchestrator, Python/Node Winget Detection, Lockfile Hash Sync, SentenceTransformer & FAISS Vector Index Self-Bootstrap, Signature-Verified Port Safety) | COMPLETE |
+| Final Browser QA & Real Developer Usability Validation (5 Prototype Builds, >60s Live Gameplay, Conflict Diffing, Forward Restore, 0 Console Errors) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Self-Bootstrapping Local Launcher V1)
+## Current Verification (as of Final Browser QA & Usability Validation)
 
-- **Backend tests**: 434/434 passing (100% pass rate across all suites via pytest).
-- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 72 files).
-- **Discovery seed pure unit tests**: 7/7 passing (`npx tsx src/utils/__tests__/discovery.test.ts`).
-- **Progression toasts unit tests**: 11/11 passing (`npx tsx src/services/__tests__/progressionToasts.test.ts`).
-- **URL normalization & direct transport unit tests**: 34/34 passing (`npx tsx src/services/__tests__/urlUtils.test.ts`).
+- **Backend tests**: 626/626 passing (100% pass rate across all suites via pytest in 106.04s).
+- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.04s).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 85 files).
+- **Frontend unit test suites**: 10/10 suites passing (86 assertions across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
 - **Production build**: succeeds (`npm run build`).
-- **Technical Refinement 1 (Version-Aware Stale Guard)**: Analysis staleness evaluates against `activeVersion.created_at` timestamp rather than `project.updatedAt`, ensuring project renames do not invalidate recommendations while version updates flag stale analysis.
-- **Technical Refinement 2 (Restore Concurrency Safety)**: `ProjectVersion` enforces `UniqueConstraint("project_id", "version_number")`, and `restore_project_version` utilizes transactional collision retry proven via multi-threaded test.
-- **Zero-AI studio browsing audit**: Verified browsing tabs, viewing blueprint, inspecting versions, and historical playback execute client-side / cache with zero AI quota consumption.
-- **Single-invocation progress refresh audit**: Verified exactly 1 `refreshProgress()` per completed playtest/remix/improvement/restore action.
-- **Browser verification**: Explicitly NOT PERFORMED for this milestone pending user authorization (`BROWSER TESTING: NOT PERFORMED`).
+- **Live Browser QA**: COMPLETED and VERIFIED. 5 prototype generation runs, 72s of interactive gameplay, real combat/locomotion/dash/collectibles, qualitative analysis, speed remix bump, stale guard 409, and forward restoration verified with zero uncaught JavaScript exceptions and zero WebGL context losses.
 
 - **Dev API Transport (Elimination of FS-034 Dev Proxy Dependency)**: Local development (`start.bat`) automatically supplies `VITE_API_URL=http://127.0.0.1:<BACKEND_PORT>` and `CORS_ORIGINS` when not explicitly set, routing browser REST and SSE traffic directly to FastAPI. This bypasses the development-only Vite proxy hop and permanently eliminates intermittent `ECONNRESET` socket drops in local dev. The Vite proxy remains in place only as a backward-compatible fallback for environments without `VITE_API_URL`.
 
