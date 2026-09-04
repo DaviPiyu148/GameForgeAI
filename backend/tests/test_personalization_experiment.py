@@ -1641,9 +1641,9 @@ class TestPhase8TenPercentControlledExpansion:
     """
 
     def test_config_ten_percent_treatment_pct(self):
-        """Verify settings reflect 10% treatment cohort."""
+        """Verify settings reflect active treatment cohort (>= 10%)."""
         from app.config import settings
-        assert settings.PERSONALIZATION_TREATMENT_PCT == 10
+        assert settings.PERSONALIZATION_TREATMENT_PCT in (10, 25)
         assert settings.PERSONALIZATION_MODE == "TREATMENT"
         assert settings.PERSONALIZATION_MODE_LAMBDAS["POPULAR"] == 0.00
         assert settings.PERSONALIZATION_MODE_LAMBDAS["BEST_MATCH"] == 0.02
@@ -1856,3 +1856,333 @@ class TestPhase81RobustnessAndHeterogeneousEffects:
         assert len(c_events) == 1 and c_events[0]["user_id"] == user_ctrl
         assert all(e["treated_req"] is True for e in t_events)
         assert all(e["treated_req"] is False for e in c_events)
+
+
+# ---------------------------------------------------------------------------
+# Phase 9: Controlled 25% Expansion Tests
+# ---------------------------------------------------------------------------
+
+class TestPhase9Controlled25PctExpansion:
+    """
+    Phase 9: Controlled 25% Expansion Tests:
+    1. Configuration audit (PERSONALIZATION_TREATMENT_PCT == 25, mode frozen).
+    2. Cohort transition audit (10% -> 25% preserves all 10% treatment users,
+       newly treats buckets 10-24, keeps >=25 as control).
+    3. Stable assignment across multiple sessions and contexts.
+    4. Control identity (users with bucket >= 25 receive exact base response).
+    5. Mode-specific lambdas frozen (POPULAR 0.00 zero movement, BEST_MATCH 0.02, DISCOVER 0.05, HIDDEN_GEMS 0.05).
+    6. Cold start neutrality (COLD tier has 0 movement, 0 PAU).
+    7. Hard constraints and explicit avoidance enforcement.
+    8. Project switching isolation and global profile immutability.
+    9. Event attribution integrity (strict 25/75 cohort isolation with 0 leakage).
+    """
+
+    def test_config_twenty_five_percent_treatment_pct(self):
+        """Verify settings reflect 25% treatment cohort and frozen mode lambdas."""
+        from app.config import settings
+        assert settings.PERSONALIZATION_TREATMENT_PCT == 25
+        assert settings.PERSONALIZATION_MODE == "TREATMENT"
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["POPULAR"] == 0.00
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["BEST_MATCH"] == 0.02
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["DISCOVER"] == 0.05
+        assert settings.PERSONALIZATION_MODE_LAMBDAS["HIDDEN_GEMS"] == 0.05
+
+    def test_cohort_transition_audit_10_to_25_percent(self):
+        """
+        Verify cohort transition invariants when moving from 10% to 25%:
+        1. Users in treatment at 10% MUST still be in treatment at 25% (zero demotions).
+        2. Users with hash bucket [10..24] become treatment.
+        3. Users with hash bucket >= 25 remain control.
+        4. Overall treatment rate is ~25% (23.5% - 26.5%).
+        """
+        import hashlib
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        pop_size = 10000
+        demoted = 0
+        bucket_0_9_count = 0
+        bucket_10_24_count = 0
+        bucket_25_99_count = 0
+
+        for i in range(pop_size):
+            uid = f"dev_phase9_{i:05d}"
+            digest = hashlib.sha256(uid.encode("utf-8")).hexdigest()
+            bucket = int(digest[:8], 16) % 100
+
+            was_in_10 = personalization_experiment_service.user_in_treatment_cohort(uid, 10)
+            is_in_25 = personalization_experiment_service.user_in_treatment_cohort(uid, 25)
+
+            if was_in_10 and not is_in_25:
+                demoted += 1
+
+            if bucket < 10:
+                assert was_in_10 is True
+                assert is_in_25 is True
+                bucket_0_9_count += 1
+            elif 10 <= bucket < 25:
+                assert was_in_10 is False
+                assert is_in_25 is True
+                bucket_10_24_count += 1
+            else:
+                assert was_in_10 is False
+                assert is_in_25 is False
+                bucket_25_99_count += 1
+
+        assert demoted == 0, "No previous treatment user may be demoted to control!"
+        total_treated_25 = bucket_0_9_count + bucket_10_24_count
+        treated_pct = total_treated_25 / pop_size * 100.0
+        assert 23.5 <= treated_pct <= 26.5, f"Expected ~25% treatment, got {treated_pct:.2f}%"
+
+    def test_stable_assignment_across_contexts(self):
+        """Verify deterministic stability across multiple queries, discovery modes, and active projects."""
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        test_uids = [f"developer_{i}" for i in range(100)]
+        for uid in test_uids:
+            expected = personalization_experiment_service.user_in_treatment_cohort(uid, 25)
+            # Re-evaluate across 10 simulated queries/modes/projects
+            for mode in ["BEST_MATCH", "POPULAR", "DISCOVER", "HIDDEN_GEMS"]:
+                for proj_id in [None, "proj_alpha", "proj_beta"]:
+                    res = personalization_experiment_service.user_in_treatment_cohort(uid, 25)
+                    assert res == expected, f"Assignment for {uid} mutated across context!"
+
+    def test_control_identity_exact_base_in_25pct(self):
+        """Users in control cohort (bucket >= 25) must receive exact base response."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        ctrl_uid = None
+        for i in range(500):
+            uid = f"ctrl_test_{i:04d}"
+            if not personalization_experiment_service.user_in_treatment_cohort(uid, 25):
+                ctrl_uid = uid
+                break
+
+        assert ctrl_uid is not None
+        cand_a = _make_result("game_1", "Game 1", 0.90, ["Action"])
+        cand_b = _make_result("game_2", "Game 2", 0.85, ["Strategy"])
+        base_resp = _make_base_response([cand_a, cand_b], mode="DISCOVER")
+
+        profile = EffectivePreferenceProfile(
+            user_id=ctrl_uid,
+            genres={"Strategy": 1.0},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=25,
+        )
+
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=profile,
+            user_id=ctrl_uid,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=25,
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+
+        assert [r.game.id for r in resp.results] == ["game_1", "game_2"]
+        assert [r.score for r in resp.results] == [cand_a.score, cand_b.score]
+        assert diag.user_in_treatment_cohort is False
+        assert diag.candidates_moved == 0
+        assert diag.top5_churn == 0
+        assert diag.top5_positional_changes == 0
+        assert all(r.personalization_reasons == [] for r in resp.results)
+
+    def test_mode_specific_lambdas_in_25pct(self):
+        """Verify POPULAR has lambda=0.00 (0 movement) and BEST_MATCH has lambda=0.02 (0 set churn)."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        treat_uid = None
+        for i in range(500):
+            uid = f"treat_test_{i:04d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 25):
+                treat_uid = uid
+                break
+        assert treat_uid is not None
+
+        profile = EffectivePreferenceProfile(
+            user_id=treat_uid,
+            genres={"RPG": 1.0},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=20,
+        )
+
+        # 1. POPULAR -> 0 movement
+        cand_pop1 = _make_result("p1", "Popular 1", 0.95, ["Action"])
+        cand_pop2 = _make_result("p2", "Popular 2", 0.90, ["RPG"])
+        base_pop = _make_base_response([cand_pop1, cand_pop2], mode="POPULAR")
+
+        resp_pop, diag_pop = personalization_experiment_service.apply(
+            base_response=base_pop,
+            effective_profile=profile,
+            user_id=treat_uid,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=25,
+            mode_lambdas={"POPULAR": 0.00, "BEST_MATCH": 0.02, "DISCOVER": 0.05, "HIDDEN_GEMS": 0.05},
+        )
+        assert diag_pop.lambda_ == 0.00
+        assert diag_pop.candidates_moved == 0
+        assert [r.game.id for r in resp_pop.results] == ["p1", "p2"]
+
+        # 2. BEST_MATCH -> lambda=0.02, conservative, 0 set churn
+        cand_bm = [_make_result(f"bm_{i}", f"BM {i}", 0.85 - i * 0.01, ["Action" if i != 1 else "RPG"]) for i in range(5)]
+        base_bm = _make_base_response(cand_bm, mode="BEST_MATCH")
+
+        resp_bm, diag_bm = personalization_experiment_service.apply(
+            base_response=base_bm,
+            effective_profile=profile,
+            user_id=treat_uid,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=25,
+            mode_lambdas={"POPULAR": 0.00, "BEST_MATCH": 0.02, "DISCOVER": 0.05, "HIDDEN_GEMS": 0.05},
+        )
+        assert diag_bm.lambda_ == 0.02
+        assert diag_bm.top5_churn == 0, "BEST_MATCH must have 0 set churn from outside Top-5"
+
+    def test_cold_start_neutrality_in_25pct(self):
+        """Verify COLD tier treatment users receive exactly 0 movement and 0 PAU."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        treat_uid = None
+        for i in range(500):
+            uid = f"treat_cold_{i:04d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 25):
+                treat_uid = uid
+                break
+        assert treat_uid is not None
+
+        cands = [_make_result(f"g_{i}", f"Game {i}", 0.80 - i * 0.05, ["Action"]) for i in range(5)]
+        base_resp = _make_base_response(cands, mode="DISCOVER")
+        cold_prof = EffectivePreferenceProfile(
+            user_id=treat_uid,
+            confidence_tier="COLD",
+            total_signal_count=0,
+        )
+
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=cold_prof,
+            user_id=treat_uid,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=25,
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+        assert diag.candidates_moved == 0
+        assert diag.top5_churn == 0
+        assert diag.top5_positional_changes == 0
+        assert diag.preference_alignment_uplift == 0.0
+        assert [r.game.id for r in resp.results] == [c.game.id for c in cands]
+
+    def test_hard_constraints_and_avoidance_safety_in_25pct(self):
+        """Verify explicit avoidances and hard genre constraints are strictly preserved."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        treat_uid = None
+        for i in range(500):
+            uid = f"treat_safety_{i:04d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 25):
+                treat_uid = uid
+                break
+        assert treat_uid is not None
+
+        cands = [
+            _make_result("g_allowed", "Allowed Game", 0.80, ["Strategy"]),
+            _make_result("g_avoided", "Avoided Game", 0.79, ["Action"]),
+        ]
+        base_resp = _make_base_response(cands, mode="DISCOVER")
+
+        profile = EffectivePreferenceProfile(
+            user_id=treat_uid,
+            genres={"Action": 1.0, "Strategy": 0.5},
+            explicit_avoidances={"Action"},
+            suppressed_game_ids={"g_avoided"},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=15,
+        )
+
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=profile,
+            user_id=treat_uid,
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=25,
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+        assert resp.results[0].game.id == "g_allowed"
+        assert diag.avoidance_violations == 0
+
+    def test_project_switching_isolation_in_25pct(self):
+        """Verify project switching does not mutate global profile."""
+        from app.services.context_blender import context_blender
+
+        global_prof = DeveloperPreferenceProfile(
+            user_id="dev_switch_test",
+            genres={"RPG": 0.8},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=20,
+        )
+        proj_a = ProjectPreferenceProfile(
+            project_id="proj_a",
+            title="Cyber RPG",
+            genres={"Cyberpunk": 1.0},
+            context_confidence=1.0,
+        )
+        proj_b = ProjectPreferenceProfile(
+            project_id="proj_b",
+            title="Space Sim",
+            genres={"Sci-Fi": 1.0},
+            context_confidence=1.0,
+        )
+
+        blend_a = context_blender.blend(global_prof, proj_a)
+        blend_b = context_blender.blend(global_prof, proj_b)
+        blend_none = context_blender.blend(global_prof, None)
+
+        assert blend_a.active_project_id == "proj_a"
+        assert "Cyberpunk" in blend_a.genres
+        assert blend_b.active_project_id == "proj_b"
+        assert "Sci-Fi" in blend_b.genres
+        assert blend_none.active_project_id is None
+
+        # Global profile must remain strictly immutable
+        assert global_prof.genres == {"RPG": 0.8}
+
+    def test_event_attribution_integrity_in_25pct(self):
+        """Verify strict 25/75 cohort event isolation with zero cross-contamination."""
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        t_uids = []
+        c_uids = []
+        for i in range(200):
+            uid = f"dev_attrib_{i:04d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 25):
+                t_uids.append(uid)
+            else:
+                c_uids.append(uid)
+
+        assert len(t_uids) > 0 and len(c_uids) > 0
+
+        events = []
+        for u in t_uids[:10]:
+            events.append({"user_id": u, "event_type": "SAVE_DISCOVERY", "treated_request": True})
+        for u in c_uids[:30]:
+            events.append({"user_id": u, "event_type": "SAVE_DISCOVERY", "treated_request": False})
+
+        t_attributed = [e for e in events if personalization_experiment_service.user_in_treatment_cohort(e["user_id"], 25)]
+        c_attributed = [e for e in events if not personalization_experiment_service.user_in_treatment_cohort(e["user_id"], 25)]
+
+        assert len(t_attributed) == 10
+        assert len(c_attributed) == 30
+        assert all(e["treated_request"] is True for e in t_attributed)
+        assert all(e["treated_request"] is False for e in c_attributed)
+

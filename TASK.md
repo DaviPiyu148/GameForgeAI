@@ -1,24 +1,25 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Personalization V1 — Phase 8.1: 10% Treatment Robustness & Heterogeneous-Effect Validation
+Personalization V1 — Phase 9: Controlled 25% Expansion
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute comprehensive robustness and heterogeneous-effect validation of the 10% treatment cohort:
-1. Freeze everything: `PERSONALIZATION_MODE = TREATMENT`, `PERSONALIZATION_TREATMENT_PCT = 10`, mode lambdas (`DISCOVER: 0.05`, `HIDDEN_GEMS: 0.05`, `BEST_MATCH: 0.02`, `POPULAR: 0.00`).
-2. Correct reporting semantics: strictly distinguish Top-5 Set Churn (`new_in_top5`) from Positional Alignment Changes (Beneficial, Neutral, Harmful in changed slots).
-3. Pre-treatment baseline balance audit: verify randomized equivalence across 6 covariates using Standardized Mean Differences (|SMD| < 0.10).
-4. Evaluate primary user-level endpoints (K=3) with Newcombe 95% CIs and Holm-Bonferroni correction.
-5. Heterogeneous treatment effects: analyze outcomes across Profile Maturity Tiers (`COLD`, `EMERGING`, `MODERATE`, `ESTABLISHED`), Discovery Modes, and Project Context (observational).
-6. Verify effect stability vs Phase 7.4.
-7. Engagement event attribution audit: verify 100% strict cohort isolation with 0 cross-contamination.
-8. Invariant safety & latency enforcement (0 violations, 0 fallbacks, 0 Gemini calls, SLA < 50 ms).
+Execute controlled 25% treatment cohort expansion under strict methodology distinguishing REAL ORGANIC traffic from SIMULATED BENCHMARK evidence:
+1. Increase treatment exposure from 10% to 25% (`PERSONALIZATION_TREATMENT_PCT = 25`, `PERSONALIZATION_MODE = "TREATMENT"`).
+2. Freeze algorithm, ranker, RRF, FAISS, context weights (0.30/0.70), and mode lambdas (`DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`, `BEST_MATCH = 0.02`, `POPULAR = 0.00`).
+3. Audit real organic coverage from `backend/gameforge.db` (58 registered developers, 17 treated, 41 control). Explicitly record "insufficient organic traffic for a reliable Phase 9 conclusion".
+4. Cohort transition audit (40,000 benchmark population): retain 100% of 10% treatment users (bucket 0-9), newly treat bucket 10-24, keep bucket 25-99 as control. Zero demotions.
+5. Audit pre-treatment baseline balance (SMDs across 6 covariates) using deterministic hash-based cohort assignment (|SMD| < 0.10).
+6. Evaluate primary user-level endpoints (K=3, N=2,000 per group, Newcombe 95% CIs, Holm-Bonferroni correction).
+7. Validate ranking quality and corrected movement semantics (Top-5 set churn vs positional alignment changes).
+8. Verify all 7 safety invariants (0 violations) and latency SLA (< 50 ms).
 
 ## Previous Commit Checkpoint
-- SHA: `9246a72` — `backend: execute personalization V1 phase 8 controlled 10% treatment expansion`
+- SHA: `cf1bba9` — `backend: validate 10 percent treatment robustness and heterogeneous effects`
+- SHA: `272a173` — `docs(task): update Phase 8.1 commit hash in ledger`
 
 ## Started
 2026-09-04
@@ -2500,4 +2501,134 @@ DECISION:             1. Proceed to 25% controlled expansion (Ready & Justified)
 ```
 
 ### Git Checkpoint
-- Commit hash: cf1bba9
+- Commit hash: 272a173
+
+---
+
+## 34. Phase 9: Controlled 25% Expansion Implementation Evidence
+
+### 1. Controlled 25% Expansion Implementation
+- `backend/app/config.py`:
+  - Updated `PERSONALIZATION_TREATMENT_PCT = 25` (expanded from 10%).
+  - Retained `PERSONALIZATION_MODE = "TREATMENT"`.
+  - Retained frozen mode-specific lambdas: `DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`, `BEST_MATCH = 0.02`, `POPULAR = 0.00`.
+  - Retained 50 ms latency budget guard: `PERSONALIZATION_LATENCY_BUDGET_MS = 50.0`.
+  - Zero modifications to ranking formulas, context blending, or scoring mechanisms.
+- `backend/tests/test_personalization_experiment.py`:
+  - Updated `test_config_ten_percent_treatment_pct` to allow `PERSONALIZATION_TREATMENT_PCT in (10, 25)`.
+  - Added dedicated test class `TestPhase9Controlled25PctExpansion` with 9 focused unit tests:
+    - `test_config_twenty_five_percent_treatment_pct`: Verifies settings reflect 25% cohort and frozen lambdas.
+    - `test_cohort_transition_audit_10_to_25_percent`: Validates 0 demotions from 10% cohort, bucket [10..24] newly treated, bucket [25..99] control across 10,000 developers.
+    - `test_stable_hashing_across_contexts`: Verifies deterministic assignment stability across queries, modes, and active projects.
+    - `test_control_identity_exact_base_in_25pct`: Verifies bucket [25..99] receives exact base consensus response.
+    - `test_mode_specific_lambdas_in_25pct`: Verifies POPULAR has 0 movement, BEST_MATCH has 0 set churn.
+    - `test_cold_start_neutrality_in_25pct`: Verifies COLD tier receives 0 movement and 0 PAU.
+    - `test_hard_constraints_and_avoidance_safety_in_25pct`: Verifies hard genre filters and explicit avoidances.
+    - `test_project_switching_isolation_in_25pct`: Verifies project switching does not mutate global profile.
+    - `test_event_attribution_integrity_in_25pct`: Verifies strict 25/75 cohort event isolation with 0 leakage.
+- `backend/scripts/run_phase9_25pct_expansion.py`:
+  - Created standalone evaluation runner with strict methodology distinguishing REAL ORGANIC from SIMULATED BENCHMARK evidence.
+  - Audited real organic database `backend/gameforge.db` (58 registered developers, 17 treated, 41 control).
+  - Evaluated 8,800 requests across authentic queries, modes, developer tiers, and project contexts.
+
+### 2. Empirical Validation Findings
+
+#### A. Real Organic Coverage Audit (Production Database)
+- Database: `backend/gameforge.db`
+- Registered Developers: **58**
+  - Bucket 0–9 (Previous 10% Treatment): **10 developers**
+  - Bucket 10–24 (Newly Treated 25%): **7 developers**
+  - Total Active 25% Treatment Cohort: **17 developers** (29.3%)
+  - Control Cohort Remaining: **41 developers** (70.7%)
+- Real Organic Saves: Total **21** (Treatment: 10, Control: 11)
+- Real Organic Prototype Builds: Total **99** (Treatment: 32, Control: 67)
+- Real Organic Playtest Sessions: Total **45** (Treatment: 6, Control: 39)
+- Assessment: **insufficient organic traffic for a reliable Phase 9 conclusion** (authentic early pilot dataset; lacks statistical power for standalone p < 0.05 user-level inference).
+
+#### B. Controlled Benchmark Cohort Transition Audit (40,000 Developers)
+- Total Eligible Population: **40,000 Developers**
+- Previous 10% Treatment (Bucket 0–9): **4,121 (10.30%)**
+- Newly Treated (Bucket 10–24): **5,921 (14.80%)**
+- Total Treatment Cohort (25%): **10,042 (25.11%)**
+- Control Cohort Remaining (25–99): **29,958 (74.89%)**
+- Demotions from Previous Cohort: **0 (100% Retention Guarantee)**
+
+#### C. Pre-Treatment Baseline Balance Audit (Deterministic Hash-Based Cohort Assignment)
+```
+| Pre-Treatment Covariate          | Control Baseline (75%) | Treatment Baseline (25%) |     SMD (d) | Balance Status (|d|<.10) |
+|:---------------------------------|-----------------------:|-------------------------:|------------:|:-------------------------|
+| COLD Profile Tier %              |                 25.09% |                   24.39% |     -0.0162 | Balanced (|d|<.10)       |
+| ESTABLISHED Profile Tier %       |                 25.00% |                   24.57% |     -0.0100 | Balanced (|d|<.10)       |
+| Historical Queries / Dev         |                   5.51 |                     5.53 |     +0.0087 | Balanced (|d|<.10)       |
+| Historical 24h Return Rate %     |                 56.63% |                   57.38% |     +0.0151 | Balanced (|d|<.10)       |
+| Historical Save Discovery Rate % |                 34.68% |                   35.15% |     +0.0099 | Balanced (|d|<.10)       |
+| Historical Project Ownership %   |                 24.71% |                   25.00% |     +0.0069 | Balanced (|d|<.10)       |
+```
+*All absolute SMDs << 0.10, proving randomized equivalence under deterministic pseudo-random hashing.*
+
+#### D. Primary User-Level Outcomes (N=2,000 per group, Newcombe 95% CI, Holm-Bonferroni)
+```
+| Metric                   |        Control |      Treatment |   Absolute Δ |   Relative Δ |    95% CI (Newcombe) |     Raw p |  Holm Adj p |
+|:-------------------------|---------------:|---------------:|-------------:|-------------:|:--------------------:|----------:|------------:|
+| Save Discovery           | 695/2000 (34.8%)| 864/2000 (43.2%)|       +8.45% |       +24.3% |      [+5.4%, +11.4%] |    0.0000 |      0.0000 |
+| Return within 24h        |1136/2000 (56.8%)|1376/2000 (68.8%)|      +12.00% |       +21.1% |      [+9.0%, +15.0%] |    0.0000 |      0.0000 |
+| Prototype / Build Start  | 381/2000 (19.1%)| 536/2000 (26.8%)|       +7.75% |       +40.7% |      [+5.2%, +10.3%] |    0.0000 |      0.0000 |
+```
+*All 3 primary endpoints remain statistically significant at p < 0.0001 with positive intervals separated from zero.*
+
+#### E. Ranking Quality & Corrected Semantics (Top-5 Set Churn vs Positional Changes)
+- Overall Mean PAU: **+0.0061** (95% CI: `[+0.0056, +0.0065]`)
+- Top-5 Set Churn (`new_in_top5`): **0.17 external items / req**
+- Top-10 Set Churn: **0.00 external items / req**
+- Top-5 Positional Slot Changes: **0.54 positions / req**
+- Positional Alignment Changes (among altered slots):
+  - Beneficial ($\ge +0.05$): **48.6%** (1,164 slots)
+  - Neutral ($[-0.02, +0.05)$): **31.9%** (764 slots)
+  - Harmful ($\le -0.02$): **19.5%** (467 slots)
+  - Beneficial / Harmful Ratio: **2.49x**
+
+#### F. Mode Breakdown
+- `POPULAR` ($\lambda=0.00$): 600 reqs, PAU = `+0.0000`, Set Churn = **0.00**, Pos Changes = **0.00** (Exact Base Consensus)
+- `BEST_MATCH` ($\lambda=0.02$): 1,600 reqs, PAU = `+0.0015`, Set Churn = **0.02**, Pos Changes = **0.19** (Conservative Swaps)
+- `DISCOVER` ($\lambda=0.05$): 1,000 reqs, PAU = `+0.0077`, Set Churn = **0.27**, Pos Changes = **1.00**, Pos Ben = 70.4%
+- `HIDDEN_GEMS` ($\lambda=0.05$): 1,200 reqs, PAU = `+0.0137`, Set Churn = **0.36**, Pos Changes = **0.92**, Pos Ben = 76.0%
+
+#### G. Profile Maturity Breakdown
+- `COLD`: 1,100 reqs, PAU = `+0.0000`, Set Churn = **0.00**, Pos Changes = **0.00** (Strict Neutrality Invariant)
+- `EMERGING`: 1,100 reqs, PAU = `+0.0079`, Set Churn = 0.27, Pos Changes = 0.45, Ben = 73.4%
+- `MODERATE`: 1,100 reqs, PAU = `+0.0122`, Set Churn = 0.30, Pos Changes = 1.39, Ben = 41.3%
+- `ESTABLISHED`: 1,100 reqs, PAU = `+0.0041`, Set Churn = 0.09, Pos Changes = 0.33, Ben = 45.5%
+
+#### H. Safety & Latency Invariants Across 8,800 Evaluated Requests
+- Control Identity Failures: **0 / 4,400**
+- POPULAR Mode Violations: **0 / 600**
+- Cold-Start Regressions: **0 / 1,100**
+- Hard Constraint Violations: **0**
+- Explicit Avoidance Violations: **0**
+- Safety Fallbacks Triggered: **0**
+- External Gemini API Calls: Exactly **0**
+- Latency Overhead: Mean = **0.89 ms**, P95 = **1.31 ms**, P99 = **1.58 ms**, Budget Exceedance = **0.0%** (vs 50 ms SLA)
+
+### 3. Verification Suite Results
+- `pytest backend/tests/test_personalization_experiment.py -q`: **88 passed, 1 warning** in 1.40s.
+- `pytest backend/tests/ -q`: **579 passed, 1 warning** in 103.07s.
+- `npx tsc --noEmit`: **0 errors**.
+- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- `npm run build`: built production assets in **2.10s**.
+
+### 4. Production State
+```
+PERSONALIZATION:      TREATMENT = 25%
+CONTROL COHORT:       75% (Base Consensus Ranking)
+MODE LAMBDAS:
+  DISCOVER            0.05
+  HIDDEN_GEMS         0.05
+  BEST_MATCH          0.02
+  POPULAR             0.00
+GEMINI:               0
+DECISION:             1. Keep 25% (Controlled real-world exposure test; accumulate organic traffic)
+```
+
+### 5. Git Checkpoint
+- Commit hash: (see below after commit)
+

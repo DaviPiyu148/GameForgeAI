@@ -114,8 +114,8 @@ class Settings(BaseSettings):
 
     # Percentage of authenticated users assigned to the TREATMENT cohort (0–100).
     # Deterministic assignment is based on hash(user_id) % 100.
-    # Phase 8: 10% controlled treatment expansion.
-    PERSONALIZATION_TREATMENT_PCT: int = 10
+    # Phase 9: 25% controlled treatment expansion.
+    PERSONALIZATION_TREATMENT_PCT: int = 25
 
     # Phase 6.3 Mode-Specific Lambdas for shadow experiment:
     # DISCOVER: 0.05, HIDDEN_GEMS: 0.05, BEST_MATCH: 0.02, POPULAR: 0.00
