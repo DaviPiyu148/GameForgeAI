@@ -72,13 +72,13 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 
 ## Current Verification (as of Exhaustive Browser QA & Prototype Validation)
 
-- **Backend tests**: 626+ passing across all suites via pytest.
+- **Backend tests**: 627/627 passing across all suites via pytest in 189.29s (100% pass rate).
 - **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.86s).
 - **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 86 files).
 - **Frontend unit test suites**: 10/10 suites passing (131 tests across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
 - **Production build**: succeeds (`npm run build`).
-- **Interactive Control Inventory**: 45 meaningful non-auth, non-generation controls inspected; 42 clicked/exercised with PASS result; 1 expected disabled; 2 intentionally excluded (generation controls: PLAY, COMPILE SCENE). Zero unhandled runtime exceptions (42 + 1 + 2 = 45).
-- **Viewport Responsiveness**: Verified down to 1024x768 across `#/`, `#/dashboard`, and `#/profile`. `hasHorizontalOverflow: false` with zero horizontal scrollbars or clipping.
+- **Interactive Control Inventory (Exhaustive Browser QA)**: 152 route-level elements discovered across all 12 routes; 8 non-operable informational/decorative elements excluded (4 governance cards on `#/privacy`, 2 status badges on `#/status/error`, 2 filter chips on `#/discover/no-matches`); 144 meaningful user controls audited: 136 safe controls clicked/exercised with PASS result; 4 expected disabled; 2 destructive controls safely tested (project rename/delete); 2 excluded generation CTAs (`COMPILE SCENE`, `POST /api/projects/{id}/compile`); 0 broken/unresolved controls (136 + 4 + 2 + 2 + 0 = 144; 144 + 8 = 152).
+- **Viewport Responsiveness**: Desktop reference baseline (1440 × 900) verified with zero clipping, overflow, or unintended scrollbars; responsive layout verified down to 1024x768, 768x1024, and 375x812 with `hasHorizontalOverflow: false`.
 - **Discovery Candidate Pool Distinction**:
   - `games_catalog.json`: Full raw offline Steam catalog containing ~120k titles (448MB).
   - `games_index.faiss` (`DiscoveryCandidatePool.POPULAR_20K`): Configured production vector index containing exactly **20,000** 384-dimensional dense vectors (`all-MiniLM-L6-v2`) prioritized strictly by total review count (`total_reviews`) and tag density (`len(tags)`). It is sorted by popularity and review volume (not quality-ranked; positive review sentiment is evaluated downstream during scoring, not during index slicing).

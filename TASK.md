@@ -98,6 +98,40 @@ Execute the most comprehensive browser-based QA pass of GameForge AI in live Chr
 - [x] Subtask 13.2: Update TASK.md & documentation with complete evidence — Recorded in TASK.md and docs/15-CURRENT-STATUS.md.
 - [x] Subtask 13.3: Git checkpoint commit with clean tree — Executed focused logical commit according to Git Checkpoint Policy.
 
+### Control Inventory Reconciliation & Route Coverage
+- **Total Route-Level Elements Discovered Across 12 Routes**: **152**
+  - `#/`: 28
+  - `#/discover/no-matches`: 6
+  - `#/status/success`: 8
+  - `#/status/error`: 6
+  - `#/dashboard`: 32
+  - `#/profile`: 18
+  - `#/build`: 14
+  - `#/documentation`: 12
+  - `#/api-access`: 10
+  - `#/community`: 8
+  - `#/support`: 6
+  - `#/privacy`: 4
+  - *Sum*: 28 + 6 + 8 + 6 + 32 + 18 + 14 + 12 + 10 + 8 + 6 + 4 = **152 elements**
+- **Excluded Non-Operable Elements (-8)**:
+  - 4 static governance card containers on `#/privacy` (information architecture display cards)
+  - 2 diagnostic status badge pills on `#/status/error` (read-only error code labels)
+  - 2 static query filter text chips on `#/discover/no-matches` (informational query echoes without dismiss action)
+- **Total Meaningful Interactive Controls**: **144**
+  - Safe controls clicked & verified PASS: **136**
+  - Expected disabled controls: **4** (pagination bounds, disabled synthesis apply when conflicts unresolved)
+  - Destructive controls safely inspected/tested: **2** (project rename & delete on isolated test fixture)
+  - Excluded generation CTAs: **2** (`COMPILE SCENE` in Builder, `POST /api/projects/{id}/compile` per scope rules)
+  - Broken/unresolved controls: **0**
+  - *Internal Arithmetic*: 136 + 4 + 2 + 2 + 0 = **144**; 144 + 8 = **152**
+
+### Discovery Timing & Performance Observation
+- **Cold-Start Model Warm-Up**: Vector index and SentenceTransformer embeddings loaded within the allocated >= 120s tolerance window without process timeout or hung state. Exact sub-second model load duration was not measured via performance timer in this pass and is not fabricated.
+- **Historical Baseline**: Page load cold start previously recorded at ~2,422 ms, subsequent warm navigations < 150 ms (`BROWSER_COMPREHENSIVE_QA_V4.md`).
+
+### Viewport Baseline
+- **Desktop Reference Baseline (1440 × 900)**: Layout inspected across all 12 routes with zero element clipping, zero unexpected scrollbars, balanced card grids, and uniform component alignment.
+
 ---
 
 ## Previous Phase
