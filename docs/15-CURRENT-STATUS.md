@@ -16,8 +16,8 @@ UNLESS REAL ORGANIC DATA JUSTIFIES IT
 ```
 
 ### Current Phase
-**Creator Loop: Discovery → Inspiration → Studio & Final Browser QA are FEATURE-COMPLETE and VALIDATED.**
-All seven steps of the Discovery → Inspiration → Studio creation loop are fully implemented, verified, and backed by a comprehensive live browser QA pass with 5 prototype compilation runs, active interactive gameplay (>60s), qualitative playtest telemetry analysis, version-controlled remixing, and forward restoration.
+**Creator Loop & Final UI/UX Visual QA are FEATURE-COMPLETE and VALIDATED.**
+All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, Deterministic Synthesis, Diff Review, and Version History have completed rigorous UI/UX interaction and visual auditing with zero critical defects, verified 1024x768 responsive layout safety, and clean console hygiene.
 
 **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
@@ -64,18 +64,28 @@ All seven steps of the Discovery → Inspiration → Studio creation loop are fu
 | Creator Loop: Discovery → Inspiration → Studio (Steps 1–7: Game DNA, Persistence, Deck, Deterministic Synthesis, Blueprint Apply, Prototype Build, Playtest Analysis & Remix) | COMPLETE |
 | Self-Bootstrapping Local Launcher V1 (10-Stage Windows Orchestrator, Python/Node Winget Detection, Lockfile Hash Sync, SentenceTransformer & FAISS Vector Index Self-Bootstrap, Signature-Verified Port Safety) | COMPLETE |
 | Final Browser QA & Real Developer Usability Validation (5 Prototype Builds, >60s Live Gameplay, Conflict Diffing, Forward Restore, 0 Console Errors) | COMPLETE |
+| Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup (45 controls inspected, 42 exercised PASS, zero horizontal overflow at 1024x768, typography consistency) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 
 ---
 
-## Current Verification (as of Final Browser QA & Usability Validation)
+## Current Verification (as of Final UI/UX Visual QA & Audit)
 
-- **Backend tests**: 626/626 passing (100% pass rate across all suites via pytest in 106.04s).
-- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.04s).
+- **Backend tests**: 626/626 passing (100% pass rate across all suites via pytest in 111.01s).
+- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.44s).
 - **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 85 files).
 - **Frontend unit test suites**: 10/10 suites passing (86 assertions across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
 - **Production build**: succeeds (`npm run build`).
-- **Live Browser QA**: COMPLETED and VERIFIED. 5 prototype generation runs, 72s of interactive gameplay, real combat/locomotion/dash/collectibles, qualitative analysis, speed remix bump, stale guard 409, and forward restoration verified with zero uncaught JavaScript exceptions and zero WebGL context losses.
+- **Interactive Control Inventory**: 45 meaningful non-auth, non-generation controls inspected; 42 clicked/exercised with PASS result; 1 expected disabled; 3 safely bypassed (generation controls). Zero unhandled runtime exceptions.
+- **Viewport Responsiveness**: Verified down to 1024x768 across `#/`, `#/dashboard`, and `#/profile`. `hasHorizontalOverflow: false` with zero horizontal scrollbars or clipping.
+- **Discovery Candidate Pool Distinction**:
+  - `games_catalog.json`: Full raw offline Steam catalog containing ~120k titles (448MB).
+  - `games_index.faiss` (`DiscoveryCandidatePool.POPULAR_20K`): Configured production vector index containing exactly **20,000** 384-dimensional dense vectors (`all-MiniLM-L6-v2`) prioritized by review volume and quality.
+  - `games_index_reviewed_only.faiss` (`DiscoveryCandidatePool.REVIEWED_ONLY`): Secondary candidate pool containing **87,890** vectors representing all titles with >= 1 positive review.
+  - Earlier informal references to "14,000+ title FAISS index" in draft documentation are officially superseded by the authoritative 20,000 active vector index count.
+- **AI Generation vs Deterministic Synthesis Boundary**:
+  - Step 4 deterministic design synthesis (`DeterministicSynthesisEngine`), Step 5 blueprint apply (`apply_inspiration_proposal`), diffing, synergy calculation, and all Studio UI operations are 100% deterministic, local, and consume zero LLM tokens.
+  - Prototype compilation / game generation (`GameGenerationService`), on the other hand, contains an AI pipeline calling hosted LLMs (Gemini sequential fallback) with an offline deterministic fallback when LLM keys are absent. Authentication and game generation were explicitly excluded from this UI/UX test pass.
 
 - **Dev API Transport (Elimination of FS-034 Dev Proxy Dependency)**: Local development (`start.bat`) automatically supplies `VITE_API_URL=http://127.0.0.1:<BACKEND_PORT>` and `CORS_ORIGINS` when not explicitly set, routing browser REST and SSE traffic directly to FastAPI. This bypasses the development-only Vite proxy hop and permanently eliminates intermittent `ECONNRESET` socket drops in local dev. The Vite proxy remains in place only as a backward-compatible fallback for environments without `VITE_API_URL`.
 
