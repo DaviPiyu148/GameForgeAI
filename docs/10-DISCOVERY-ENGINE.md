@@ -1,7 +1,19 @@
 # 10 — Discovery Engine & Discovery Experience V2
 
-## Implementation Status (IMPLEMENTED — Discovery Experience V2)
-The Discovery Engine features hybrid semantic + lexical retrieval, deterministic rich intent parsing (moods, session lengths, combat/difficulty preferences, hard/soft negations), centralized ranking configuration (`ranking_config.py`), O(1) FAISS vector retrieval, multi-signal ranking with bounded Game DNA personalization, soft franchise diversity reranking, interactive discovery modes (`BEST_MATCH`, `DISCOVER`, `HIDDEN_GEMS`, `POPULAR`), interactive feedback API (`POST /api/discovery/feedback`), grounded explanations, honest trade-offs, and clean English display normalization.
+## System Freeze Status
+```text
+DISCOVERY V1
+= FROZEN
+
+PERSONALIZATION V1
+= FROZEN AT 25% EXPERIMENTAL EXPOSURE
+
+NO FURTHER RANKING TUNING
+UNLESS REAL ORGANIC DATA JUSTIFIES IT
+```
+
+## Implementation Status (IMPLEMENTED & FROZEN)
+The Discovery Engine and Personalization V1 subsystems are feature-complete and frozen. Treatment exposure is stabilized at 25% (`PERSONALIZATION_TREATMENT_PCT = 25`, `POPULAR = 0.00`, `BEST_MATCH = 0.02`, `DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`). No further ranking formula modifications or candidate pool sweeps are permitted without concrete organic production data. Current engineering effort transitions to the **Creator Loop: Discovery → Inspiration → Studio**.
 
 Discovery Experience V2 elevates this with cold-start Game DNA onboarding (`POST /api/profile/preferences/onboard`), safe preferences reset (`POST /api/profile/preferences/reset`), multi-game side-by-side comparison (`POST /api/discovery/compare`), session-scoped tuning panel without database pollution, and interactive quick mood discovery.
 

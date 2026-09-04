@@ -1,10 +1,26 @@
 # 15 — Current Status
 
 ## Date
-2026-08-31
+2026-09-04
+
+## System Freeze Status
+```text
+DISCOVERY V1
+= FROZEN
+
+PERSONALIZATION V1
+= FROZEN AT 25% EXPERIMENTAL EXPOSURE
+
+NO FURTHER RANKING TUNING
+UNLESS REAL ORGANIC DATA JUSTIFIES IT
+```
 
 ## Current Phase
-Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Detection, Encounter Pacing, Failure Clarity) complete. Flow model, beat evaluation, deadlock checks, and failure clarity active. **Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
+**Personalization V1 is FEATURE-COMPLETE and FROZEN AT 25% EXPERIMENTAL EXPOSURE** (`PERSONALIZATION_TREATMENT_PCT = 25`, mode lambdas: `DISCOVER = 0.05`, `HIDDEN_GEMS = 0.05`, `BEST_MATCH = 0.02`, `POPULAR = 0.00`). No further ranking or candidate-pool sweeps will be conducted unless organic production traffic warrants it.
+
+**Next Milestone Active**: **Creator Loop: Discovery → Inspiration → Studio** (Transforming Discovery from a pure recommendation endpoint into a structured design input system by attaching games as structured inspiration DNA to active projects for Studio blueprint proposals).
+
+**Phase 7 (AI Game Director) and Phase 8 (Monetization/BYOK) are NOT STARTED** — nothing in the codebase implements them; do not treat any document that mentions them as describing current behavior.
 
 ---
 
@@ -24,7 +40,7 @@ Gameplay Experience V1 (Moment-to-Moment Gameplay, Gameplay Beats, Deadlock Dete
 | Gameplay Experience V1 (Beats, Pacing, Deadlock Detection, Failure Clarity) (`GAMEPLAY_EXPERIENCE_V1.md`) | COMPLETE |
 | Discovery Experience V2 (Game DNA Onboarding, Reset, Comparison, Tuning, Mood Explorer) (`DISCOVERY_EXPERIENCE_V2.md`) | COMPLETE |
 | Game DNA / behavioral personalization | COMPLETE |
-
+| Personalization V1 (Developer Profile, Project Context Blending, Explanations, 25% Treatment Exposure) | COMPLETE (FROZEN AT 25%) |
 
 
 
