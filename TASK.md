@@ -43,6 +43,7 @@ Execute the most comprehensive browser-based QA pass of GameForge AI in live Chr
 - [x] Subtask 3.4: Discovery modes test (`BEST_MATCH`, `POPULAR`, `DISCOVER`, `HIDDEN_GEMS`) — Mode switching verified, `💎 HIDDEN GEM` badges rendered.
 - [x] Subtask 3.5: Discovery query archetypes & result card interactions (Save, Use as Inspiration, Details) — 24 candidates retrieved for cyberpunk deckbuilder; result cards, tags, cover art verified.
 - [x] Subtask 3.6: Discovery feedback (Like, Like again, Dislike, Dislike again, Show Less, Undo) — Like toggles to emerald and untoggles; Dislike toggles to red; Less hides card with feedback.
+- [x] Subtask 3.7: Prompt Suggestion Chips & Quick Mood Discovery Vibe Selectors — Harmonized 'Build Game DNA' with the 3 natural-language prompt chips into a single cohesive outline pill row (h-8, rounded-full, transparent bg, theme hover glow). Rebuilt Quick Mood Discovery with gradient neon rules, pulsing cyan bolt, and 6 arcade vibe cards with dedicated Material icons (spa, electric_bolt, explore, auto_stories, psychology, casino), theme color borders/shadows, hover animations, and complete non-truncated text labels across viewports.
 
 ### Batch 4: Game Details Modal & Inspiration Semantic Paths
 - [x] Subtask 4.1: Game Details Modal layout, footer buttons (`h-10`), close icon, responsive wrapping — Open/close via X and Escape, footer buttons uniform `h-10`.

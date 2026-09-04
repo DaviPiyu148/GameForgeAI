@@ -392,71 +392,125 @@ const HomePage = () => {
 
       {/* 3. Suggestion & Refinement Chips */}
       {!hasResults && !state.isSearching && (
-        <section className="flex flex-wrap items-center justify-center gap-2.5 w-full max-w-3xl mx-auto mb-16 sm:mb-20 stagger-enter stagger-3">
-          <button
-            type="button"
-            aria-label="Search prompt: Cozy farming without horror"
-            onClick={() => handleChipClick('Cozy farming without horror')}
-            className="h-8 px-4 border border-secondary text-secondary font-mono text-xs rounded-full hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
-          >
-            <span aria-hidden="true" className="font-bold">&gt;</span>
-            <span>Cozy farming without horror</span>
-          </button>
+        <section className="w-full max-w-4xl mx-auto mb-8 sm:mb-10 stagger-enter stagger-3">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
+            <button
+              type="button"
+              aria-label="Search prompt: Cozy farming without horror"
+              onClick={() => handleChipClick('Cozy farming without horror')}
+              className="h-8 px-3.5 border border-secondary/70 text-secondary font-mono text-xs rounded-full hover:border-secondary hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.25)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            >
+              <span aria-hidden="true" className="font-bold">&gt;</span>
+              <span>Cozy farming without horror</span>
+            </button>
 
-          <button
-            type="button"
-            aria-label="Search prompt: Cyberpunk co-op shooter"
-            onClick={() => handleChipClick('Cyberpunk co-op shooter')}
-            className="h-8 px-4 border border-tertiary text-tertiary font-mono text-xs rounded-full hover:bg-tertiary/10 hover:shadow-[0_0_10px_rgba(255,194,76,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
-          >
-            <span aria-hidden="true" className="font-bold">&gt;</span>
-            <span>Cyberpunk co-op shooter</span>
-          </button>
+            <button
+              type="button"
+              aria-label="Search prompt: Cyberpunk co-op shooter"
+              onClick={() => handleChipClick('Cyberpunk co-op shooter')}
+              className="h-8 px-3.5 border border-tertiary/70 text-tertiary font-mono text-xs rounded-full hover:border-tertiary hover:bg-tertiary/10 hover:shadow-[0_0_10px_rgba(255,194,76,0.25)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            >
+              <span aria-hidden="true" className="font-bold">&gt;</span>
+              <span>Cyberpunk co-op shooter</span>
+            </button>
 
-          <button
-            type="button"
-            aria-label="Search prompt: Space exploration no pvp"
-            onClick={() => handleChipClick('Space exploration no pvp')}
-            className="h-8 px-4 border border-primary text-primary font-mono text-xs rounded-full hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
-          >
-            <span aria-hidden="true" className="font-bold">&gt;</span>
-            <span>Space exploration no pvp</span>
-          </button>
+            <button
+              type="button"
+              aria-label="Search prompt: Space exploration no pvp"
+              onClick={() => handleChipClick('Space exploration no pvp')}
+              className="h-8 px-3.5 border border-primary/70 text-primary font-mono text-xs rounded-full hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.25)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            >
+              <span aria-hidden="true" className="font-bold">&gt;</span>
+              <span>Space exploration no pvp</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setIsOnboardingModalOpen(true)}
-            className="h-8 px-4 bg-primary/20 border border-primary text-primary-bright font-mono text-xs rounded-full hover:bg-primary/30 hover:shadow-[0_0_12px_rgba(76,224,210,0.4)] transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold"
-          >
-            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">genetics</span>
-            <span>Build Game DNA</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setIsOnboardingModalOpen(true)}
+              aria-label="Calibrate Game DNA"
+              className="h-8 px-3.5 border border-primary/70 text-primary-bright font-mono text-xs rounded-full hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.25)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            >
+              <span className="material-symbols-outlined text-sm leading-none text-primary" aria-hidden="true">genetics</span>
+              <span>Build Game DNA</span>
+            </button>
+          </div>
         </section>
       )}
 
       {/* Quick Mood & Discovery Explorer Bar */}
       {!hasResults && !state.isSearching && (
-        <section className="w-full max-w-4xl mx-auto mb-12 text-center space-y-3 stagger-enter stagger-3">
-          <div className="flex items-center justify-center gap-2 text-xs font-mono text-on-surface-variant uppercase tracking-wider font-bold">
-            <span className="material-symbols-outlined text-primary text-sm">bolt</span>
-            <span>QUICK MOOD DISCOVERY</span>
+        <section className="w-full max-w-5xl mx-auto mb-12 text-center space-y-3.5 stagger-enter stagger-3">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent flex-1 max-w-[140px]" />
+            <div className="flex items-center gap-2 text-xs font-mono text-primary font-bold uppercase tracking-widest text-glow-cyan">
+              <span className="material-symbols-outlined text-primary text-sm animate-pulse" aria-hidden="true">bolt</span>
+              <span>QUICK MOOD DISCOVERY</span>
+            </div>
+            <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent flex-1 max-w-[140px]" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 w-full">
             {[
-              { label: 'Relax & Chill', prompt: 'relaxing cozy simulation no combat' },
-              { label: 'High Intensity', prompt: 'fast paced action adrenaline bullet hell' },
-              { label: 'Deep Exploration', prompt: 'atmospheric exploration discovery open world' },
-              { label: 'Rich Story', prompt: 'narrative rich atmospheric deep lore rpg' },
-              { label: 'Tactical Mind', prompt: 'tactical turn-based strategy puzzle thinking' },
-              { label: 'Surprise Me 🎲', prompt: 'innovative hidden gem experimental indie' },
+              {
+                label: 'Relax & Chill',
+                prompt: 'relaxing cozy simulation no combat',
+                icon: 'spa',
+                iconColor: 'text-emerald-400 group-hover:text-emerald-300',
+                btnTheme: 'border-emerald-500/30 hover:border-emerald-400 hover:shadow-[0_0_12px_rgba(52,211,153,0.3)] hover:bg-emerald-500/10',
+                iconAnim: 'transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-6',
+              },
+              {
+                label: 'High Intensity',
+                prompt: 'fast paced action adrenaline bullet hell',
+                icon: 'electric_bolt',
+                iconColor: 'text-secondary group-hover:text-pink-300',
+                btnTheme: 'border-secondary/30 hover:border-secondary hover:shadow-[0_0_12px_rgba(255,61,129,0.3)] hover:bg-secondary/10',
+                iconAnim: 'transition-transform duration-200 group-hover:scale-125',
+              },
+              {
+                label: 'Deep Exploration',
+                prompt: 'atmospheric exploration discovery open world',
+                icon: 'explore',
+                iconColor: 'text-primary group-hover:text-cyan-200',
+                btnTheme: 'border-primary/30 hover:border-primary hover:shadow-[0_0_12px_rgba(76,224,210,0.3)] hover:bg-primary/10',
+                iconAnim: 'transition-transform duration-300 group-hover:rotate-45',
+              },
+              {
+                label: 'Rich Story',
+                prompt: 'narrative rich atmospheric deep lore rpg',
+                icon: 'auto_stories',
+                iconColor: 'text-purple-400 group-hover:text-purple-300',
+                btnTheme: 'border-purple-500/30 hover:border-purple-400 hover:shadow-[0_0_12px_rgba(192,132,252,0.3)] hover:bg-purple-500/10',
+                iconAnim: 'transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:scale-110',
+              },
+              {
+                label: 'Tactical Mind',
+                prompt: 'tactical turn-based strategy puzzle thinking',
+                icon: 'psychology',
+                iconColor: 'text-tertiary group-hover:text-amber-300',
+                btnTheme: 'border-tertiary/30 hover:border-tertiary hover:shadow-[0_0_12px_rgba(255,194,76,0.3)] hover:bg-tertiary/10',
+                iconAnim: 'transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110',
+              },
+              {
+                label: 'Surprise Me',
+                prompt: 'innovative hidden gem experimental indie',
+                icon: 'casino',
+                iconColor: 'text-indigo-300 group-hover:text-white',
+                btnTheme: 'border-indigo-400/30 hover:border-indigo-300 hover:shadow-[0_0_12px_rgba(224,231,255,0.35)] hover:bg-indigo-500/10',
+                iconAnim: 'transition-transform duration-500 ease-out group-hover:rotate-180',
+              },
             ].map((m) => (
               <button
                 key={m.label}
                 type="button"
                 onClick={() => handleChipClick(m.prompt)}
-                className="h-8 px-2 bg-surface-container-highest/40 hover:bg-surface-container-highest border border-outline-variant/50 hover:border-primary/50 text-on-surface hover:text-white font-mono text-xs rounded transition-colors cursor-pointer flex items-center justify-center text-center truncate"
+                className={`group relative h-10 px-3 sm:px-3.5 rounded-lg border bg-terminal-bg/80 ${m.btnTheme} text-on-surface hover:text-white font-mono text-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer inline-flex items-center justify-center gap-2 select-none`}
               >
-                {m.label}
+                <span className={`material-symbols-outlined text-base ${m.iconColor} ${m.iconAnim}`} aria-hidden="true">
+                  {m.icon}
+                </span>
+                <span className="font-mono text-xs font-semibold tracking-wide">
+                  {m.label}
+                </span>
               </button>
             ))}
           </div>

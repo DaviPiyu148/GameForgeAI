@@ -68,6 +68,7 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 | Living documentation refresh (this pass) | COMPLETE |
 | Exhaustive Browser QA, Interaction, Visual, Route & Existing-Prototype Validation (12 routes visited, 31 mandatory items verified in live browser, existing prototype runtime tested, zero new builds triggered, single Game DNA & border seam verified, responsive viewports 1440/1024/768/375) | COMPLETE |
 | Feature Card Interactive Micro-Animations Refinement (All 3 icons stationary at rest and strictly hover-animated: authentic Material Symbol skull with rotating cogwheel on hover, arrow moving towards target goal on hover, and outline bonfire with dancing flames/rising sparks on hover, zero square box artifacts) | COMPLETE |
+| Discovery Prompt Chips & Quick Mood Vibe Selectors (Harmonized outline pill row for prompt chips + Build Game DNA; 6 neon arcade vibe cards with dedicated Material icons and non-truncated labels) | COMPLETE |
 
 ---
 
