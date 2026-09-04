@@ -88,3 +88,39 @@ class ProjectListResponse(BaseModel):
         from_attributes=True,
         serialize_by_alias=True,
     )
+
+
+class CompileProjectRequest(BaseModel):
+    """Schema for requesting deterministic compilation of a project version."""
+    version_number: Optional[int] = Field(
+        default=None,
+        ge=1,
+        alias="versionNumber",
+        description="Explicit version number to compile. If omitted, uses current_version.",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        extra="forbid",
+    )
+
+
+class CompileProjectResponse(BaseModel):
+    """Authoritative response schema for project prototype compilation."""
+    project_id: str = Field(..., alias="projectId")
+    version_number: int = Field(..., alias="versionNumber")
+    status: Literal["SUCCESS", "ERROR"]
+    game_dsl: Dict[str, Any] = Field(..., alias="gameDsl")
+    design_spec: Optional[Dict[str, Any]] = Field(default=None, alias="designSpec")
+    runtime_metadata: Dict[str, Any] = Field(..., alias="runtimeMetadata")
+    validation_summary: Optional[Dict[str, Any]] = Field(default=None, alias="validationSummary")
+    compiled_at: datetime = Field(..., alias="compiledAt")
+    message: str = "Prototype compiled successfully."
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        serialize_by_alias=True,
+    )
+

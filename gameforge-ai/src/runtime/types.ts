@@ -424,14 +424,19 @@ export interface GameDSL {
 }
 
 export interface RuntimeMetadata {
-  rendererVersion: string;
-  phaserVersion: string;
-  dslSchemaVersion: string;
+  rendererVersion?: string;
+  phaserVersion?: string;
+  dslSchemaVersion?: string;
   seed: number;
   provider?: string;
   model?: string;
   fallbackUsed?: boolean;
   fallbackReason?: string;
+  version_number?: number;
+  project_id?: string;
+  archetype?: string;
+  engine?: string;
+  compiled_at?: string;
 }
 
 export type GameState = 'READY' | 'PLAYING' | 'PAUSED' | 'WON' | 'LOST';

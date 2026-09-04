@@ -105,8 +105,9 @@ class GameGenerationService:
         rules = compiled.get("rules") if isinstance(compiled.get("rules"), list) else None
         ui = compiled.get("ui") if isinstance(compiled.get("ui"), dict) else None
 
-        # 1. Prototype Profile (engine) mapping
-        if engine == "2D Platformer":
+        # 1. Prototype Profile (engine / archetype) mapping
+        engine_norm = str(engine or "").lower().strip()
+        if engine_norm in ("2d platformer", "platformer", "runner"):
             if meta is not None:
                 meta["archetype"] = "platformer"
             if world is not None and world.get("gravity", 0) <= 0:
@@ -122,18 +123,20 @@ class GameGenerationService:
                         "trigger": "on_reach_goal",
                         "action": "win_game",
                     })
-        elif engine == "Arena Survival":
+        elif engine_norm in ("arena survival", "survival", "arena"):
             if meta is not None:
-                meta["archetype"] = "survival"
+                meta["archetype"] = "survival" if "survival" in engine_norm else "arena"
             if world is not None:
                 world["gravity"] = 0
                 world["wave_count"] = max(3, world.get("wave_count", 3))
-        elif engine == "Data Collector":
+        elif engine_norm in ("data collector", "collector"):
             if meta is not None:
                 meta["archetype"] = "collector"
             if world is not None:
                 world["gravity"] = 0
-        elif engine == "Top-Down Action":
+        elif engine_norm in ("top-down action", "shooter"):
+            if meta is not None:
+                meta["archetype"] = "shooter"
             if world is not None:
                 world["gravity"] = 0
 
@@ -149,14 +152,14 @@ class GameGenerationService:
             world["hazard_density"] = int(10 + (art_density / 100) * 50)
 
         # 4. Logic Modules Materialization
-        if "Combat & Dash Mobility" in modules and player is not None:
+        if any(m in modules for m in ("Combat & Dash Mobility", "WeaponUpgrade", "ProjectileBarrage")) and player is not None:
             player["dash_speed"] = max(player.get("dash_speed", 0), 500)
             player["stamina"] = max(player.get("stamina", 0), 100)
             if player.get("attack_type") in (None, "none"):
                 player["attack_type"] = "ranged"
             player["attack_damage"] = max(player.get("attack_damage", 0), 25)
 
-        if "Resource & Score Economy" in modules:
+        if any(m in modules for m in ("Resource & Score Economy", "ScoreTracker", "InventorySystem")):
             ui = compiled.setdefault("ui", {})
             ui["show_score"] = True
             if rules is not None and entities is not None:
@@ -173,8 +176,10 @@ class GameGenerationService:
                         "params": {"amount": 50},
                     })
 
-        # 5. Objective & UI compilation
-        if spec_dict:
+        # 5. Objective & Theme compilation
+        if spec_dict and isinstance(spec_dict, dict):
+            if spec_dict.get("theme") and world is not None:
+                world["theme"] = spec_dict["theme"]
             primary_obj = spec_dict.get("primary_objective")
             if not primary_obj and isinstance(spec_dict.get("objective_details"), dict):
                 primary_obj = spec_dict["objective_details"].get("primary")

@@ -1,6 +1,95 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 6: Build & Prototype Integration
+
+## Status
+COMPLETE
+
+## Objective
+Implement explicit, version-aware prototype compilation for GameForge AI. When the developer explicitly
+triggers `[ PLAY PROTOTYPE ]` or `[ COMPILE ]`, the build pipeline consumes the authoritative current
+`ProjectVersion` (vN+1 with inspiration synthesis proposal applied) and produces a playable Phaser
+prototype artifact traceable to that specific version. Guarantees: no auto-build on proposal apply,
+authoritative server-side version resolution, 0 Gemini/LLM calls, version immutability, playtest
+compatibility, and clean IDOR protection.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 5: Review & Apply Structured Inspiration Proposal to Blueprint
+Status: COMPLETE
+Commit: 82604a5
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Audited existing build and generation pipeline (`build_service.py`, `game_generation_service.py`, `project_service.py`, `compatibility.py`, `projects.py`, `AppContext.tsx`, `PrototypeModal.tsx`)
+- [x] Established strict constraints:
+  1. Mandatory explicit developer action (no auto-build on proposal application).
+  2. Authoritative server-side version resolution (never trusts stale client version).
+  3. 0 Gemini / 0 external LLM calls (deterministic compiler execution).
+  4. ProjectVersion rows are strictly immutable (read-only during compilation).
+  5. Playtest compatibility (playtests from vN are marked stale when project advances to vN+1).
+  6. Discovery V1 and Personalization V1 remain strictly frozen.
+
+---
+
+## 2. Implementation
+
+- [x] 2.1 Backend Schemas: `backend/app/schemas/project.py` (Added `CompileProjectRequest`, `CompileProjectResponse` with `extra="forbid"`)
+- [x] 2.2 Backend Service: `backend/app/services/project_service.py` & `backend/app/services/game_generation_service.py` (Added `compile_project_version` with authoritative version resolution, parameter propagation, runtime compatibility checks, and deterministic metadata generation)
+- [x] 2.3 Backend API Endpoint: `POST /api/projects/{project_id}/compile` in `backend/app/api/projects.py` (with auth, IDOR, and error handling)
+- [x] 2.4 Frontend Service & Types: `gameforge-ai/src/types/index.ts` & `gameforge-ai/src/services/projects.ts` (Added `compileProject` API method & response types)
+- [x] 2.5 Frontend Studio & Playback Integration: Verified and ensured `PLAY PROTOTYPE` and `COMPILE` actions in `ProjectStudioModal.tsx`, `StudioOverviewTab.tsx`, and `StudioVersionsTab.tsx` target active/requested version
+- [x] 2.6 Tests: Backend test suite in `backend/tests/test_inspiration_build_integration.py` & frontend unit tests in `src/utils/__tests__/buildIntegration.test.ts`
+
+---
+
+## 3. Verification
+
+- [x] Backend Step 6 tests (7 passed): `backend/tests/test_inspiration_build_integration.py`
+- [x] Full backend regression (619 passed, 0 failures): `pytest backend/tests/ -q`
+- [x] Frontend unit tests (71 passed, 0 failures across 6 test suites): `npx tsx src/utils/__tests__/*.test.ts`
+- [x] Frontend type check (0 errors): `npx tsc --noEmit`
+- [x] Frontend lint check (0 warnings, 0 errors on 84 files): `npx oxlint`
+- [x] Frontend build (built production assets in 974ms): `npm run build`
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] git diff reviewed
+- [x] git status verified
+- [x] commit created for Step 6
+- [x] working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Step 6 started following user authorization for Build & Prototype Integration.
+- 2026-09-04: Implemented version-aware compilation service, backend compile endpoint, updated runtime and project schemas, wired frontend studio compilation, added integration tests for version immutability and playtest compatibility, and verified full 619-test backend and 71-test frontend regressions.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 5: Review & Apply Structured Inspiration Proposal to Blueprint
 
 ## Status
@@ -21,82 +110,6 @@ field merging, traceable source attribution survival, and post-apply Studio stat
 Discovery -> Inspiration -> Studio // Step 4: Inspiration Synthesis -> Structured Design Proposal
 Status: COMPLETE
 Commit: 764b17e
-
----
-
-## 1. Pre-Implementation
-
-- [x] Read AGENTS.md
-- [x] Audited existing project versioning, `ProjectVersion`, `project_service.py`, `GameDesignSpec`, and `GameDSL`
-- [x] Established strict constraints:
-  1. Mandatory explicit developer approval (never auto-applied).
-  2. Creates immutable forward `ProjectVersion` (vN -> vN+1) via transaction.
-  3. Server-side authoritative proposal revalidation and bound checks (2–5 inspirations).
-  4. Optimistic concurrency & stale proposal protection (`base_version_number`).
-  5. Unresolved conflicts strictly block apply until resolved by developer.
-  6. Non-destructive field-level diff and patch (preserves narrative, custom entities, audio, etc.).
-  7. Preserves traceable source attributions in resulting design spec / change summary.
-  8. Zero Gemini / external LLM calls.
-  9. Zero automatic prototype building / playtesting.
-  10. Discovery V1 and Personalization V1 remain strictly frozen.
-
----
-
-## 2. Implementation
-
-- [x] 2.1 Backend Schemas: `backend/app/schemas/inspiration_synthesis.py` (Added `ApplySynthesisProposalRequest`, `ApplySynthesisProposalResponse`, `BlueprintFieldChange`)
-- [x] 2.2 Backend Service Extension: `backend/app/services/inspiration_synthesis_service.py` (Added `apply_proposal` with conflict validation, field-level diffing, DSL/spec patching, version bump, and transactional rollback protection)
-- [x] 2.3 Backend API Endpoint: `POST /api/projects/{project_id}/inspirations/synthesize/apply` in `backend/app/api/project_inspirations.py` (with auth, IDOR, and stale version 409 error handling)
-- [x] 2.4 Frontend Types & Service: `gameforge-ai/src/types/index.ts` & `gameforge-ai/src/services/inspirations.ts` (Added apply method & types)
-- [x] 2.5 Frontend Conflict Resolution & Diff UI: Updated `StudioSynthesisModal.tsx` with interactive option selectors, blueprint diff preview, confirmation dialog, and stale proposal retry flow
-- [x] 2.6 Frontend Studio Integration: Connected apply success to `ProjectStudioModal` to refresh project, blueprint, and version number
-- [x] 2.7 Tests: Backend test suite in `backend/tests/test_inspiration_synthesis_apply.py` (8 tests) & frontend unit tests in `src/utils/__tests__/synthesisApply.test.ts` (14 tests)
-
----
-
-## 3. Verification
-
-- [x] Backend Step 5 tests (8 passed): `backend/tests/test_inspiration_synthesis_apply.py`
-- [x] Full backend regression (612 passed, 0 failures): `pytest backend/tests/ -q`
-- [x] Frontend unit tests (63 passed across 5 suites): `npx tsx src/utils/__tests__/*.test.ts`
-  - `gameDna.test.ts` (14 passed)
-  - `synergy.test.ts` (8 passed)
-  - `inspirationDeck.test.ts` (11 passed)
-  - `synthesisProposal.test.ts` (16 passed)
-  - `synthesisApply.test.ts` (14 passed)
-- [x] Frontend type check (0 errors): `npx tsc --noEmit`
-- [x] Frontend lint check (0 warnings, 0 errors on 83 files): `npx oxlint`
-- [x] Frontend build (built production assets in 1.02s): `npm run build`
-
----
-
-## 4. Documentation
-
-- [x] TASK.md updated upon completion
-
----
-
-## 5. Git Checkpoint
-
-- [x] Commit created for Step 5
-- [x] Working tree verified clean
-
----
-
-## Change Log
-- 2026-09-04: Step 5 started following user authorization for versioned proposal application to Blueprint.
-- 2026-09-04: Implemented versioned apply endpoint, conflict resolution flow, blueprint diff preview, and test suites.
-
----
-
----
-
-## Previous Phase Ledgers (archived below)
-
-# GameForge AI — Task Execution Ledger
-
-## Task
-Discovery -> Inspiration -> Studio // Step 4: Inspiration Synthesis -> Structured Design Proposal
 
 ## Status
 COMPLETE

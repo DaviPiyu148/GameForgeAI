@@ -13,7 +13,7 @@ class ProjectInspirationRepository:
         return (
             db.query(ProjectInspiration)
             .filter(ProjectInspiration.project_id == project_id)
-            .order_by(ProjectInspiration.created_at.desc())
+            .order_by(ProjectInspiration.created_at.desc(), ProjectInspiration.id.desc())
             .all()
         )
 

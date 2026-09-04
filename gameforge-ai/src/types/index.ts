@@ -121,6 +121,24 @@ export interface ApplySynthesisProposalResponse {
   status: 'SUCCESS';
 }
 
+export interface CompileProjectResponse {
+  projectId: string;
+  versionNumber: number;
+  status: 'SUCCESS' | 'ERROR';
+  gameDsl: GameDSL;
+  designSpec?: GameDesignSpec | null;
+  runtimeMetadata: RuntimeMetadata;
+  validationSummary?: {
+    isValid: boolean;
+    archetype: string;
+    warnings: string[];
+    entitiesCount: number;
+    rulesCount: number;
+  };
+  compiledAt: string;
+  message: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;

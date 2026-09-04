@@ -11,6 +11,8 @@ from app.models.project_version import ProjectVersion
 from app.repositories.project_repo import ProjectRepository, project_repository
 from app.schemas.project import (
     BuildParams,
+    CompileProjectRequest,
+    CompileProjectResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
@@ -696,5 +698,127 @@ class ProjectService:
                 if attempt == max_attempts - 1:
                     raise
 
+    def compile_project_version(
+        self,
+        db: Session,
+        project_id: str,
+        user_id: str,
+        version_number: Optional[int] = None,
+    ) -> CompileProjectResponse:
+        """
+        Deterministically compile an active or historical project version into a validated playable Phaser prototype.
+
+        Guarantees:
+          - IDOR safe: requester must own the project.
+          - Authoritative version resolution: resolves requested version or active project.current_version.
+          - Immutability: strictly read-only on ProjectVersion history (does NOT mutate historical rows).
+          - Parameter propagation: applies engine, physics, art density, world mode, modules, and theme to DSL.
+          - Runtime compatibility validation: verifies Phaser 3.88.2 renderer boundaries and capability matrix.
+          - Deterministic execution: 0 Gemini / 0 external LLM calls.
+        """
+        project = self._get_owned_project(db, project_id, user_id)
+
+        target_version_num = version_number if version_number is not None else (project.current_version or 1)
+
+        # Look up target version record in database
+        version_row = (
+            db.query(ProjectVersion)
+            .filter(
+                ProjectVersion.project_id == project_id,
+                ProjectVersion.version_number == target_version_num,
+            )
+            .first()
+        )
+
+        if version_number is not None and not version_row:
+            raise ValueError(f"Version {version_number} not found for project '{project_id}'.")
+
+        if version_row and version_row.game_dsl:
+            raw_dsl = version_row.game_dsl
+            raw_spec = version_row.design_spec or project.design_spec
+        else:
+            raw_dsl = project.game_dsl
+            raw_spec = project.design_spec
+
+        if not raw_dsl or not isinstance(raw_dsl, dict):
+            raise ValueError(f"Project version {target_version_num} has no generated Game DSL to compile.")
+
+        # Deepen & propagate build parameters deterministically
+        if target_version_num == project.current_version:
+            engine = project.engine or raw_dsl.get("metadata", {}).get("archetype") or "Top-Down Action"
+            art_density = project.art_density if project.art_density is not None else 50
+            physics = project.physics if project.physics is not None else 80
+            modules = project.modules if isinstance(project.modules, list) else []
+            world_mode = project.world_mode
+            scale = project.scale
+        else:
+            # For historical versions, preserve that specific version's archetype and world settings
+            engine = raw_dsl.get("metadata", {}).get("archetype") or project.engine or "Top-Down Action"
+            art_density = 50
+            physics = 80
+            modules = []
+            world_mode = raw_dsl.get("world", {}).get("world_mode") or project.world_mode
+            scale = raw_dsl.get("world", {}).get("scale") or project.scale
+
+        compiled_dict = game_generation_service._compile_and_propagate_parameters(
+            dsl_dict=raw_dsl,
+            spec_dict=raw_spec,
+            engine=engine,
+            art_density=art_density,
+            physics=physics,
+            modules=modules,
+        )
+
+        if world_mode and world_mode in ("linear", "campaign", "open_world"):
+            compiled_dict.setdefault("world", {})["world_mode"] = world_mode
+
+        # Schema validation
+        dsl_val = validate_game_dsl(compiled_dict)
+        if not dsl_val.is_valid or not dsl_val.dsl:
+            raise ValueError(f"Compiled Game DSL failed validation: {'; '.join(dsl_val.errors)}")
+
+        # Runtime compatibility checks for Phaser
+        from app.runtime.compatibility import RuntimeCompatibilityValidator
+        compat = RuntimeCompatibilityValidator.validate(dsl_val.dsl)
+        if not compat.compatible:
+            raise ValueError(f"Phaser runtime compatibility validation failed: {'; '.join(compat.errors)}")
+
+        # Deterministic runtime metadata generation with version traceability
+        from app.runtime.metadata import generate_runtime_metadata
+        seed_source = f"{project.id}_v{target_version_num}"
+        runtime_meta = generate_runtime_metadata(seed_source=seed_source)
+        runtime_meta["version_number"] = target_version_num
+        runtime_meta["project_id"] = project.id
+        if project.runtime_metadata and isinstance(project.runtime_metadata, dict):
+            if "provider" in project.runtime_metadata:
+                runtime_meta["provider"] = project.runtime_metadata["provider"]
+            if "model" in project.runtime_metadata:
+                runtime_meta["model"] = project.runtime_metadata["model"]
+
+        # If compiling current active version, sync runtime_metadata and updated_at
+        if target_version_num == project.current_version:
+            project.runtime_metadata = runtime_meta
+            project.updated_at = datetime.now(timezone.utc)
+            db.commit()
+
+        return CompileProjectResponse(
+            projectId=project.id,
+            versionNumber=target_version_num,
+            status="SUCCESS",
+            gameDsl=compiled_dict,
+            designSpec=raw_spec,
+            runtimeMetadata=runtime_meta,
+            validationSummary={
+                "isValid": True,
+                "archetype": compat.archetype,
+                "warnings": compat.warnings,
+                "entitiesCount": len(dsl_val.dsl.entities),
+                "rulesCount": len(dsl_val.dsl.rules),
+            },
+            compiledAt=datetime.now(timezone.utc),
+            message=f"Prototype for version {target_version_num} compiled and validated successfully.",
+        )
+
 
 project_service = ProjectService()
+

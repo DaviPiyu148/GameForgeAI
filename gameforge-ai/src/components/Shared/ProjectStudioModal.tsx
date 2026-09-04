@@ -190,7 +190,14 @@ export const ProjectStudioModal: React.FC<ProjectStudioModalProps> = ({
 
         {/* Tab Body */}
         <div className="p-4 sm:p-6 bg-terminal-bg flex-1">
-          {activeTab === 'overview' && <StudioOverviewTab project={project} onCloseStudio={handleClose} />}
+          {activeTab === 'overview' && (
+            <StudioOverviewTab
+              project={project}
+              onCloseStudio={handleClose}
+              onPlayCurrent={onPlayCurrent}
+              onProjectUpdated={onProjectUpdated}
+            />
+          )}
           {activeTab === 'playtests' && (
             <StudioPlaytestsTab
               project={project}

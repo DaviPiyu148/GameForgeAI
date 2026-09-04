@@ -18,6 +18,8 @@ from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.project import (
+    CompileProjectRequest,
+    CompileProjectResponse,
     ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
@@ -470,4 +472,53 @@ def restore_version(
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except ValueError as e:
         return make_error_response("VERSION_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+
+
+@router.post(
+    "/{project_id}/compile",
+    response_model=CompileProjectResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Deterministically compile a project version into a playable Phaser prototype",
+)
+def compile_project(
+    project_id: str,
+    data: Optional[CompileProjectRequest] = Body(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> CompileProjectResponse:
+    """
+    Deterministically compile an owned project's active or requested version into a validated playable prototype artifact.
+    0 Gemini / 0 LLM calls.
+    Preserves version immutability and enforces IDOR protection.
+    """
+    version_num = data.version_number if data else None
+    try:
+        res = service.compile_project_version(
+            db=db,
+            project_id=project_id,
+            user_id=current_user.id,
+            version_number=version_num,
+        )
+
+        try:
+            from app.services.progression_service import progression_service
+            progression_service.grant_xp(
+                db=db,
+                user_id=current_user.id,
+                event_type="START_BUILD",
+                source_ref=f"compile_{project_id}_v{res.version_number}",
+            )
+        except Exception:
+            pass
+
+        return res
+    except ProjectNotFoundError as e:
+        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except ValueError as e:
+        return make_error_response("COMPILATION_ERROR", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+    except Exception as e:
+        logger.exception("Unexpected error compiling project %s: %s", project_id, e)
+        return make_error_response("COMPILATION_FAILED", str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore
+
 

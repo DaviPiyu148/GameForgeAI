@@ -6,6 +6,7 @@ import type {
   RemixIntent,
   RemixApplyResponse,
   ProjectVersionSummary,
+  CompileProjectResponse,
 } from '../types';
 
 interface ProjectListApiResponse {
@@ -88,4 +89,14 @@ export const projectService = {
   async duplicateProject(id: string): Promise<GameProject> {
     return await apiClient.post<GameProject>(`/projects/${id}/duplicate`);
   },
+
+  /**
+   * Deterministically compile a project version into a validated playable Phaser prototype.
+   */
+  async compileProject(id: string, versionNumber?: number): Promise<CompileProjectResponse> {
+    return await apiClient.post<CompileProjectResponse>(`/projects/${id}/compile`, {
+      versionNumber,
+    });
+  },
 };
+

@@ -6,12 +6,14 @@ import { StudioInspirationDeck } from './StudioInspirationDeck';
 interface StudioOverviewTabProps {
   project: GameProject;
   onCloseStudio?: () => void;
+  onPlayCurrent?: () => void;
   onProjectUpdated?: (updated: GameProject) => void;
 }
 
 export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
   project,
   onCloseStudio,
+  onPlayCurrent,
   onProjectUpdated,
 }) => {
   const [blueprint, setBlueprint] = useState<GameBlueprint | null>(null);
@@ -132,10 +134,22 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
 
       {/* World & Build Parameters */}
       <div className="bg-surface-container-low border border-outline-variant/50 p-4 rounded-sm space-y-3">
-        <h3 className="text-xs text-secondary uppercase tracking-widest font-bold flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm">tune</span>
-          <span>Build Specifications</span>
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs text-secondary uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="material-symbols-outlined text-sm">tune</span>
+            <span>Build Specifications</span>
+          </h3>
+          {onPlayCurrent && (
+            <button
+              onClick={onPlayCurrent}
+              className="px-2.5 py-1 bg-primary text-surface font-mono font-bold text-[11px] rounded hover:bg-primary/90 transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_10px_rgba(76,224,210,0.3)]"
+              title={`Compile and play prototype version ${project.currentVersion || 1}`}
+            >
+              <span className="material-symbols-outlined text-xs">play_arrow</span>
+              <span>PLAY v{project.currentVersion || 1}</span>
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div className="bg-surface p-2.5 rounded border border-outline-variant/30">
             <div className="text-on-surface-variant text-[10px]">ENGINE</div>
