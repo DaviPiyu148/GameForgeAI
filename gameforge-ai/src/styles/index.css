@@ -569,22 +569,194 @@
   }
 }
 
-.animate-synaptic-pulse {
-  display: inline-block;
-  transform-origin: center center;
-  animation: synapticPulse 2.6s ease-in-out infinite;
+/* ─── Feature Card Interactive Icon Animations ─── */
+
+/* 1. Understand Intent: Setting Gear inside Brain (rotates on card hover, stops when not hovering) */
+.brain-gear-spin {
+  transform-origin: 12px 9.5px;
+  transform: rotate(0deg);
+  transition: transform 0.25s ease-out;
 }
 
-.animate-radar-sweep {
-  display: inline-block;
-  transform-origin: center center;
-  animation: radarSweepPulse 2.8s ease-in-out infinite;
+.group:hover .brain-gear-spin {
+  animation: spinBrainGear 1.8s linear infinite;
 }
 
-.animate-build-flicker {
-  display: inline-block;
-  transform-origin: center center;
-  animation: buildRemixFlicker 2.7s ease-in-out infinite;
+@keyframes spinBrainGear {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 2. Multi-Signal Ranking: Arrow Moving Towards Goal (animates on card hover, stops when not hovering) */
+.arrow-moving-to-goal {
+  transform-origin: center;
+  transform: translateX(0);
+  transition: transform 0.25s ease-out;
+}
+
+.group:hover .arrow-moving-to-goal {
+  animation: arrowMoveTowardsGoal 1.25s cubic-bezier(0.2, 0.9, 0.3, 1) infinite;
+}
+
+@keyframes arrowMoveTowardsGoal {
+  0% {
+    transform: translateX(-5px);
+    opacity: 0.2;
+  }
+  25% {
+    opacity: 1;
+  }
+  65% {
+    transform: translateX(4px);
+    opacity: 1;
+  }
+  80% {
+    transform: translateX(5.5px);
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(255, 61, 129, 0.9));
+  }
+  95%, 100% {
+    transform: translateX(6px);
+    opacity: 0;
+  }
+}
+
+.target-bullseye-pulse {
+  transform-origin: 15px 12px;
+}
+
+.group:hover .target-bullseye-pulse {
+  animation: bullseyeTargetHit 1.25s ease-out infinite;
+}
+
+@keyframes bullseyeTargetHit {
+  0%, 60% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(255, 61, 129, 0.4));
+  }
+  75% {
+    transform: scale(1.45);
+    filter: drop-shadow(0 0 10px rgba(255, 61, 129, 1));
+  }
+  90%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(255, 61, 129, 0.4));
+  }
+}
+
+/* 3. Build & Remix: Fire Burning Animation */
+.fire-outer-flame {
+  transform-origin: 12px 22px;
+  animation: fireBurnOuter 1.3s ease-in-out infinite alternate;
+  filter: drop-shadow(0 -2px 6px rgba(255, 87, 34, 0.65));
+}
+
+@keyframes fireBurnOuter {
+  0% {
+    transform: scale(1, 1) skewX(-1.5deg);
+    filter: drop-shadow(0 -2px 6px rgba(255, 87, 34, 0.6));
+  }
+  35% {
+    transform: scale(1.05, 0.97) skewX(2deg);
+    filter: drop-shadow(0 -3px 9px rgba(255, 110, 0, 0.85));
+  }
+  70% {
+    transform: scale(0.97, 1.06) skewX(-2deg);
+    filter: drop-shadow(0 -4px 10px rgba(255, 60, 0, 0.9));
+  }
+  100% {
+    transform: scale(1.04, 1.02) skewX(1deg);
+    filter: drop-shadow(0 -2px 7px rgba(255, 87, 34, 0.75));
+  }
+}
+
+.fire-mid-flame {
+  transform-origin: 12px 21px;
+  animation: fireBurnMid 0.95s ease-in-out infinite alternate-reverse;
+  filter: drop-shadow(0 -1px 4px rgba(255, 194, 76, 0.8));
+}
+
+@keyframes fireBurnMid {
+  0% {
+    transform: scale(1, 1) skewX(2deg);
+  }
+  50% {
+    transform: scale(0.96, 1.07) skewX(-2deg);
+  }
+  100% {
+    transform: scale(1.06, 0.96) skewX(1.5deg);
+  }
+}
+
+.fire-core-flame {
+  transform-origin: 12px 20px;
+  animation: fireBurnCore 0.75s ease-in-out infinite alternate;
+}
+
+@keyframes fireBurnCore {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.12);
+    opacity: 1;
+    filter: drop-shadow(0 0 4px #ffffff);
+  }
+}
+
+.fire-ember-left {
+  animation: emberRiseLeft 1.5s ease-out infinite;
+}
+
+.fire-ember-right {
+  animation: emberRiseRight 1.8s ease-out infinite 0.6s;
+}
+
+@keyframes emberRiseLeft {
+  0% {
+    transform: translate(0, 4px) scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-3px, -8px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes emberRiseRight {
+  0% {
+    transform: translate(0, 3px) scale(0.5);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(3px, -9px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.group:hover .fire-outer-flame {
+  animation-duration: 0.75s;
+  filter: drop-shadow(0 -4px 14px rgba(255, 60, 0, 1)) drop-shadow(0 0 18px rgba(255, 194, 76, 0.6));
+}
+
+.group:hover .fire-mid-flame {
+  animation-duration: 0.55s;
+  filter: drop-shadow(0 -2px 8px rgba(255, 215, 64, 1));
+}
+
+.group:hover .fire-core-flame {
+  animation-duration: 0.45s;
 }
 
 /* ─── Reduced Motion ─── */
@@ -616,7 +788,15 @@
   .terminal-cursor,
   .animate-synaptic-pulse,
   .animate-radar-sweep,
-  .animate-build-flicker {
+  .animate-build-flicker,
+  .brain-gear-spin,
+  .arrow-moving-to-goal,
+  .target-bullseye-pulse,
+  .fire-outer-flame,
+  .fire-mid-flame,
+  .fire-core-flame,
+  .fire-ember-left,
+  .fire-ember-right {
     animation: none !important;
   }
 

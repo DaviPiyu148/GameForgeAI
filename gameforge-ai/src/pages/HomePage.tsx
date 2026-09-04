@@ -7,6 +7,7 @@ import { TuneRecommendationsModal } from '../components/Shared/TuneRecommendatio
 import { GameComparisonModal } from '../components/Shared/GameComparisonModal';
 import { GameDNAOnboardingModal } from '../components/Shared/GameDNAOnboardingModal';
 import { InspirationAttachModal } from '../components/Shared/InspirationAttachModal';
+import { BrainGearIcon, TargetArrowIcon, FireBurningIcon } from '../components/Shared/FeatureIcons';
 import { projectService } from '../services/projects';
 import { inspirationService } from '../services/inspirations';
 import type { DiscoverySearchResult } from '../types';
@@ -874,7 +875,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-cyan flex flex-col items-start transition-colors hover:border-primary-bright hover:shadow-[0_0_20px_rgba(76,224,210,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-primary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-primary/10 transition-colors">
-                <span className="material-symbols-outlined text-primary text-2xl animate-synaptic-pulse">psychology</span>
+                <BrainGearIcon />
               </div>
               <h3 className="text-primary text-glow-cyan font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Understand Intent
@@ -886,7 +887,7 @@ const HomePage = () => {
 
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-magenta flex flex-col items-start transition-colors hover:border-secondary hover:shadow-[0_0_20px_rgba(255,61,129,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-secondary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-secondary/10 transition-colors">
-                <span className="material-symbols-outlined text-secondary text-2xl animate-radar-sweep">radar</span>
+                <TargetArrowIcon />
               </div>
               <h3 className="text-secondary text-glow-magenta font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Multi-Signal Ranking
@@ -898,7 +899,7 @@ const HomePage = () => {
 
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-amber flex flex-col items-start transition-colors hover:border-tertiary-bright hover:shadow-[0_0_20px_rgba(255,194,76,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-tertiary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-tertiary/10 transition-colors">
-                <span className="material-symbols-outlined text-tertiary text-2xl animate-build-flicker">architecture</span>
+                <FireBurningIcon />
               </div>
               <h3 className="text-tertiary text-glow-amber font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Build & Remix

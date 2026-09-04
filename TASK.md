@@ -37,7 +37,7 @@ Execute the most comprehensive browser-based QA pass of GameForge AI in live Chr
 - [x] Subtask 2.4: Re-login & session continuity verification — Projects, profile level/XP, and inspirations intact across sessions.
 
 ### Batch 3: Home & Discovery Experience
-- [x] Subtask 3.1: Home feature-card icon animations audit (visible scale/glow, no layout shift) — `animate-synaptic-pulse`, `animate-radar-sweep`, `animate-build-flicker` verified with visible scale (1.12) / glow, identical heights (241.85px), 0 layout shift.
+- [x] Subtask 3.1: Home feature-card interactive icon animations — Card 1 (Understand Intent): setting gear inside brain rotates on hover (`spinBrainGear` 1.8s) and stops when unhovered; Card 2 (Multi-Signal Ranking): arrow moves towards target goal on hover (`arrowMoveTowardsGoal` 1.25s) with pulsing bullseye hit, stops when unhovered; Card 3 (Build & Remix): multi-layered fire burning animation with dancing flames, hot core, and rising embers, flaring up on hover. Verified in live Chrome with zero layout shift (all deltas 0.0px).
 - [x] Subtask 3.2: Cold start Discovery loading & model warm-up (patient wait >= 120s) — FAISS index and embeddings queried cleanly.
 - [x] Subtask 3.3: Discovery action cluster visual hierarchy (Build from Scratch, Tune, Clear) — Unified `h-9` (36px), primary cyan CTA, secondary tune, tertiary clear.
 - [x] Subtask 3.4: Discovery modes test (`BEST_MATCH`, `POPULAR`, `DISCOVER`, `HIDDEN_GEMS`) — Mode switching verified, `💎 HIDDEN GEM` badges rendered.

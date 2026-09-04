@@ -67,6 +67,7 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 | Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup (45 controls inspected, 42 exercised PASS, zero horizontal overflow at 1024x768, typography consistency) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
 | Exhaustive Browser QA, Interaction, Visual, Route & Existing-Prototype Validation (12 routes visited, 31 mandatory items verified in live browser, existing prototype runtime tested, zero new builds triggered, single Game DNA & border seam verified, responsive viewports 1440/1024/768/375) | COMPLETE |
+| Feature Card Interactive Micro-Animations (Rotating brain gear on hover, arrow moving towards goal on hover, and burning fire animation with flame tongues/embers) | COMPLETE |
 
 ---
 
