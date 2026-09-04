@@ -20,6 +20,7 @@ from app.models.user import User
 from app.schemas.project import (
     CompileProjectRequest,
     CompileProjectResponse,
+    ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
@@ -57,6 +58,22 @@ def make_error_response(code: str, message: str, status_code: int) -> JSONRespon
             }
         },
     )
+
+
+@router.post(
+    "",
+    response_model=ProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new Game Project",
+)
+def create_project(
+    data: ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(lambda: project_service),
+) -> ProjectResponse:
+    """Create and persist a new project record and initial version for authenticated user."""
+    return service.create_project(db, data, user_id=current_user.id)
 
 
 @router.get(

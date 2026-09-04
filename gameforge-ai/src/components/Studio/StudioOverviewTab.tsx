@@ -55,7 +55,7 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
             <span className="material-symbols-outlined text-sm">auto_stories</span>
             <span>Narrative Premise & Theme</span>
           </div>
-          <p className="text-on-surface/90 text-xs leading-relaxed font-sans">
+          <p className="text-on-surface/90 text-xs leading-relaxed font-body">
             {elevatorPitch || (
               <span className="text-outline italic">No narrative premise provided.</span>
             )}
@@ -73,7 +73,7 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
             <span className="material-symbols-outlined text-sm">sync</span>
             <span>Core Gameplay Loop</span>
           </div>
-          <p className="text-on-surface/90 text-xs leading-relaxed font-sans">
+          <p className="text-on-surface/90 text-xs leading-relaxed font-body">
             {coreLoop || (
               <span className="text-outline italic">Standard interactive arcade loop.</span>
             )}
@@ -100,7 +100,7 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
               {objectives.map((obj, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <span className="text-secondary text-[10px] mt-0.5">▶</span>
-                  <span className="font-sans">{typeof obj === 'string' ? obj : obj.description}</span>
+                  <span className="font-body">{typeof obj === 'string' ? obj : obj.description}</span>
                 </li>
               ))}
             </ul>

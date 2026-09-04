@@ -8,6 +8,7 @@ interface PhaserCanvasProps {
   seed?: number;
   onClose?: () => void;
   onPlaytestComplete?: (summary: PlaytestSummary) => void;
+  isPausedExternal?: boolean;
 }
 
 export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
@@ -15,11 +16,33 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
   seed,
   onClose,
   onPlaytestComplete,
+  isPausedExternal = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [gameState, setGameState] = useState<GameState>('PLAYING');
   const onPlaytestCompleteRef = useRef(onPlaytestComplete);
+
+  // Sync external pause (e.g. when Remix drawer opens)
+  useEffect(() => {
+    if (gameRef.current) {
+      const scene = gameRef.current.scene.getScene('GameScene');
+      if (scene) {
+        if (isPausedExternal) {
+          scene.scene.pause();
+          setGameState('PAUSED');
+        } else {
+          setGameState((prev) => {
+            if (prev === 'PAUSED') {
+              scene.scene.resume();
+              return 'PLAYING';
+            }
+            return prev;
+          });
+        }
+      }
+    }
+  }, [isPausedExternal]);
 
   useEffect(() => {
     onPlaytestCompleteRef.current = onPlaytestComplete;
@@ -223,6 +246,17 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
         }}
       >
         <div ref={containerRef} className="w-full h-full flex items-center justify-center" />
+        {gameState === 'PAUSED' && (
+          <div className="absolute inset-0 z-10 bg-background/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2 pointer-events-none animate-fade-in">
+            <span className="font-mono text-xs sm:text-sm font-bold text-secondary uppercase tracking-widest bg-surface/90 border border-secondary/50 px-4 py-2 rounded shadow-lg flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">pause_circle</span>
+              <span>GAMEPLAY PAUSED {isPausedExternal ? '// REMIX ACTIVE' : '// [P]'}</span>
+            </span>
+            <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">
+              {isPausedExternal ? 'Close or apply remix to resume playing' : 'Press P or click Resume to continue'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Bottom Controls / Status Guide */}

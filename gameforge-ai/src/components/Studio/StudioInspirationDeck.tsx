@@ -221,7 +221,7 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
             <h4 className="text-xs font-bold uppercase tracking-wider text-white">
               No inspirations attached yet
             </h4>
-            <p className="text-[11px] text-on-surface-variant font-sans max-w-md mx-auto leading-relaxed">
+            <p className="text-[11px] text-on-surface-variant font-body max-w-md mx-auto leading-relaxed">
               Discover games that could influence your game&apos;s mechanics, theme, or feel. Use
               <span className="text-primary font-bold"> &quot;Use as Inspiration&quot; </span> in Discovery to attach them here.
             </p>
@@ -401,7 +401,7 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
             </span>
           </div>
 
-          <p className="text-[11px] text-on-surface-variant font-sans leading-relaxed">
+          <p className="text-[11px] text-on-surface-variant font-body leading-relaxed">
             Deterministic attribute intersections across your attached inspirations. These commonalities represent natural mechanics and thematic anchors for your game.
           </p>
 

@@ -34,7 +34,7 @@ interface InspirationAttachModalProps {
   /** Navigate to an existing project selection UI. */
   onSelectProject: () => void;
   /** Navigate to the new-project creation UI. */
-  onCreateProject: () => void;
+  onCreateProject: () => void | Promise<void>;
 }
 
 /**
@@ -187,6 +187,12 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
               inspiration. Choose a project to attach it to:
             </p>
 
+            {errorMessage && (
+              <div className="p-2.5 rounded bg-error/10 border border-error/40 text-error text-xs font-mono">
+                {errorMessage}
+              </div>
+            )}
+
             <div className="space-y-3">
               <button
                 type="button"
@@ -204,16 +210,24 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  handleClose();
-                  onCreateProject();
+                disabled={isAttaching}
+                onClick={async () => {
+                  try {
+                    setIsAttaching(true);
+                    setErrorMessage(null);
+                    await onCreateProject();
+                    handleClose();
+                  } catch (err: unknown) {
+                    setIsAttaching(false);
+                    setErrorMessage(err instanceof Error ? err.message : 'Failed to create project.');
+                  }
                 }}
-                className="w-full px-4 py-3 border border-secondary/50 hover:border-secondary bg-secondary/5 hover:bg-secondary/10 text-secondary font-mono text-xs uppercase font-bold rounded flex items-center gap-2 transition-colors cursor-pointer"
+                className="w-full px-4 py-3 border border-secondary/50 hover:border-secondary bg-secondary/5 hover:bg-secondary/10 text-secondary font-mono text-xs uppercase font-bold rounded flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-sm" aria-hidden="true">
-                  add_circle
+                <span className={`material-symbols-outlined text-sm ${isAttaching ? 'animate-spin' : ''}`} aria-hidden="true">
+                  {isAttaching ? 'sync' : 'add_circle'}
                 </span>
-                <span>Create new project</span>
+                <span>{isAttaching ? 'Creating project...' : 'Create new project'}</span>
               </button>
 
               <button

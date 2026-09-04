@@ -279,15 +279,16 @@ export default function ProfilePage() {
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-fade-in font-body text-on-surface pb-24">
-      {/* Profile Header Console */}
-      <div className="relative arcade-border bg-surface-container-low p-6 arcade-panel">
+      {/* Profile Header Console - Sleek Compact Hero */}
+      <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel space-y-5">
         <div className="absolute top-0 left-0 right-0 h-1 bg-primary/30"></div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
-          {/* Left: Avatar and Info */}
-          <div className="flex items-center gap-6">
+        {/* Identity & Actions Bar */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+          {/* Left: Avatar and Identity */}
+          <div className="flex items-center gap-4 sm:gap-5">
             <div className="relative group">
-              <div className="w-24 h-24 rounded-sm border-4 border-primary bg-surface-container-high flex items-center justify-center shrink-0 glow-box-cyan overflow-hidden">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-sm border-2 border-primary bg-surface-container-high flex items-center justify-center shrink-0 glow-box-cyan overflow-hidden">
                 {state.user?.avatar_url ? (
                   <img
                     src={state.user.avatar_url}
@@ -295,77 +296,48 @@ export default function ProfilePage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="material-symbols-outlined text-primary text-[48px]">person</span>
+                  <span className="material-symbols-outlined text-primary text-3xl sm:text-4xl">person</span>
                 )}
               </div>
               {state.authStatus === 'AUTHENTICATED' && (
                 <button
+                  type="button"
                   onClick={() => {
                     setAvatarError(null);
                     setAvatarFile(null);
                     setAvatarPreview(null);
                     setShowAvatarModal(true);
                   }}
-                  className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-mono font-bold"
+                  className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px] font-mono font-bold"
                   title="Update Profile Picture"
                 >
-                  <span className="material-symbols-outlined text-lg mb-0.5">photo_camera</span>
+                  <span className="material-symbols-outlined text-base mb-0.5">photo_camera</span>
                   Change
                 </button>
               )}
             </div>
 
-            <div className="space-y-2">
-              <h1 className="font-display text-xl md:text-2xl text-primary uppercase text-glow-cyan tracking-wider">
+            <div className="space-y-1.5">
+              <h1 className="font-display text-lg sm:text-xl md:text-2xl text-primary uppercase text-glow-cyan tracking-wider">
                 {username}
               </h1>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 text-tertiary text-sm md:text-base bg-tertiary/10 px-3 py-1.5 rounded-sm border border-tertiary/20 w-fit font-mono">
-                  <span className="material-symbols-outlined text-[18px]">stars</span>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-1.5 text-tertiary text-xs bg-tertiary/10 px-2.5 py-1 rounded-sm border border-tertiary/20 w-fit font-mono font-bold">
+                  <span className="material-symbols-outlined text-sm">stars</span>
                   <span>Level {currentLevel} • {progressData?.creator_title || 'Novice Creator'}</span>
                 </div>
                 <span className="font-mono text-xs text-on-surface-variant">{email}</span>
-                {state.authStatus === 'AUTHENTICATED' && (
-                  <button
-                    onClick={() => {
-                      document.getElementById('account-settings')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="flex items-center gap-1 text-xs font-mono text-primary/80 hover:text-primary hover:underline cursor-pointer border border-primary/30 hover:border-primary/60 px-2.5 py-1 rounded-sm bg-primary/5 transition-colors"
-                    title="Jump to Account Settings"
-                  >
-                    <span className="material-symbols-outlined text-sm">settings</span>
-                    <span>Settings</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Right: Stat boxes & Auth Action */}
-          <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
-              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Total XP</div>
-              <div className="font-display text-tertiary text-base font-bold">{progressData?.total_xp || 0}</div>
-            </div>
-            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
-              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Milestones</div>
-              <div className="font-display text-tertiary text-base font-bold">
-                {progressData?.unlocked_milestone_count || 0} / {progressData?.total_milestone_count || 8}
-              </div>
-            </div>
-            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
-              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Saved Items</div>
-              <div className="font-display text-primary text-base font-bold">{state.savedDiscoveries.length}</div>
-            </div>
-            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
-              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Games Built</div>
-              <div className="font-display text-secondary text-base font-bold">{displayGames}</div>
-            </div>
-
+          {/* Right: Quick Actions */}
+          <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
             {state.authStatus === 'AUTHENTICATED' ? (
               <button
+                type="button"
                 onClick={logout}
-                className="px-4 py-3 border border-error/50 text-error hover:bg-error/10 font-mono text-xs uppercase flex items-center gap-1.5 transition-colors cursor-pointer rounded-sm"
+                className="h-9 px-3.5 border border-error/50 text-error hover:bg-error/10 font-mono text-xs uppercase flex items-center gap-1.5 transition-colors cursor-pointer rounded-sm"
                 title="Log out of GameForge AI"
               >
                 <span className="material-symbols-outlined text-sm">logout</span>
@@ -373,13 +345,36 @@ export default function ProfilePage() {
               </button>
             ) : (
               <button
+                type="button"
                 onClick={() => openAuthModal('login')}
-                className="px-6 py-3 bg-primary text-on-primary font-mono text-xs uppercase flex items-center gap-1.5 glow-cyan btn-interactive cursor-pointer rounded-sm"
+                className="h-9 px-5 bg-primary text-on-primary font-mono text-xs uppercase flex items-center gap-1.5 glow-cyan btn-interactive cursor-pointer rounded-sm"
               >
                 <span className="material-symbols-outlined text-sm">login</span>
                 <span>Sign In / Register</span>
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Sleek 4-Stat Metric Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-outline-variant/30">
+          <div className="bg-surface-container-high h-20 p-2.5 border border-outline-variant/50 flex flex-col items-center justify-center text-center rounded-sm">
+            <div className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider mb-0.5">Total XP</div>
+            <div className="font-display text-tertiary text-sm sm:text-base font-bold">{progressData?.total_xp || 0}</div>
+          </div>
+          <div className="bg-surface-container-high h-20 p-2.5 border border-outline-variant/50 flex flex-col items-center justify-center text-center rounded-sm">
+            <div className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider mb-0.5">Milestones</div>
+            <div className="font-display text-tertiary text-sm sm:text-base font-bold">
+              {progressData?.unlocked_milestone_count || 0} / {progressData?.total_milestone_count || 8}
+            </div>
+          </div>
+          <div className="bg-surface-container-high h-20 p-2.5 border border-outline-variant/50 flex flex-col items-center justify-center text-center rounded-sm">
+            <div className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider mb-0.5">Saved Items</div>
+            <div className="font-display text-primary text-sm sm:text-base font-bold">{state.savedDiscoveries.length}</div>
+          </div>
+          <div className="bg-surface-container-high h-20 p-2.5 border border-outline-variant/50 flex flex-col items-center justify-center text-center rounded-sm">
+            <div className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider mb-0.5">Games Built</div>
+            <div className="font-display text-secondary text-sm sm:text-base font-bold">{displayGames}</div>
           </div>
         </div>
       </div>

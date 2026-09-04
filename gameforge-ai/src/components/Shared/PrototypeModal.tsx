@@ -67,7 +67,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   const [activeArchetype, setActiveArchetype] = useState<Archetype>(
     currentDsl.metadata.archetype || 'survival'
   );
-  const modalContainerRef = useRef<HTMLDivElement>(null);
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
@@ -119,10 +119,10 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, currentVersion]);
 
-  // Fullscreen toggle — targets the modal outer container so the entire dialog
-  // including header, canvas, and AI panel enters fullscreen (not just the canvas).
+  // Fullscreen toggle — targets the Phaser game canvas container directly,
+  // scoping fullscreen strictly to the playable game viewport rather than the outer modal dialog.
   const handleToggleFullscreen = useCallback(() => {
-    const elem = modalContainerRef.current;
+    const elem = canvasViewportRef.current;
     if (!elem) return;
 
     const fsElem = document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
@@ -144,13 +144,10 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
   }, []);
 
   // Keep isFullscreen in sync with the browser's native fullscreen state
-  // (e.g. user presses ESC to exit fullscreen — browser handles it natively
-  // but we need to update the icon back to fullscreen).
   useEffect(() => {
     const onFullscreenChange = () => {
       const fsElem = document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
-      setIsFullscreen(Boolean(fsElem));
-      // Brief scale/opacity pulse to mark the fullscreen transition itself
+      setIsFullscreen(Boolean(fsElem && fsElem === canvasViewportRef.current));
       setFullscreenPulse(true);
       setTimeout(() => setFullscreenPulse(false), 260);
     };
@@ -374,10 +371,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
 
   return createPortal(
     <div
-      ref={modalContainerRef}
-      className={`fixed inset-0 z-50 flex items-center justify-center ${
-        isFullscreen ? 'p-0 bg-background' : 'p-2 sm:p-4 bg-background/90 backdrop-blur-sm'
-      } ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-background/90 backdrop-blur-sm ${
         isClosing ? 'modal-backdrop-exit' : 'modal-backdrop-enter'
       }`}
       onClick={handleBackdropClick}
@@ -387,11 +381,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
     >
       <div
         ref={dialogRef}
-        className={`w-full ${
-          isFullscreen
-            ? 'h-full max-h-screen max-w-none rounded-none border-0'
-            : 'max-w-5xl max-h-[95vh] rounded-lg border-2 border-primary shadow-[0_0_50px_rgba(76,224,210,0.2)]'
-        } overflow-y-auto bg-surface flex flex-col ${
+        className={`w-full max-w-5xl max-h-[95vh] rounded-lg border-2 border-primary shadow-[0_0_50px_rgba(76,224,210,0.2)] overflow-y-auto bg-surface flex flex-col ${
           isClosing ? 'modal-exit' : 'modal-enter'
         } ${fullscreenPulse ? 'fullscreen-transition' : ''}`}
         onClick={(e) => e.stopPropagation()}
@@ -537,7 +527,21 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
         )}
 
         {/* Live Phaser Canvas Container */}
-        <div className="w-full bg-terminal-bg flex flex-col items-center justify-center p-2 relative min-h-[420px]">
+        <div
+          ref={canvasViewportRef}
+          className="w-full bg-terminal-bg flex flex-col items-center justify-center p-2 relative min-h-[420px] shrink-0 [&:fullscreen]:w-screen [&:fullscreen]:h-screen [&:fullscreen]:p-0 [&:fullscreen]:bg-black [&:fullscreen]:justify-center"
+        >
+          {isFullscreen && (
+            <button
+              type="button"
+              onClick={handleToggleFullscreen}
+              className="absolute top-4 right-4 z-50 px-3 py-1.5 bg-surface/90 text-primary border border-primary/50 text-xs font-mono rounded hover:bg-primary/20 flex items-center gap-1.5 cursor-pointer backdrop-blur-xs"
+              aria-label="Exit fullscreen"
+            >
+              <span className="material-symbols-outlined text-sm">fullscreen_exit</span>
+              <span>EXIT FULLSCREEN (ESC)</span>
+            </button>
+          )}
           <div className="w-full max-w-4xl flex justify-center">
             <React.Suspense
               fallback={
@@ -556,6 +560,7 @@ export const PrototypeModal: React.FC<PrototypeModalProps> = ({
                 seed={resolvedSeed}
                 onClose={handleClose}
                 onPlaytestComplete={handlePlaytestComplete}
+                isPausedExternal={isRemixPanelOpen}
               />
             </React.Suspense>
           </div>

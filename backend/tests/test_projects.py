@@ -386,6 +386,48 @@ def test_restore_concurrent_requests_allocate_unique_forward_versions(client):
     assert all_versions == [1, 2, 3]
 
 
+def test_create_project_api(client):
+    """Test POST /api/projects creates and persists project with initial v1 version."""
+    token, user_id = _register_and_token(client)
+
+    # 1. Unauthenticated request rejected
+    res_unauth = client.post("/api/projects", json={
+        "title": "Unauth Game",
+        "prompt": "Test prompt",
+    })
+    assert res_unauth.status_code == 401
+
+    # 2. Authenticated creation succeeds with default starter blueprint/DSL
+    payload = {
+        "title": "Neon Roguelike Inspired",
+        "genre": "Roguelike",
+        "prompt": "Fast paced neon deckbuilder with tactical movement",
+        "parameters": {
+            "engine": "Top-Down Action",
+            "artDensity": 60,
+            "physics": 75,
+            "modules": ["Procedural Generation"],
+            "scale": "standard",
+            "worldMode": "linear",
+        },
+    }
+    res = client.post("/api/projects", json=payload, headers=_auth(token))
+    assert res.status_code == 201
+    data = res.json()
+    assert data["title"] == "Neon Roguelike Inspired"
+    assert data["genre"] == "Roguelike"
+    assert data["currentVersion"] == 1
+    assert data["gameDsl"] is not None
+    assert data["designSpec"] is not None
+    assert data["status"] == "PLAYABLE"
+
+    # 3. Verify project exists in list
+    list_res = client.get("/api/projects", headers=_auth(token))
+    assert list_res.status_code == 200
+    assert any(p["id"] == data["id"] for p in list_res.json()["projects"])
+
+
+
 
 
 

@@ -143,6 +143,22 @@ class ProjectService:
         db.add(project)
         db.flush()
 
+        # If game_dsl or design_spec was omitted, generate starter deterministic blueprint
+        if not project.game_dsl or not project.design_spec:
+            from app.services.game_generation_service import game_generation_service
+            fallback = game_generation_service._build_deterministic_fallback(
+                prompt=project.prompt,
+                contract=None,
+                engine=project.engine,
+                scale=project.scale or "standard",
+                world_mode=project.world_mode or "linear",
+                modules=project.modules or [],
+            )
+            if not project.design_spec:
+                project.design_spec = fallback.get("design_spec")
+            if not project.game_dsl:
+                project.game_dsl = fallback.get("dsl")
+
         # Create initial ProjectVersion (v1) record atomically in the same transaction
         if project.game_dsl:
             v1 = ProjectVersion(

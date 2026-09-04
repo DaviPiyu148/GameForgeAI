@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import { ProjectStudioModal, type StudioTabId } from '../components/Shared/ProjectStudioModal';
@@ -119,6 +119,7 @@ const DashboardPage = () => {
     clearBuildInspiration,
   } = useAppContext();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
   const [playModalInitialTab, setPlayModalInitialTab] = useState<'play' | 'remix'>('play');
@@ -134,6 +135,30 @@ const DashboardPage = () => {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleOpenStudio = useCallback((game: GameProject, initialTab: StudioTabId = 'overview') => {
+    setOpenMenuId(null);
+    setSelectedPlayProject(null);
+    setPlaybackVersion(null);
+    setStudioInitialTab(initialTab);
+    setStudioProject(game);
+  }, []);
+
+  // Auto-open Studio when navigating with ?studio=<projectId>
+  useEffect(() => {
+    const studioParam = searchParams.get('studio');
+    if (studioParam && state.myGames.length > 0) {
+      const target = state.myGames.find((p) => p.id === studioParam);
+      if (target) {
+        handleOpenStudio(target, 'overview');
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('studio');
+          return next;
+        }, { replace: true });
+      }
+    }
+  }, [searchParams, state.myGames, handleOpenStudio, setSearchParams]);
 
   // Global click-outside & Escape dismiss for 3-dots dropdown
   useEffect(() => {
@@ -191,14 +216,6 @@ const DashboardPage = () => {
       explanation: 'In your curated saved games library',
     };
     setSelectedSavedGame(resultToOpen);
-  };
-
-  const handleOpenStudio = (game: GameProject, initialTab: StudioTabId = 'overview') => {
-    setOpenMenuId(null);
-    setSelectedPlayProject(null);
-    setPlaybackVersion(null);
-    setStudioInitialTab(initialTab);
-    setStudioProject(game);
   };
 
   const handlePlay = (game: GameProject) => {

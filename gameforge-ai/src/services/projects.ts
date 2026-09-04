@@ -15,6 +15,22 @@ interface ProjectListApiResponse {
 
 export const projectService = {
   /**
+   * Create and persist a new project on backend.
+   */
+  async createProject(data: {
+    title: string;
+    genre?: string;
+    prompt: string;
+    parameters?: import('../types').BuildParams;
+    designSpec?: Record<string, any>;
+    gameDsl?: Record<string, any>;
+    runtimeMetadata?: Record<string, any>;
+    currentVersion?: number;
+  }): Promise<GameProject> {
+    return await apiClient.post<GameProject>('/projects', data);
+  },
+
+  /**
    * Fetch all persisted projects from backend database.
    */
   async getProjects(limit: number = 100, offset: number = 0): Promise<GameProject[]> {

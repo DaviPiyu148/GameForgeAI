@@ -212,7 +212,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
         <div className="bg-surface-container-low border border-outline-variant/50 p-6 rounded text-center space-y-3">
           <span className="material-symbols-outlined text-3xl text-outline">sports_esports</span>
           <div className="text-xs text-on-surface-variant">No playtest sessions recorded for this game yet.</div>
-          <p className="text-[11px] text-outline max-w-md mx-auto font-sans">
+          <p className="text-[11px] text-outline max-w-md mx-auto font-body">
             Playtesting records telemetry (score, survivability, enemies defeated) and unlocks AI qualitative design critique with 1-click balance patches.
           </p>
           <button
@@ -323,7 +323,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
                       <span className="material-symbols-outlined text-xs">thumb_up</span>
                       <span>Strengths</span>
                     </div>
-                    <ul className="space-y-1 text-on-surface/80 text-[11px] font-sans">
+                    <ul className="space-y-1 text-on-surface/80 text-[11px] font-body">
                       {activeAnalysis.strengths?.map((s, i) => (
                         <li key={i}>• {s}</li>
                       ))}
@@ -334,7 +334,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
                       <span className="material-symbols-outlined text-xs">report_problem</span>
                       <span>Friction Points</span>
                     </div>
-                    <ul className="space-y-1 text-on-surface/80 text-[11px] font-sans">
+                    <ul className="space-y-1 text-on-surface/80 text-[11px] font-body">
                       {activeAnalysis.problems?.map((p, i) => (
                         <li key={i}>• {typeof p === 'string' ? p : p.diagnosis || p.evidence}</li>
                       ))}
@@ -426,7 +426,7 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
                             )}
                             <div className="space-y-1 flex-1">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="font-bold font-sans text-xs">{rec.description}</div>
+                                <div className="font-bold font-body text-xs">{rec.description}</div>
                                 <span
                                   className={`text-[9px] px-1.5 py-0.2 rounded uppercase font-mono font-bold ${
                                     isActionable

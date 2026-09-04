@@ -110,7 +110,7 @@ const BuilderPage = () => {
                       title={`AI generation subtly incorporates your Game DNA preferences: ${userGameDNA}`}
                     >
                       <span className="material-symbols-outlined text-xs">genetics</span>
-                      <span>Using Game DNA</span>
+                      <span>GAME DNA ON</span>
                       <span className="material-symbols-outlined text-xs text-primary/60 hover:text-primary cursor-help">info</span>
                     </div>
                   )}
@@ -206,16 +206,6 @@ const BuilderPage = () => {
               <div className="px-4 py-3 border-t border-primary/20 bg-terminal-header flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="text-primary/60 font-mono text-[10px]">TOKENS: {state.currentPrompt.length} / 8192</div>
-                  {userGameDNA && (
-                    <div
-                      className="hidden md:inline-flex items-center gap-1.5 h-6 px-2.5 rounded-xs bg-primary/10 border border-primary/30 font-mono text-[10px] font-bold text-primary uppercase"
-                      title={`AI generation subtly incorporates your Game DNA preferences: ${userGameDNA}`}
-                    >
-                      <span className="material-symbols-outlined text-xs text-primary">genetics</span>
-                      <span>Using Game DNA</span>
-                      <span className="material-symbols-outlined text-xs text-primary/60 hover:text-primary cursor-help">info</span>
-                    </div>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {state.buildStatus === 'COMPILING' && (

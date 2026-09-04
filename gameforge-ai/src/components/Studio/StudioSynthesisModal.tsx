@@ -242,7 +242,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
                   <div className="font-bold text-[11px] uppercase">
                     {isStale ? 'STALE PROPOSAL DETECTED' : 'APPLICATION FAILED'}
                   </div>
-                  <p className="text-[11px] font-sans text-on-surface/90 mt-0.5">
+                  <p className="text-[11px] font-body text-on-surface/90 mt-0.5">
                     {applyError}
                   </p>
                 </div>
@@ -280,7 +280,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
                 <div className="font-bold tracking-wider uppercase text-[11px]">
                   SYNTHESIS CONFIDENCE: {proposal.confidence}
                 </div>
-                <p className="text-[11px] font-sans text-on-surface/90 mt-0.5 leading-relaxed">
+                <p className="text-[11px] font-body text-on-surface/90 mt-0.5 leading-relaxed">
                   {proposal.confidenceExplanation}
                 </p>
               </div>
@@ -291,7 +291,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
           {proposal.isSingleSourceDominant && proposal.dominantSourceTitle && (
             <div className="bg-amber-500/10 border border-amber-500/40 text-amber-300 rounded p-3 flex items-start gap-2">
               <span className="material-symbols-outlined text-sm mt-0.5">balance</span>
-              <p className="text-[11px] font-sans leading-relaxed">
+              <p className="text-[11px] font-body leading-relaxed">
                 <span className="font-bold">Source Balance Notice:</span> This proposal draws primarily from{' '}
                 <span className="font-bold">&quot;{proposal.dominantSourceTitle}&quot;</span>. Consider adding more varied reference games to achieve a more balanced synthesis.
               </p>
@@ -376,7 +376,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
                 <React.Fragment key={idx}>
                   <div className="bg-surface border border-outline-variant/40 p-2.5 rounded text-center flex-1 min-w-[120px]">
                     <div className="text-[9px] text-secondary font-bold uppercase">PHASE 0{idx + 1}</div>
-                    <div className="text-[10px] text-on-surface mt-0.5 font-sans leading-tight">{step}</div>
+                    <div className="text-[10px] text-on-surface mt-0.5 font-body leading-tight">{step}</div>
                   </div>
                   {idx < loopSteps.length - 1 && (
                     <span className="text-outline text-center text-xs sm:rotate-0 rotate-90 shrink-0">
@@ -398,7 +398,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
               </div>
               <ul className="space-y-2 pt-1">
                 {proposal.designObjectives.map((obj, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-[11px] text-on-surface font-sans">
+                  <li key={idx} className="flex items-start gap-2 text-[11px] text-on-surface font-body">
                     <span className="text-secondary text-[10px] font-mono font-bold mt-0.5">
                       [{obj.type}]
                     </span>
@@ -481,7 +481,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
                           {isResolved ? 'RESOLVED' : 'UNRESOLVED'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-on-surface-variant font-sans leading-relaxed">
+                      <p className="text-[11px] text-on-surface-variant font-body leading-relaxed">
                         {conflict.description}
                       </p>
                       <div className="space-y-1.5 pt-1">
@@ -562,7 +562,7 @@ export const StudioSynthesisModal: React.FC<StudioSynthesisModalProps> = ({
                   <h4 className="font-bold text-xs uppercase tracking-wider">
                     Confirm Blueprint Mutation (Version {(project.currentVersion || 1) + 1})
                   </h4>
-                  <p className="text-[11px] font-sans text-on-surface/90 mt-1 leading-relaxed">
+                  <p className="text-[11px] font-body text-on-surface/90 mt-1 leading-relaxed">
                     This action will apply the approved synthesis proposal and create a new immutable{' '}
                     <span className="font-bold text-primary">Version {(project.currentVersion || 1) + 1}</span>.
                     Your prior versions remain completely preserved and recoverable at any time in Studio Version History.

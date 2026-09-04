@@ -1,18 +1,13 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-UI/UX Visual Inconsistencies, Interaction Audit & Polish (12 Approved Items)
+Targeted Remediation Pass: P0/P1 Critical Interactions & P2 Polish (9 Items)
 
 ## Status
 COMPLETE
 
 ## Objective
-Address 12 approved visual inconsistencies, interaction defects, and icon animation enhancements identified in user feedback (uploaded_media_0 to uploaded_media_15). Strictly enforce exclusions: Authentication, Game Generation, and Game Runtime/Controls (Items 8, 9, 10, 11 deferred to separate Game Runtime backlog).
-
-## Explicit Exclusions
-- **Authentication**: Registration, Login, Logout, Password reset/change flows (bypassed per scope rules).
-- **Game Generation & Compilation**: Code generation, LLM prompts, build job SSE streams (bypassed).
-- **Game Runtime & Controls (Items 8, 9, 10, 11)**: W/S movement, R restart canvas focus, canvas-specific fullscreen, and Phaser Remix panel docking are deferred to the Future Game Runtime Backlog.
+Remediate 4 critical P0/P1 issues (Inspiration-to-Project creation flow, Prototype Remix overlap & pause, canvas-specific fullscreen, duplicate Game DNA badge) and 5 P2 visual & UX defects (feature-card icon animations, Discovery action cluster hierarchy, Builder double border, Studio typography tokens, Profile hero & anchored popover). Enforce strict exclusions: Authentication and Game Generation/Compilation LLM prompts remain untouched.
 
 ## Started
 2026-09-04
@@ -20,11 +15,50 @@ Address 12 approved visual inconsistencies, interaction defects, and icon animat
 ---
 
 ## Previous Phase
-Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup
+UI/UX Visual Inconsistencies, Interaction Audit & Polish (12 Approved Items)
 Status: COMPLETE
-Commit: 2f1c0b8
+Commit: b5cff7e
 
 ---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md Constitution & guidelines
+- [x] Inspect all user screenshots (`uploaded_media_0` to `uploaded_media_15`)
+- [x] Trace root causes across frontend components, CSS tokens, and layout trees
+- [x] Verify running services: FastAPI backend (8000), Vite frontend (5173), Chrome remote debugging (9222)
+- [x] Verify clean git working tree on `fresh-main` (`b5cff7e`)
+
+---
+
+## 2. Implementation Batches (9 Targeted Items)
+
+### Batch 1: P0/P1 Critical Interactions (Items 1, 2, 3, 4)
+- [x] Subtask 1.1 (P0/P1 Logic Defect): Fix "Use as Inspiration -> Create New Project" flow. Add backend `POST /api/projects` endpoint with initial starter DSL/spec, attach authoritative inspiration record, update context state, and auto-open Project Studio via `?studio=<id>` on `/dashboard`.
+- [x] Subtask 1.2 (P0/P1 Layout & Runtime Defect): Fix Prototype Remix panel overlap & pause. Pause Phaser scene when Remix is open (`isPausedExternal={isRemixPanelOpen}`), and establish strict layout boundary so the canvas container cannot overlap remix controls.
+- [x] Subtask 1.3 (P0/P1 UX Defect): Fix Fullscreen target in PrototypeModal. Target canvas container viewport element directly (`canvasViewportRef`) rather than outer modal dialog, with floating "EXIT FULLSCREEN (ESC)" overlay.
+- [x] Subtask 1.4 (P0/P1 Visual Defect): Remove Builder duplicate Game DNA bottom footer badge, keeping single compact `[🧬 GAME DNA ON ⓘ]` status indicator chip in the top toolbar.
+
+### Batch 2: P2 Visual & UX Polish (Items 5, 6, 7, 8, 9)
+- [x] Subtask 2.1 (P2 Visual Enhancement): Enhance Feature-card icon animations in `styles/index.css` & `HomePage.tsx` to be visibly perceptible (`transform: scale(1.12)`, double drop-shadow, `display: inline-block`, `transform-origin: center center`, 2.6s/2.8s/2.7s cycles) with reduced-motion support.
+- [x] Subtask 2.2 (P2 Visual Hierarchy): Standardize Discovery action cluster hierarchy in `HomePage.tsx` (`BUILD FROM SCRATCH` primary cyan CTA, `TUNE` secondary, `CLEAR SEARCH` tertiary, all unified to `h-9`).
+- [x] Subtask 2.3 (P2 Visual Defect): Remove redundant visual seam / double border between Builder editor and output console in `BuilderPage.tsx`.
+- [x] Subtask 2.4 (P2 Typography Consistency): Audit Studio typography tokens: replace `font-sans` with semantic `font-body` across Studio components (`StudioOverviewTab`, `StudioInspirationDeck`, `StudioSynthesisModal`, `StudioPlaytestsTab`).
+- [x] Subtask 2.5 (P2 UX Enhancement): Redesign Profile header with a compact hero and add anchored profile popover in `Navbar.tsx` (avatar, creator title, Level/XP, View Profile, Account Settings, Preferences, Sign Out).
+
+---
+
+## 3. Verification & Evidence Plan
+- [x] TypeScript check (`npx tsc --noEmit`): 0 errors
+- [x] Frontend lint check (`npx oxlint`): 0 warnings, 0 errors across 86 files
+- [x] Frontend unit tests (`npx tsx --test src/utils/__tests__/*.test.ts src/services/__tests__/*.test.ts`): 131 tests passed across 10 suites (0 failures)
+- [x] Frontend production build (`npm run build`): Vite build completed cleanly in 2.00s
+- [x] Backend unit tests (`pytest backend/tests/test_projects.py backend/tests/test_project_inspirations.py -v`): 29/29 tests passed in 14.28s
+- [x] BROWSER TESTING: NOT PERFORMED (Per user instruction, browser QA was excluded for this completion run)
+
+---
+
+## Historical Phase: 12 Remediated Items (Archived)
 
 ## 1. Pre-Implementation
 

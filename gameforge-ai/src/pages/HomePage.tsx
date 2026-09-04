@@ -7,6 +7,8 @@ import { TuneRecommendationsModal } from '../components/Shared/TuneRecommendatio
 import { GameComparisonModal } from '../components/Shared/GameComparisonModal';
 import { GameDNAOnboardingModal } from '../components/Shared/GameDNAOnboardingModal';
 import { InspirationAttachModal } from '../components/Shared/InspirationAttachModal';
+import { projectService } from '../services/projects';
+import { inspirationService } from '../services/inspirations';
 import type { DiscoverySearchResult } from '../types';
 
 const INITIAL_VISIBLE_RESULTS = 12;
@@ -41,6 +43,8 @@ const HomePage = () => {
     clearDiscoveryResults,
     saveDiscovery,
     pushToast,
+    addGameProject,
+    openAuthModal,
   } = useAppContext();
 
   // Sync initial prompt from context if needed
@@ -501,45 +505,51 @@ const HomePage = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Secondary: TUNE */}
               <button
                 type="button"
                 onClick={() => setIsTuneModalOpen(true)}
-                className="px-3.5 py-2 border border-primary/60 bg-primary/10 hover:bg-primary/20 text-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(76,224,210,0.2)]"
+                className="h-9 px-3.5 border border-primary/60 bg-primary/10 hover:bg-primary/20 text-primary font-mono text-xs uppercase font-bold rounded inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(76,224,210,0.2)] btn-interactive transition-colors"
+                title="Tune Discovery search preferences"
               >
                 <span className="material-symbols-outlined text-sm">tune</span>
-                <span>Tune</span>
+                <span>TUNE</span>
               </button>
 
               {comparedGameIds.length >= 2 && (
                 <button
                   type="button"
                   onClick={() => setIsCompareModalOpen(true)}
-                  className="px-3.5 py-2 bg-gradient-to-r from-primary to-primary-bright text-on-primary font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.4)] btn-interactive glow-cyan"
+                  className="h-9 px-3.5 bg-gradient-to-r from-primary to-primary-bright text-surface font-mono text-xs uppercase font-bold rounded inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.4)] btn-interactive glow-cyan"
                 >
                   <span className="material-symbols-outlined text-sm">compare_arrows</span>
                   <span>Compare ({comparedGameIds.length})</span>
                 </button>
               )}
 
+              {/* Primary: BUILD FROM SCRATCH */}
               <button
                 type="button"
                 onClick={() => {
                   clearBuildInspiration();
                   navigate('/build');
                 }}
-                className="px-4 py-2 bg-secondary text-on-secondary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-magenta flex items-center gap-2 cursor-pointer"
+                className="h-9 px-4 bg-primary text-surface font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-cyan inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.4)]"
               >
                 <span className="material-symbols-outlined text-sm">construction</span>
-                <span>Build From Scratch</span>
+                <span>BUILD FROM SCRATCH</span>
               </button>
 
+              {/* Tertiary: CLEAR SEARCH */}
               <button
                 type="button"
                 onClick={clearDiscoveryResults}
-                className="px-3 py-2 border border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary font-mono text-xs uppercase rounded transition-colors cursor-pointer"
+                className="h-9 px-3.5 border border-outline-variant/60 hover:border-primary/60 bg-surface/40 hover:bg-surface-container text-on-surface-variant hover:text-primary font-mono text-xs uppercase font-bold rounded inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer btn-interactive"
+                title="Clear current search results"
               >
-                Clear Search
+                <span className="material-symbols-outlined text-sm">close</span>
+                <span>CLEAR SEARCH</span>
               </button>
             </div>
           </div>
@@ -1000,9 +1010,58 @@ const HomePage = () => {
             setInspirationTarget(null);
             navigate('/dashboard');
           }}
-          onCreateProject={() => {
-            setInspirationTarget(null);
-            navigate('/build');
+          onCreateProject={async () => {
+            if (!inspirationTarget) return;
+            const targetGame = inspirationTarget.game;
+            const targetTitle = targetGame.display_title ?? targetGame.title;
+
+            if (state.authStatus !== 'AUTHENTICATED') {
+              setInspirationTarget(null);
+              openAuthModal('login', 'Sign in to create a project with this inspiration.');
+              return;
+            }
+
+            try {
+              const newProj = await projectService.createProject({
+                title: `${targetTitle} Inspired`,
+                genre: targetGame.genres?.[0] || 'Action',
+                prompt: `Game concept inspired by ${targetTitle}.`,
+                parameters: {
+                  engine: 'Top-Down Action',
+                  artDensity: 50,
+                  physics: 80,
+                  modules: ['Procedural Generation'],
+                  scale: 'standard',
+                  worldMode: 'linear',
+                },
+              });
+
+              const steamAppId = targetGame.external_id || targetGame.id;
+              if (steamAppId) {
+                try {
+                  await inspirationService.attach(newProj.id, steamAppId);
+                } catch (attachErr) {
+                  console.warn('Could not auto-attach inspiration to new project:', attachErr);
+                }
+              }
+
+              addGameProject(newProj);
+              setState((s) => ({ ...s, activeProjectId: newProj.id }));
+              setInspirationTarget(null);
+              pushToast({
+                variant: 'success',
+                title: 'PROJECT CREATED & INSPIRATION ATTACHED',
+                description: `Created "${newProj.title}" with "${targetTitle}" attached in Studio.`,
+              });
+              navigate(`/dashboard?studio=${newProj.id}`);
+            } catch (err: unknown) {
+              console.error('Failed to create project with inspiration:', err);
+              pushToast({
+                variant: 'error',
+                title: 'PROJECT CREATION FAILED',
+                description: err instanceof Error ? err.message : 'Could not create new project.',
+              });
+            }
           }}
         />
       )}

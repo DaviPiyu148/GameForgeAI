@@ -4,9 +4,12 @@ import { useAppContext } from '../../context/AppContext';
 
 export const Navbar = () => {
   const location = useLocation();
-  const { state, openAuthModal, clearBuildInspiration } = useAppContext();
+  const { state, openAuthModal, logout, clearBuildInspiration } = useAppContext();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const profilePopoverRef = useRef<HTMLDivElement>(null);
+  const profileBtnRef = useRef<HTMLButtonElement>(null);
 
   const navLinks = [
     { name: 'Discover', path: '/' },
@@ -26,10 +29,40 @@ export const Navbar = () => {
     return location.pathname === path || location.pathname.startsWith(path);
   };
 
-  // Close drawer upon route change
+  // Close drawer and profile popover upon route change
   useEffect(() => {
     setIsMobileDrawerOpen(false);
+    setIsProfilePopoverOpen(false);
   }, [location.pathname]);
+
+  // Handle outside click and Escape key for profile popover
+  useEffect(() => {
+    if (!isProfilePopoverOpen) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (
+        profilePopoverRef.current &&
+        !profilePopoverRef.current.contains(e.target as Node) &&
+        profileBtnRef.current &&
+        !profileBtnRef.current.contains(e.target as Node)
+      ) {
+        setIsProfilePopoverOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsProfilePopoverOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfilePopoverOpen]);
 
   // Lock body scroll and handle Escape key when mobile drawer is open
   useEffect(() => {
@@ -102,25 +135,126 @@ export const Navbar = () => {
           </Link>
 
           {state.authStatus === 'AUTHENTICATED' && state.user ? (
-            <Link
-              to="/profile"
-              className="h-9 px-2.5 rounded-sm border border-outline-variant bg-surface-container flex items-center gap-2 text-primary icon-interactive hover:border-primary transition-colors font-mono text-xs"
-              title={`Logged in as ${state.user.username} (Level ${state.progress?.current_level || state.user.level || 1} ${state.progress?.creator_title || 'Creator'})`}
-            >
-              {state.user.avatar_url ? (
-                <img
-                  src={state.user.avatar_url}
-                  alt={state.user.username}
-                  className="w-6 h-6 rounded-full object-cover border border-primary/50"
-                />
-              ) : (
-                <span className="material-symbols-outlined text-base" aria-hidden="true">account_circle</span>
+            <div className="relative">
+              <button
+                ref={profileBtnRef}
+                type="button"
+                onClick={() => setIsProfilePopoverOpen((prev) => !prev)}
+                className="h-9 px-2.5 rounded-sm border border-outline-variant bg-surface-container flex items-center gap-2 text-primary icon-interactive hover:border-primary transition-colors font-mono text-xs cursor-pointer"
+                title={`Logged in as ${state.user.username} (Level ${state.progress?.current_level || state.user.level || 1} ${state.progress?.creator_title || 'Creator'})`}
+                aria-expanded={isProfilePopoverOpen}
+                aria-haspopup="true"
+              >
+                {state.user.avatar_url ? (
+                  <img
+                    src={state.user.avatar_url}
+                    alt={state.user.username}
+                    className="w-6 h-6 rounded-full object-cover border border-primary/50"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-base" aria-hidden="true">account_circle</span>
+                )}
+                <span className="hidden md:inline font-bold">{state.user.username}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/40 font-mono font-bold tracking-tight">
+                  LVL {state.progress?.current_level || state.user.level || 1}
+                </span>
+                <span className="material-symbols-outlined text-xs text-primary/70" aria-hidden="true">
+                  {isProfilePopoverOpen ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+
+              {isProfilePopoverOpen && (
+                <div
+                  ref={profilePopoverRef}
+                  className="absolute right-0 top-full mt-2 w-72 bg-surface-container-high border-2 border-primary shadow-[0_0_30px_rgba(76,224,210,0.25)] rounded-md p-3 z-50 animate-fadeIn font-mono text-xs space-y-3"
+                  role="menu"
+                  aria-label="Profile navigation menu"
+                >
+                  {/* User Summary Header */}
+                  <div className="flex items-center gap-2.5 pb-2.5 border-b border-primary/20">
+                    <div className="w-10 h-10 rounded-full border border-primary/60 bg-surface-container-highest flex items-center justify-center shrink-0 overflow-hidden">
+                      {state.user.avatar_url ? (
+                        <img src={state.user.avatar_url} alt={state.user.username} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="material-symbols-outlined text-primary text-xl">person</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-xs text-primary truncate uppercase">{state.user.username}</div>
+                      <div className="text-[10px] text-tertiary font-bold truncate">
+                        Level {state.progress?.current_level || state.user.level || 1} • {state.progress?.creator_title || 'Novice Creator'}
+                      </div>
+                      <div className="text-[9px] text-on-surface-variant truncate">{state.user.email}</div>
+                    </div>
+                  </div>
+
+                  {/* Level & XP Quick Bar */}
+                  <div className="space-y-1 bg-surface-container-low p-2 rounded border border-outline-variant/30">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-on-surface-variant uppercase">XP Progress:</span>
+                      <span className="text-tertiary font-bold">{state.progress?.total_xp || 0} XP</span>
+                    </div>
+                    <div className="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-tertiary h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${Math.min(100, ((state.progress?.total_xp || 0) % 500) / 5)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Navigation Links */}
+                  <div className="space-y-1 pt-1">
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsProfilePopoverOpen(false)}
+                      className="w-full px-2.5 py-2 rounded hover:bg-primary/10 text-on-surface hover:text-primary flex items-center gap-2 transition-colors cursor-pointer"
+                      role="menuitem"
+                    >
+                      <span className="material-symbols-outlined text-sm text-primary">person</span>
+                      <span>View Full Profile</span>
+                    </Link>
+
+                    <Link
+                      to="/profile"
+                      onClick={() => {
+                        setIsProfilePopoverOpen(false);
+                      }}
+                      className="w-full px-2.5 py-2 rounded hover:bg-primary/10 text-on-surface hover:text-primary flex items-center gap-2 transition-colors cursor-pointer"
+                      role="menuitem"
+                    >
+                      <span className="material-symbols-outlined text-sm text-primary">manage_accounts</span>
+                      <span>Account Settings</span>
+                    </Link>
+
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setIsProfilePopoverOpen(false)}
+                      className="w-full px-2.5 py-2 rounded hover:bg-primary/10 text-on-surface hover:text-primary flex items-center gap-2 transition-colors cursor-pointer"
+                      role="menuitem"
+                    >
+                      <span className="material-symbols-outlined text-sm text-secondary">sports_esports</span>
+                      <span>My Projects ({state.myGames.length})</span>
+                    </Link>
+                  </div>
+
+                  {/* Sign Out Action */}
+                  <div className="pt-2 border-t border-primary/20">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfilePopoverOpen(false);
+                        logout();
+                      }}
+                      className="w-full px-2.5 py-2 rounded hover:bg-error/10 text-error flex items-center gap-2 transition-colors cursor-pointer text-xs"
+                      role="menuitem"
+                    >
+                      <span className="material-symbols-outlined text-sm">logout</span>
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
               )}
-              <span className="hidden md:inline font-bold">{state.user.username}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/40 font-mono font-bold tracking-tight">
-                LVL {state.progress?.current_level || state.user.level || 1}
-              </span>
-            </Link>
+            </div>
           ) : (
             <button
               onClick={() => openAuthModal('login')}

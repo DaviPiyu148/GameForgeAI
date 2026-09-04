@@ -532,47 +532,59 @@
 /* Subtle Feature Card Icon Keyframes (Non-distracting, zero layout shift) */
 @keyframes synapticPulse {
   0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(76, 224, 210, 0.4));
-    opacity: 0.9;
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px rgba(76, 224, 210, 0.4));
+    opacity: 0.85;
   }
   50% {
-    filter: drop-shadow(0 0 7px rgba(76, 224, 210, 0.85));
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 12px rgba(76, 224, 210, 0.95)) drop-shadow(0 0 20px rgba(76, 224, 210, 0.4));
     opacity: 1;
   }
 }
 
 @keyframes radarSweepPulse {
   0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(255, 61, 129, 0.4));
-    opacity: 0.88;
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 3px rgba(255, 61, 129, 0.4));
+    opacity: 0.85;
   }
   50% {
-    filter: drop-shadow(0 0 7px rgba(255, 61, 129, 0.9));
+    transform: scale(1.12) rotate(6deg);
+    filter: drop-shadow(0 0 12px rgba(255, 61, 129, 0.95)) drop-shadow(0 0 20px rgba(255, 61, 129, 0.4));
     opacity: 1;
   }
 }
 
 @keyframes buildRemixFlicker {
   0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(255, 194, 76, 0.4));
-    opacity: 0.9;
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px rgba(255, 194, 76, 0.4));
+    opacity: 0.85;
   }
   50% {
-    filter: drop-shadow(0 0 7px rgba(255, 194, 76, 0.85));
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 12px rgba(255, 194, 76, 0.95)) drop-shadow(0 0 20px rgba(255, 194, 76, 0.4));
     opacity: 1;
   }
 }
 
 .animate-synaptic-pulse {
-  animation: synapticPulse 4s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: center center;
+  animation: synapticPulse 2.6s ease-in-out infinite;
 }
 
 .animate-radar-sweep {
-  animation: radarSweepPulse 4.5s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: center center;
+  animation: radarSweepPulse 2.8s ease-in-out infinite;
 }
 
 .animate-build-flicker {
-  animation: buildRemixFlicker 5s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: center center;
+  animation: buildRemixFlicker 2.7s ease-in-out infinite;
 }
 
 /* ─── Reduced Motion ─── */
