@@ -40,6 +40,18 @@ export interface ProjectUpdateInput {
   runtimeMetadata?: RuntimeMetadata;
 }
 
+export interface ProjectInspirationRecord {
+  id: string;
+  projectId: string;
+  steamAppId: string;
+  title: string;
+  coverUrl?: string | null;
+  genres: string[];
+  tags: string[];
+  playerModes: string[];
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;

@@ -1,23 +1,25 @@
 /**
  * InspirationAttachModal.tsx
  *
- * Step 1: Discovery -> Inspiration -> Studio
+ * Step 2: Discovery -> Inspiration -> Studio (Persistent API integration)
  *
  * Renders when a developer clicks "Use as Inspiration" on a Discovery result.
  *
  * Rules:
  * - Only displays DNA grounded in real GameDiscoveryItem fields.
  * - No LLM calls. No free-form invented content.
- * - Alignment section only shows verified genre intersections.
- * - Attach action defers persistence (Step 2). Shows a clear deferred toast.
- * - Does NOT affect Discovery ranking or personalization.
+ * - Alignment section only shows verified genre intersections (derived dynamically).
+ * - Persists to backend via POST /api/projects/{id}/inspirations.
+ * - Enforces single submission and clear error handling for duplicates/unauthorized.
  */
 
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalDialog } from '../../hooks/useModalDialog';
 import type { DiscoverySearchResult, GameProject } from '../../types';
 import { extractGameDNA, computeProjectAlignment } from '../../utils/gameDna';
+import { inspirationService } from '../../services/inspirations';
+import { ApiError } from '../../services/api';
 
 interface InspirationAttachModalProps {
   /** The Discovery result the developer explicitly chose. */
@@ -27,7 +29,7 @@ interface InspirationAttachModalProps {
   /** All projects available for selection (used in no-active-project flow). */
   allProjects: GameProject[];
   onClose: () => void;
-  /** Called when the developer confirms attachment. projectId is the target project. */
+  /** Called when attachment successfully completes and persists. */
   onAttach: (result: DiscoverySearchResult, projectId: string) => void;
   /** Navigate to an existing project selection UI. */
   onSelectProject: () => void;
@@ -75,6 +77,9 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
   onCreateProject,
 }) => {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const { isClosing, handleClose, handleBackdropClick, dialogRef } = useModalDialog({
     isOpen: true,
     onClose,
@@ -100,6 +105,40 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
 
   const hasDna =
     dna.genres.length > 0 || dna.playerModes.length > 0 || dna.tags.length > 0;
+
+  const handleConfirmAttach = async () => {
+    if (!activeProject) return;
+    const steamAppId = game.external_id || game.id;
+    if (!steamAppId) {
+      setErrorMessage('Game catalog identity is missing.');
+      return;
+    }
+
+    try {
+      setIsAttaching(true);
+      setErrorMessage(null);
+      await inspirationService.attach(activeProject.id, steamAppId);
+      onAttach(result, activeProject.id);
+      handleClose();
+    } catch (err: unknown) {
+      setIsAttaching(false);
+      if (err instanceof ApiError) {
+        if (err.status === 409 || err.code === 'ALREADY_INSPIRED') {
+          setErrorMessage('This game is already attached as inspiration to this project.');
+        } else if (err.status === 404 || err.code === 'PROJECT_NOT_FOUND') {
+          setErrorMessage('Project not found or you do not have permission.');
+        } else if (err.status === 401) {
+          setErrorMessage('Please sign in to attach inspirations to your project.');
+        } else {
+          setErrorMessage(err.message || 'Failed to attach inspiration.');
+        }
+      } else if (err instanceof Error) {
+        setErrorMessage(err.message || 'Failed to attach inspiration.');
+      } else {
+        setErrorMessage('Failed to connect to server. Please try again.');
+      }
+    }
+  };
 
   // ---- Render: No active project branch ----
   if (!activeProject) {
@@ -340,19 +379,17 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
             </>
           )}
 
-          {/* Deferred-persistence notice */}
-          <div className="bg-surface-container/40 border border-outline-variant/40 rounded p-3 flex items-start gap-2">
-            <span
-              className="material-symbols-outlined text-sm text-on-surface-variant shrink-0 mt-0.5"
-              aria-hidden="true"
-            >
-              info
-            </span>
-            <p className="font-mono text-[10px] text-on-surface-variant leading-relaxed">
-              Inspiration attachment is session-local in this release.
-              Full persistence will be available in the next update.
-            </p>
-          </div>
+          {/* Error Banner */}
+          {errorMessage && (
+            <div className="bg-rose-500/10 border border-rose-500/50 rounded p-3 flex items-start gap-2 text-rose-400">
+              <span className="material-symbols-outlined text-sm shrink-0 mt-0.5" aria-hidden="true">
+                error
+              </span>
+              <p className="font-mono text-xs leading-relaxed" data-testid="attach-error-msg">
+                {errorMessage}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer Action Bar */}
@@ -360,23 +397,34 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2.5 border border-outline-variant hover:border-on-surface text-on-surface-variant hover:text-white font-mono text-xs uppercase rounded transition-colors cursor-pointer"
+            disabled={isAttaching}
+            className="px-4 py-2.5 border border-outline-variant hover:border-on-surface text-on-surface-variant hover:text-white font-mono text-xs uppercase rounded transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              onAttach(result, activeProject.id);
-            }}
-            className="px-5 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-cyan flex items-center gap-2 cursor-pointer shadow-lg"
+            onClick={handleConfirmAttach}
+            disabled={isAttaching}
+            className="px-5 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-cyan flex items-center gap-2 cursor-pointer shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
             data-testid="attach-button"
           >
-            <span className="material-symbols-outlined text-sm" aria-hidden="true">
-              lightbulb
-            </span>
-            <span>Attach to Active Project</span>
+            {isAttaching ? (
+              <>
+                <span className="material-symbols-outlined text-sm animate-spin" aria-hidden="true">
+                  progress_activity
+                </span>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">
+                  lightbulb
+                </span>
+                <span>Attach to Active Project</span>
+              </>
+            )}
           </button>
         </div>
       </div>

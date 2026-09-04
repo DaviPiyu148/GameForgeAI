@@ -1,6 +1,98 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 2: Persistent Project Inspiration Data Model & API
+
+## Status\r\nCOMPLETE
+
+## Objective
+Implement dedicated `project_inspirations` relational data model, Alembic migration,
+repository, service, REST API (`POST`, `GET`, `DELETE`), and frontend integration for
+attaching/detaching game inspirations to owned projects with minimal immutable historical snapshots.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 1: Discovery UI Action
+Status: COMPLETE
+Commit: 0125540 / c06dc69
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Read relevant documentation and inspected database / auth / project / saved_discovery models
+- [x] Checked git status: clean working tree on fresh-main
+- [x] Established strict constraints:
+  1. Production POST accepts steam_app_id as authoritative identifier.
+  2. Server-side catalog resolution is authoritative.
+  3. Client-provided metadata must never override real catalog data (extra="forbid").
+  4. Test-mode fallback isolated / mocked from production.
+  5. Concurrent duplicate test verifies exactly 1 persisted row in database.
+  6. alignment_reason derived on demand, never persisted.
+  7. Snapshot minimal: id, project_id, steam_app_id, title, cover_url, genres, tags, player_modes, created_at.
+
+---
+
+## 2. Implementation
+
+- [x] 2.1 Database Model: `backend/app/models/project_inspiration.py` + register in `models/__init__.py`
+- [x] 2.2 Alembic Migration: `backend/alembic/versions/<rev>_add_project_inspirations_table.py`
+- [x] 2.3 Repository Layer: `backend/app/repositories/project_inspiration_repo.py`
+- [x] 2.4 Pydantic Schemas: `backend/app/schemas/project_inspiration.py`
+- [x] 2.5 Service Layer: `backend/app/services/project_inspiration_service.py`
+- [x] 2.6 REST Router: `backend/app/api/project_inspirations.py` + register in `main.py`
+- [x] 2.7 Frontend Service & Types: `gameforge-ai/src/services/inspirations.ts` + `types/index.ts`
+- [x] 2.8 Frontend Integration: update `InspirationAttachModal.tsx` to call API with loading state & error handling
+
+---
+
+## 3. Verification
+
+- [x] Unit & Integration Tests (15 passed): `backend/tests/test_project_inspirations.py`
+  - CRUD (Create, List, Delete)
+  - Ownership & IDOR (404 on mismatched owner)
+  - Unauthenticated (401)
+  - Duplicates (409 ALREADY_INSPIRED)
+  - Snapshot immutability after catalog mutation
+  - Concurrency & race safety (db unique constraint, exactly 1 persisted row)
+  - Payload validation (extra="forbid")
+- [x] Full backend regression (594 passed): `pytest backend/tests/ -q`
+- [x] Frontend type check (0 errors): `npx tsc --noEmit`
+- [x] Frontend lint check (0 errors): `npx oxlint`
+- [x] Frontend build (built in 1.04s): `npm run build`
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Step 2
+- [x] Working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Step 2 started following user approval of implementation plan.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 1: Discovery UI Action
 
 ## Status\r\nCOMPLETE
@@ -2775,6 +2867,8 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
+
+
 
 
 

@@ -7,6 +7,7 @@ from app.models.playtest import PlaytestSession
 from app.models.project_version import ProjectVersion
 from app.models.progression import UserProgress, XPEvent, UserMilestone
 from app.models.preference import UserGenrePreference
+from app.models.project_inspiration import ProjectInspiration
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "XPEvent",
     "UserMilestone",
     "UserGenrePreference",
+    "ProjectInspiration",
 ]

@@ -937,9 +937,9 @@ const HomePage = () => {
           onAttach={(res, _projectId) => {
             setInspirationTarget(null);
             pushToast({
-              variant: 'info',
-              title: 'INSPIRATION NOTED',
-              description: `"${res.game.display_title ?? res.game.title}" attached as inspiration (session-local — persistence coming in the next step).`,
+              variant: 'success',
+              title: 'INSPIRATION ATTACHED',
+              description: `"${res.game.display_title ?? res.game.title}" attached as inspiration to active project.`,
             });
           }}
           onSelectProject={() => {
