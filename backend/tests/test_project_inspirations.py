@@ -437,3 +437,43 @@ def test_database_unique_constraint_enforces_single_row(client):
     finally:
         db1.close()
         db2.close()
+
+
+def test_concurrent_api_duplicate_attachment_race(client):
+    """
+    API-level concurrent race test:
+    Two simultaneous POST requests for the same (project_id, steam_app_id).
+    Expected invariant:
+      - exactly one 201 Created
+      - exactly one 409 Conflict
+      - exactly one persisted row in the database
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    token_a, user_a_id = _register_and_token(client, "user_a_race@example.com", "UserARace")
+    project_id = _create_project_in_db(user_a_id)
+
+    def make_post_request():
+        res = client.post(
+            f"/api/projects/{project_id}/inspirations",
+            json={"steam_app_id": "570"},
+            headers=_auth(token_a),
+        )
+        return res.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(make_post_request)
+        f2 = executor.submit(make_post_request)
+        results = [f1.result(), f2.result()]
+
+    assert sorted(results) == [201, 409], f"Unexpected status codes: {results}"
+
+    db = TestingSessionLocal()
+    try:
+        rows = db.query(ProjectInspiration).filter(
+            ProjectInspiration.project_id == project_id,
+            ProjectInspiration.steam_app_id == "570",
+        ).all()
+        assert len(rows) == 1
+    finally:
+        db.close()

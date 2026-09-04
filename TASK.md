@@ -1,6 +1,94 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 3: Project Studio Inspiration Deck
+
+## Status
+COMPLETE
+
+## Objective
+Build the Project Studio Inspiration Deck that consumes persisted project inspirations (`GET /api/projects/{id}/inspirations`),
+renders historical snapshot cards, supports lightweight detach (`DELETE /api/projects/{id}/inspirations/{steam_app_id}`),
+handles empty/loading/error states, and computes deterministic synergy across >= 2 inspirations (zero LLM, zero Gemini).
+Includes Step 2 concurrent API race regression test.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 2: Persistent Project Inspiration Data Model & API
+Status: COMPLETE
+Commit: 47575ba
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Inspected Studio components: `ProjectStudioModal.tsx`, `StudioOverviewTab.tsx`
+- [x] Established strict constraints:
+  1. Inspiration Deck = selected source material (deliberate design inputs).
+  2. Synergy Preview = deterministic attribute overlap across >= 2 inspirations (zero Gemini).
+  3. No synthesis or blueprint modification in Step 3 (reserved for Step 4).
+  4. Detach removes from project, does not delete underlying Discovery bookmarks.
+  5. Step 2 concurrency follow-up: verified API-level concurrent race test (1x 201, 1x 409, 1 DB row).
+
+---
+
+## 2. Implementation
+
+- [x] 2.1 Concurrency follow-up: `test_concurrent_api_duplicate_attachment_race` in `backend/tests/test_project_inspirations.py`
+- [x] 2.2 Deterministic Synergy Utility: `gameforge-ai/src/utils/synergy.ts` (`computeInspirationSynergy`)
+- [x] 2.3 Studio Inspiration Deck Component: `gameforge-ai/src/components/Studio/StudioInspirationDeck.tsx`
+  - Consumes `GET /api/projects/{id}/inspirations`
+  - Cards render: cover, title, genres, player modes, tags, attached date, dynamic project alignment
+  - Card removal: lightweight confirmation + `DELETE /api/projects/{id}/inspirations/{steam_app_id}` + toast
+  - Empty state with "Explore Games in Discovery" action
+  - Loading skeleton & error states with retry
+  - Deterministic Synergy Preview when >= 2 inspirations attached
+- [x] 2.4 Studio Overview Tab Integration: `gameforge-ai/src/components/Studio/StudioOverviewTab.tsx` + `ProjectStudioModal.tsx`
+- [x] 2.5 Unit Tests: `src/utils/__tests__/synergy.test.ts` (8 tests) & `src/utils/__tests__/inspirationDeck.test.ts` (11 tests)
+
+---
+
+## 3. Verification
+
+- [x] Backend tests: 16/16 passed in `test_project_inspirations.py` (including concurrent API race test)
+- [x] Frontend unit tests: 33/33 passed (14 gameDna + 8 synergy + 11 inspirationDeck)
+- [x] Frontend type check: `npx tsc --noEmit` (0 errors)
+- [x] Frontend lint check: `npx oxlint` (0 warnings, 0 errors on 80 files)
+- [x] Frontend build: `npm run build` (built in 989ms)
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Step 3
+- [x] Working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Added API-level concurrent race test to freeze Step 2.
+- 2026-09-04: Implemented Project Studio Inspiration Deck, deterministic synergy calculation, and full unit test suites.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 2: Persistent Project Inspiration Data Model & API
 
 ## Status\r\nCOMPLETE
@@ -2867,6 +2955,7 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
+
 
 
 

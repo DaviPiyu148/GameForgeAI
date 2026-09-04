@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import type { GameProject, GameBlueprint } from '../../types';
 import { projectService } from '../../services/projects';
+import { StudioInspirationDeck } from './StudioInspirationDeck';
 
 interface StudioOverviewTabProps {
   project: GameProject;
+  onCloseStudio?: () => void;
 }
 
-export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project }) => {
+export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project, onCloseStudio }) => {
   const [blueprint, setBlueprint] = useState<GameBlueprint | null>(null);
   const [isLoadingBlueprint, setIsLoadingBlueprint] = useState(false);
 
@@ -186,6 +188,9 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project })
           {project.prompt}
         </div>
       </div>
+
+      {/* Inspiration Deck & Synergy Section */}
+      <StudioInspirationDeck project={project} onCloseStudio={onCloseStudio} />
     </div>
   );
 };
