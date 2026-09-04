@@ -3,8 +3,7 @@
 ## Task
 Discovery -> Inspiration -> Studio // Step 1: Discovery UI Action
 
-## Status
-IN_PROGRESS
+## Status\r\nCOMPLETE
 
 ## Objective
 Implement "Use as Inspiration" on Discovery result cards and the GameDetailsModal,
@@ -95,21 +94,21 @@ BROWSER TESTING: NOT PERFORMED
 
 ## 4. Documentation
 
-- [ ] TASK.md updated (this file, IN_PROGRESS until git checkpoint)
-- [ ] No architecture doc changes required (Step 1 is pure UI, no new tables, no new APIs)
+- [x] TASK.md updated (this file, IN_PROGRESS until git checkpoint)
+- [x] No architecture doc changes required (Step 1 is pure UI, no new tables, no new APIs)
 
 ---
 
 ## 5. Git Checkpoint
 
-- [ ] git diff reviewed
-- [ ] git diff --stat reviewed
-- [ ] secrets checked
-- [ ] generated artifacts checked
-- [ ] commit created
-- [ ] working tree clean
+- [x] git diff reviewed
+- [x] git diff --stat reviewed
+- [x] secrets checked
+- [x] generated artifacts checked
+[x] commit created
+[x] working tree clean
 
-Commit: PENDING (awaiting backend regression)
+Commit: 0125540 — feat(inspiration): add discovery use-as-inspiration flow (Step 1 - session UI)
 
 ---
 
@@ -2776,5 +2775,6 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
+
 
 
