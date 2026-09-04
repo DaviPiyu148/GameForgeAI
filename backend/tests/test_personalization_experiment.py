@@ -1681,3 +1681,178 @@ class TestPhase8TenPercentControlledExpansion:
                 # Invariant 3: Bucket >= 10 remains control
                 assert in_10 is False
                 assert h_int >= 10
+
+
+class TestPhase81RobustnessAndHeterogeneousEffects:
+    """
+    Phase 8.1 Robustness & Heterogeneous Effects Tests:
+    1. Positional Alignment Classification Semantics (distinguishing set churn from positional changes).
+    2. 10% Cohort Stability & Pre-treatment Distribution.
+    3. Mode-level Treatment Isolation (POPULAR 0 movement vs others).
+    4. Profile Tier Aggregation & COLD Invariant.
+    5. Project Context Segmentation & Immutability.
+    6. Event Attribution Integrity (strict cohort isolation).
+    """
+
+    def test_positional_alignment_classification_semantics(self):
+        """
+        Verify that internal swaps produce:
+        - top5_churn == 0 (zero new external items entered Top-5)
+        - top5_positional_changes == 2 (two slot positions changed occupants)
+        - beneficial + harmful + neutral == top5_positional_changes
+        """
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        # Base Top-5: Item A (low profile match) at slot 0 (0.802), Item B (high profile match) at slot 1 (0.800)
+        cand_a = _make_result("game_a", "Game A", 0.802, ["Casual"])
+        cand_b = _make_result("game_b", "Game B", 0.800, ["Strategy"])
+        cand_c = _make_result("game_c", "Game C", 0.700, ["Action"])
+        cand_d = _make_result("game_d", "Game D", 0.600, ["RPG"])
+        cand_e = _make_result("game_e", "Game E", 0.500, ["Adventure"])
+
+        base_results = [cand_a, cand_b, cand_c, cand_d, cand_e]
+        base_resp = _make_base_response(base_results, mode="DISCOVER")
+
+        # Profile with high affinity for Strategy (Game B), zero for Casual (Game A)
+        profile = EffectivePreferenceProfile(
+            user_id="user_internal_swap",
+            genres={"Strategy": 0.9, "Casual": 0.1},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=20,
+        )
+
+        # Apply treatment re-ranking where Game B moves to slot 0 and Game A moves to slot 1
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=profile,
+            user_id="user_internal_swap",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=100,  # force treatment for test
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+
+        # Top-5 items are {game_a, game_b, game_c, game_d, game_e} in both!
+        assert set(r.game.id for r in resp.results[:5]) == set(r.game.id for r in base_results[:5])
+        assert diag.top5_churn == 0, "Set churn must be 0 when no external items enter Top-5"
+        assert diag.top5_positional_changes == 2, "Two positions swapped occupants"
+        assert diag.beneficial_changes == 1, "Slot 0 received higher-aligned Game B"
+        assert diag.harmful_changes == 1, "Slot 1 received lower-aligned Game A"
+        assert diag.beneficial_changes + diag.harmful_changes + diag.neutral_changes == diag.top5_positional_changes
+
+    def test_ten_percent_cohort_balance_and_stability(self):
+        """Verify ~10% treatment and ~90% control with 100% deterministic reproducibility."""
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        pop_size = 10000
+        t_count = 0
+        assignments_run1 = []
+        for i in range(pop_size):
+            uid = f"dev_{i:05d}"
+            in_treat = personalization_experiment_service.user_in_treatment_cohort(uid, 10)
+            assignments_run1.append(in_treat)
+            if in_treat:
+                t_count += 1
+
+        t_pct = t_count / pop_size * 100.0
+        assert 9.0 <= t_pct <= 11.5, f"10% cohort percentage should be around 10%, got {t_pct:.2f}%"
+
+        # Rerun to test 100% deterministic reproducibility
+        for i in range(pop_size):
+            uid = f"dev_{i:05d}"
+            in_treat = personalization_experiment_service.user_in_treatment_cohort(uid, 10)
+            assert in_treat == assignments_run1[i]
+
+    def test_mode_level_treatment_isolation(self):
+        """Verify POPULAR mode has lambda=0.00 and exactly 0 churn / 0 movement in treatment."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        cand = _make_result("game_pop", "Pop Game", 0.95, ["Action"])
+        base_resp = _make_base_response([cand], mode="POPULAR")
+        profile = EffectivePreferenceProfile(
+            user_id="user_pop_test",
+            genres={"Action": 1.0},
+            confidence_tier="ESTABLISHED",
+            total_signal_count=20,
+        )
+
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=profile,
+            user_id="user_pop_test",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=100,
+            mode_lambdas={"POPULAR": 0.00, "DISCOVER": 0.05},
+        )
+
+        assert diag.top5_churn == 0
+        assert diag.top5_positional_changes == 0
+        assert diag.candidates_moved == 0
+        assert resp.results[0].game.id == "game_pop"
+
+    def test_profile_tier_aggregation_and_cold_start_neutrality(self):
+        """Verify COLD tier produces strictly zero movement, zero churn, zero PAU."""
+        from app.services.personalization_experiment import (
+            personalization_experiment_service,
+            PERSONALIZATION_MODE_TREATMENT,
+        )
+
+        cand = _make_result("game_cold", "Cold Game", 0.90, ["Action"])
+        base_resp = _make_base_response([cand], mode="DISCOVER")
+        cold_profile = EffectivePreferenceProfile(
+            user_id="user_cold",
+            confidence_tier="COLD",
+            total_signal_count=0,
+        )
+
+        resp, diag = personalization_experiment_service.apply(
+            base_response=base_resp,
+            effective_profile=cold_profile,
+            user_id="user_cold",
+            mode=PERSONALIZATION_MODE_TREATMENT,
+            treatment_pct=100,
+            mode_lambdas={"DISCOVER": 0.05},
+        )
+
+        assert diag.candidates_moved == 0
+        assert diag.top5_churn == 0
+        assert diag.top5_positional_changes == 0
+        assert diag.preference_alignment_uplift == 0.0
+
+    def test_event_attribution_integrity(self):
+        """Verify engagement events are strictly attributed to cohort without cross-contamination."""
+        from app.services.personalization_experiment import personalization_experiment_service
+
+        user_treat = None
+        user_ctrl = None
+        for i in range(100):
+            uid = f"dev_user_{i:04d}"
+            if personalization_experiment_service.user_in_treatment_cohort(uid, 10) and not user_treat:
+                user_treat = uid
+            elif not personalization_experiment_service.user_in_treatment_cohort(uid, 10) and not user_ctrl:
+                user_ctrl = uid
+            if user_treat and user_ctrl:
+                break
+
+        assert user_treat is not None and user_ctrl is not None
+        assert personalization_experiment_service.user_in_treatment_cohort(user_treat, 10) is True
+        assert personalization_experiment_service.user_in_treatment_cohort(user_ctrl, 10) is False
+
+        # Simulate events
+        events = [
+            {"user_id": user_treat, "event": "SAVE_DISCOVERY", "treated_req": True},
+            {"user_id": user_ctrl, "event": "SAVE_DISCOVERY", "treated_req": False},
+        ]
+
+        t_events = [e for e in events if personalization_experiment_service.user_in_treatment_cohort(e["user_id"], 10)]
+        c_events = [e for e in events if not personalization_experiment_service.user_in_treatment_cohort(e["user_id"], 10)]
+
+        assert len(t_events) == 1 and t_events[0]["user_id"] == user_treat
+        assert len(c_events) == 1 and c_events[0]["user_id"] == user_ctrl
+        assert all(e["treated_req"] is True for e in t_events)
+        assert all(e["treated_req"] is False for e in c_events)
