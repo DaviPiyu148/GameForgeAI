@@ -293,6 +293,15 @@ class ProjectService:
     # Playtest & Telemetry Management
     # -------------------------------------------------------------------------
 
+    def _format_playtest_response(self, session: PlaytestSession) -> PlaytestSessionResponse:
+        """Helper to serialize PlaytestSession with version_number metadata."""
+        resp = PlaytestSessionResponse.model_validate(session)
+        ver = None
+        if session.ai_analysis and isinstance(session.ai_analysis, dict):
+            ver = session.ai_analysis.get("version_number")
+        resp.version_number = ver or 1
+        return resp
+
     def create_playtest_session(
         self,
         db: Session,
@@ -312,6 +321,13 @@ class ProjectService:
             declared_outcome=data.outcome,
         )
 
+        target_version = (
+            data.version_number
+            if (data.version_number and data.version_number >= 1)
+            else (project.current_version or 1)
+        )
+        initial_analysis = {"version_number": target_version}
+
         session = PlaytestSession(
             project_id=project_id,
             user_id=user_id,
@@ -324,11 +340,12 @@ class ProjectService:
             objectives_completed=summary["objectives_completed"],
             outcome=summary["outcome"],
             telemetry_events=data.telemetry_events,
+            ai_analysis=initial_analysis,
         )
         db.add(session)
         db.commit()
         db.refresh(session)
-        return PlaytestSessionResponse.model_validate(session)
+        return self._format_playtest_response(session)
 
     def get_playtest_session(
         self,
@@ -351,7 +368,7 @@ class ProjectService:
         )
         if not session:
             raise PlaytestNotFoundError(session_id)
-        return PlaytestSessionResponse.model_validate(session)
+        return self._format_playtest_response(session)
 
     def list_playtest_sessions(
         self,
@@ -368,7 +385,7 @@ class ProjectService:
             .order_by(PlaytestSession.created_at.desc())
             .all()
         )
-        return [PlaytestSessionResponse.model_validate(s) for s in sessions]
+        return [self._format_playtest_response(s) for s in sessions]
 
     async def analyze_playtest_session(
         self,
@@ -426,7 +443,14 @@ class ProjectService:
         validated = PlaytestAnalysisResponse.model_validate(analysis_dict)
 
         if target_session:
-            target_session.ai_analysis = validated.model_dump()
+            cur_ver = 1
+            if target_session.ai_analysis and isinstance(target_session.ai_analysis, dict):
+                cur_ver = target_session.ai_analysis.get("version_number", project.current_version or 1)
+            else:
+                cur_ver = project.current_version or 1
+            analysis_data = validated.model_dump()
+            analysis_data["version_number"] = cur_ver
+            target_session.ai_analysis = analysis_data
             db.commit()
 
         return validated
@@ -444,13 +468,95 @@ class ProjectService:
         if not project.game_dsl:
             raise ValueError("Cannot improve project without existing Game DSL.")
 
+        current_ver_num = project.current_version or 1
+
+        # 1. Optimistic Locking Base Version Check
+        if data.base_version_number is not None and data.base_version_number != current_ver_num:
+            raise ValueError(
+                f"Stale analysis conflict: Project is at version {current_ver_num}, "
+                f"but recommendation was requested for base version {data.base_version_number}."
+            )
+
+        # 2. Session Staleness Check
+        source_session = None
+        if data.session_id:
+            source_session = (
+                db.query(PlaytestSession)
+                .filter(
+                    PlaytestSession.id == data.session_id,
+                    PlaytestSession.project_id == project.id,
+                    PlaytestSession.user_id == user_id,
+                )
+                .first()
+            )
+            if not source_session:
+                raise PlaytestNotFoundError(data.session_id)
+
+            session_ver = None
+            if source_session.ai_analysis and isinstance(source_session.ai_analysis, dict):
+                session_ver = source_session.ai_analysis.get("version_number")
+
+            current_ver_rec = (
+                db.query(ProjectVersion)
+                .filter(
+                    ProjectVersion.project_id == project.id,
+                    ProjectVersion.version_number == current_ver_num,
+                )
+                .first()
+            )
+            if session_ver is not None and session_ver != current_ver_num:
+                raise ValueError(
+                    f"Stale analysis conflict: Playtest session was recorded for version {session_ver}, "
+                    f"which is stale relative to current version {current_ver_num}."
+                )
+            if current_ver_rec and source_session.created_at and source_session.created_at < current_ver_rec.created_at:
+                raise ValueError(
+                    f"Stale analysis conflict: Playtest session was recorded prior to current version {current_ver_num}."
+                )
+
         current_dsl = project.game_dsl
         design_spec = project.design_spec or {"title": project.title, "genre": project.genre}
+
+        # Filter and track actionable field-level changes
+        from app.schemas.improvement import ImprovementFieldChange
+        changes: List[ImprovementFieldChange] = []
+        actionable_recs = []
+
+        for rec in data.selected_recommendations:
+            patch = rec.get("suggested_patch", {})
+            rec_id = rec.get("id", "rec")
+            rec_desc = rec.get("description", "")
+            if isinstance(patch, dict) and patch:
+                actionable_recs.append(rec)
+                for top_k, top_v in patch.items():
+                    if isinstance(top_v, dict) and isinstance(current_dsl.get(top_k), dict):
+                        for sub_k, sub_v in top_v.items():
+                            prev_v = current_dsl.get(top_k, {}).get(sub_k)
+                            changes.append(
+                                ImprovementFieldChange(
+                                    fieldName=f"{top_k}.{sub_k}",
+                                    previousValue=prev_v,
+                                    newValue=sub_v,
+                                    recommendationId=rec_id,
+                                    description=rec_desc,
+                                )
+                            )
+                    else:
+                        prev_v = current_dsl.get(top_k)
+                        changes.append(
+                            ImprovementFieldChange(
+                                fieldName=top_k,
+                                previousValue=prev_v,
+                                newValue=top_v,
+                                recommendationId=rec_id,
+                                description=rec_desc,
+                            )
+                        )
 
         result = await game_generation_service.apply_improvements(
             current_dsl=current_dsl,
             design_spec=design_spec,
-            selected_recommendations=data.selected_recommendations,
+            selected_recommendations=actionable_recs if actionable_recs else data.selected_recommendations,
             user_notes=data.user_notes,
         )
 
@@ -464,11 +570,18 @@ class ProjectService:
             .filter(ProjectVersion.project_id == project.id)
             .scalar()
         )
-        new_version_num = max(max_v or 0, project.current_version or 0) + 1
+        new_version_num = max(max_v or 0, current_ver_num) + 1
         new_dsl_dict = result.dsl.model_dump()
-        change_desc = "; ".join(
-            r.get("description", "Improvement applied") for r in data.selected_recommendations
+
+        source_info = (
+            f"Playtest improvement (session {data.session_id} v{current_ver_num})"
+            if data.session_id
+            else f"Playtest improvement (v{current_ver_num})"
         )
+        recs_summary = "; ".join(r.get("description", "Improvement applied") for r in data.selected_recommendations)
+        change_desc = f"{source_info}: {recs_summary}"
+        if data.user_notes:
+            change_desc += f" [Notes: {data.user_notes}]"
 
         project.game_dsl = new_dsl_dict
         project.current_version = new_version_num
@@ -487,11 +600,17 @@ class ProjectService:
         db.refresh(project)
 
         return ImprovementApplyResponse(
-            project_id=project.id,
+            projectId=project.id,
+            previousVersionNumber=current_ver_num,
+            newVersionNumber=new_version_num,
             version_number=new_version_num,
-            game_dsl=new_dsl_dict,
-            change_summary=change_desc,
+            gameDsl=new_dsl_dict,
+            designSpec=project.design_spec,
+            changeSummary=change_desc,
+            changes=changes,
+            sourceSessionId=data.session_id,
             status="SUCCESS",
+            message=f"Playtest improvements applied successfully as version {new_version_num}.",
         )
 
     def get_project_blueprint(

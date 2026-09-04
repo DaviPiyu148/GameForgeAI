@@ -497,9 +497,38 @@ export interface PlaytestSessionRecord {
   collectibles_gathered: number;
   objectives_completed: number;
   outcome: string;
+  version_number?: number;
   telemetry_events?: unknown[] | null;
   ai_analysis?: import('../runtime/types').PlaytestAnalysis | null;
   created_at: string;
+}
+
+export interface ImprovementFieldChange {
+  fieldName: string;
+  previousValue: any;
+  newValue: any;
+  recommendationId?: string | null;
+  description?: string | null;
+}
+
+export interface ImprovementApplyRequest {
+  recommendations: import('../runtime/types').PlaytestRecommendation[];
+  sessionId?: string | null;
+  baseVersionNumber?: number | null;
+  userNotes?: string | null;
+}
+
+export interface ImprovementApplyResponse {
+  projectId: string;
+  previousVersionNumber: number;
+  newVersionNumber: number;
+  gameDsl: GameDSL;
+  designSpec?: GameDesignSpec | null;
+  changeSummary: string;
+  changes: ImprovementFieldChange[];
+  sourceSessionId?: string | null;
+  status: 'SUCCESS';
+  message: string;
 }
 
 export interface BuildInspirationResponse {

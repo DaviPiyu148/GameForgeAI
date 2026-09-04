@@ -734,6 +734,29 @@ class GameGenerationService:
         dsl_dict = current_dsl.model_dump() if hasattr(current_dsl, "model_dump") else (current_dsl if isinstance(current_dsl, dict) else {})
         dsl_copy = copy.deepcopy(dsl_dict)
 
+        # Direct deterministic patch application when structured suggested_patches exist
+        has_direct_patches = any(
+            isinstance(r.get("suggested_patch"), dict) and bool(r.get("suggested_patch"))
+            for r in selected_recommendations
+        )
+        if has_direct_patches:
+            for rec in selected_recommendations:
+                patch = rec.get("suggested_patch", {})
+                if isinstance(patch, dict):
+                    for k, v in patch.items():
+                        if isinstance(v, dict) and isinstance(dsl_copy.get(k), dict):
+                            dsl_copy[k].update(v)
+                        else:
+                            dsl_copy[k] = v
+            val_direct = validate_game_dsl(dsl_copy)
+            if val_direct.is_valid and val_direct.dsl:
+                return GenerationResult(
+                    success=True,
+                    dsl=val_direct.dsl,
+                    design_spec=design_spec if isinstance(design_spec, GameDesignSpec) else None,
+                    attempts_used=1,
+                )
+
         prompt = build_improvement_prompt(dsl_copy, spec_dict, selected_recommendations)
 
         try:

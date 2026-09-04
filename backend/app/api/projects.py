@@ -358,8 +358,13 @@ async def apply_improvements(
             logger.warning(f"Telemetry tracking failed on project improvement for user {current_user.id}: {pe}")
 
         return imp_res
-    except ProjectNotFoundError as e:
-        return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except (ProjectNotFoundError, PlaytestNotFoundError) as e:
+        return make_error_response("NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except ValueError as e:
+        err_msg = str(e)
+        if "stale" in err_msg.lower():
+            return make_error_response("STALE_ANALYSIS", err_msg, status.HTTP_409_CONFLICT)  # type: ignore
+        return make_error_response("IMPROVEMENT_FAILED", err_msg, status.HTTP_400_BAD_REQUEST)  # type: ignore
     except Exception as e:
         return make_error_response("IMPROVEMENT_FAILED", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
 

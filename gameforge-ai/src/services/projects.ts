@@ -98,5 +98,22 @@ export const projectService = {
       versionNumber,
     });
   },
+
+  /**
+   * Run playtest critique and generate actionable gameplay improvement recommendations.
+   */
+  async analyzePlaytest(id: string, sessionId?: string, telemetryPayload?: Record<string, any>): Promise<import('../runtime/types').PlaytestAnalysis> {
+    return await apiClient.post<import('../runtime/types').PlaytestAnalysis>(`/projects/${id}/analyze-playtest`, {
+      session_id: sessionId,
+      telemetry: telemetryPayload,
+    });
+  },
+
+  /**
+   * Apply approved playtest improvement recommendations to create an immutable forward version (vN+1).
+   */
+  async applyImprovements(id: string, request: import('../types').ImprovementApplyRequest): Promise<import('../types').ImprovementApplyResponse> {
+    return await apiClient.post<import('../types').ImprovementApplyResponse>(`/projects/${id}/improvements`, request);
+  },
 };
 

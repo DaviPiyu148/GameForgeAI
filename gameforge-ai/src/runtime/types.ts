@@ -513,6 +513,7 @@ export interface PlaytestRecommendation {
   dsl_change_type: string;
   evidence?: string;
   suggested_patch: Record<string, any>;
+  is_actionable?: boolean;
 }
 
 export interface PlaytestAnalysis {

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import type { GameProject, PlaytestSessionRecord, ProjectVersionSummary } from '../../types';
 import type { PlaytestAnalysis } from '../../runtime/types';
 import { projectService } from '../../services/projects';
-import { apiClient, ApiError } from '../../services/api';
+import { ApiError } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
 
 interface StudioPlaytestsTabProps {
@@ -72,18 +72,21 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
   const winRate = totalRuns > 0 ? Math.round((winCount / totalRuns) * 100) : 0;
   const highScore = playtests.length > 0 ? Math.max(...playtests.map((p) => p.score)) : 0;
 
+  const [showPatchPreview, setShowPatchPreview] = useState(false);
+
   const handleAnalyzeLatest = async () => {
     if (!latestSession) return;
     setIsAnalyzing(true);
     setPatchErrorMessage(null);
     try {
-      const res = await apiClient.post<PlaytestAnalysis>(
-        `/projects/${project.id}/analyze-playtest`,
-        { session_id: latestSession.id }
-      );
+      const res = await projectService.analyzePlaytest(project.id, latestSession.id);
       setActiveAnalysis(res);
       if (res.recommendations) {
-        setSelectedPatches(res.recommendations.map((_, i) => i));
+        // Automatically select actionable recommendations by default
+        const actionableIndices = res.recommendations
+          .map((r, i) => (r.suggested_patch && Object.keys(r.suggested_patch).length > 0 ? i : -1))
+          .filter((i) => i >= 0);
+        setSelectedPatches(actionableIndices);
       }
       await refreshProgress();
       await fetchData();
@@ -100,33 +103,73 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
     setPatchErrorMessage(null);
     setPatchSuccessMessage(null);
 
-    const chosenRecs = selectedPatches.map((idx) => activeAnalysis.recommendations[idx]).filter(Boolean);
+    const chosenRecs = selectedPatches
+      .map((idx) => activeAnalysis.recommendations[idx])
+      .filter((r) => Boolean(r && r.suggested_patch && Object.keys(r.suggested_patch).length > 0));
+
     try {
-      const res = await apiClient.post<{
-        project_id: string;
-        new_version_number: number;
-        game_dsl: import('../../runtime/types').GameDSL;
-        design_spec?: import('../../types').GameDesignSpec | null;
-        change_summary?: string;
-      }>(`/projects/${project.id}/improvements`, {
-        session_id: latestSession?.id,
+      const res = await projectService.applyImprovements(project.id, {
         recommendations: chosenRecs,
+        sessionId: latestSession?.id,
+        baseVersionNumber: project.currentVersion || 1,
       });
 
-      setPatchSuccessMessage(`Patches applied successfully! Project updated to v${res.new_version_number}.`);
+      setPatchSuccessMessage(`Patches applied successfully! Project updated to v${res.newVersionNumber}.`);
+      setShowPatchPreview(false);
       onProjectUpdated({
         ...project,
-        gameDsl: res.game_dsl,
-        designSpec: res.design_spec ?? project.designSpec,
-        currentVersion: res.new_version_number,
+        gameDsl: res.gameDsl,
+        designSpec: res.designSpec ?? project.designSpec,
+        currentVersion: res.newVersionNumber,
       });
       await refreshProgress();
+      await fetchData();
     } catch (err) {
-      setPatchErrorMessage(err instanceof ApiError ? err.message : 'Could not apply patches.');
+      if (err instanceof ApiError && err.status === 409) {
+        setPatchErrorMessage('Stale analysis conflict: Project has advanced to a newer version. Please refresh and analyze a current playtest.');
+      } else {
+        setPatchErrorMessage(err instanceof ApiError ? err.message : 'Could not apply patches.');
+      }
     } finally {
       setIsApplyingPatches(false);
     }
   };
+
+  // Helper to compute preview diffs for selected recommendations
+  const computeSelectedDiffs = () => {
+    if (!activeAnalysis?.recommendations || !project.gameDsl) return [];
+    const diffs: Array<{ field: string; current: string; proposed: string; desc: string }> = [];
+    const chosenRecs = selectedPatches.map((idx) => activeAnalysis.recommendations[idx]).filter(Boolean);
+
+    for (const rec of chosenRecs) {
+      const patch = rec.suggested_patch;
+      if (!patch || typeof patch !== 'object') continue;
+      for (const [topKey, topVal] of Object.entries(patch)) {
+        if (topVal && typeof topVal === 'object' && !Array.isArray(topVal)) {
+          for (const [subKey, subVal] of Object.entries(topVal)) {
+            const curVal = (project.gameDsl as any)?.[topKey]?.[subKey];
+            diffs.push({
+              field: `${topKey}.${subKey}`,
+              current: curVal !== undefined ? JSON.stringify(curVal) : '(undefined)',
+              proposed: JSON.stringify(subVal),
+              desc: rec.description,
+            });
+          }
+        } else {
+          const curVal = (project.gameDsl as any)?.[topKey];
+          diffs.push({
+            field: topKey,
+            current: curVal !== undefined ? JSON.stringify(curVal) : '(undefined)',
+            proposed: JSON.stringify(topVal),
+            desc: rec.description,
+          });
+        }
+      }
+    }
+    return diffs;
+  };
+
+  const selectedDiffs = computeSelectedDiffs();
 
   if (isLoading) {
     return (
@@ -301,50 +344,140 @@ export const StudioPlaytestsTab: React.FC<StudioPlaytestsTabProps> = ({
 
                 {/* Recommendations & Patch Apply */}
                 {activeAnalysis.recommendations && activeAnalysis.recommendations.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-outline-variant/20">
-                    <div className="text-[10px] text-secondary font-bold uppercase">Recommended Gameplay Patches:</div>
-                    <div className="space-y-1.5">
-                      {activeAnalysis.recommendations.map((rec, idx) => (
-                        <label
-                          key={idx}
-                          className={`flex items-start gap-2 p-2 rounded text-xs border cursor-pointer transition-colors ${
-                            selectedPatches.includes(idx)
-                              ? 'bg-primary/10 border-primary/40 text-on-surface'
-                              : 'bg-surface/40 border-outline-variant/30 text-outline hover:text-on-surface'
-                          }`}
+                  <div className="space-y-3 pt-2 border-t border-outline-variant/20">
+                    <div className="flex justify-between items-center">
+                      <div className="text-[10px] text-secondary font-bold uppercase">
+                        Recommended Gameplay Patches ({activeAnalysis.recommendations.length}):
+                      </div>
+                      {selectedDiffs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPatchPreview(!showPatchPreview)}
+                          className="text-[10px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          <input
-                            type="checkbox"
-                            disabled={isAnalysisStale}
-                            checked={selectedPatches.includes(idx)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedPatches((prev) => [...prev, idx]);
-                              } else {
-                                setSelectedPatches((prev) => prev.filter((i) => i !== idx));
-                              }
-                            }}
-                            className="mt-0.5"
-                          />
-                          <div className="space-y-0.5">
-                            <div className="font-bold font-sans text-xs">{rec.description}</div>
-                            <div className="text-[10px] text-outline">
-                              Target: {rec.dsl_change_type} {rec.evidence ? `• Evidence: ${rec.evidence}` : ''}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
+                          <span className="material-symbols-outlined text-xs">
+                            {showPatchPreview ? 'visibility_off' : 'visibility'}
+                          </span>
+                          <span>{showPatchPreview ? 'Hide Diff Preview' : `Preview Diff (${selectedDiffs.length} changes)`}</span>
+                        </button>
+                      )}
                     </div>
 
-                    <div className="pt-2 flex justify-end">
-                      <button
-                        onClick={handleApplySelectedPatches}
-                        disabled={isApplyingPatches || selectedPatches.length === 0 || isAnalysisStale}
-                        className="px-4 py-2 bg-primary text-surface font-bold text-xs rounded hover:bg-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(76,224,210,0.4)] disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <span className="material-symbols-outlined text-sm">build</span>
-                        <span>{isApplyingPatches ? 'APPLYING PATCHES...' : `APPLY ${selectedPatches.length} PATCHES → v${(project.currentVersion || 1) + 1}`}</span>
-                      </button>
+                    {/* Diff Preview Accordion */}
+                    {showPatchPreview && selectedDiffs.length > 0 && (
+                      <div className="bg-surface/80 border border-primary/30 p-3 rounded space-y-2 text-xs font-mono">
+                        <div className="text-[10px] text-primary font-bold uppercase">Proposed DSL Modifications:</div>
+                        <div className="divide-y divide-outline-variant/20 max-h-48 overflow-y-auto">
+                          {selectedDiffs.map((d, i) => (
+                            <div key={i} className="py-1.5 flex flex-col gap-0.5">
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-secondary font-bold">{d.field}</span>
+                                <span className="text-[9px] text-outline truncate max-w-[200px]">{d.desc}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px]">
+                                <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">
+                                  Current: {d.current}
+                                </span>
+                                <span className="material-symbols-outlined text-xs text-outline">arrow_forward</span>
+                                <span className="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-bold">
+                                  Proposed: {d.proposed}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      {activeAnalysis.recommendations.map((rec, idx) => {
+                        const isActionable = Boolean(rec.suggested_patch && Object.keys(rec.suggested_patch).length > 0);
+                        const isSelected = selectedPatches.includes(idx);
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-2.5 p-2.5 rounded text-xs border transition-colors ${
+                              !isActionable
+                                ? 'bg-surface/30 border-outline-variant/20 opacity-80'
+                                : isSelected
+                                ? 'bg-primary/10 border-primary/40 text-on-surface'
+                                : 'bg-surface/40 border-outline-variant/30 text-outline hover:text-on-surface'
+                            }`}
+                          >
+                            {isActionable ? (
+                              <input
+                                type="checkbox"
+                                disabled={isAnalysisStale}
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedPatches((prev) => [...prev, idx]);
+                                  } else {
+                                    setSelectedPatches((prev) => prev.filter((i) => i !== idx));
+                                  }
+                                }}
+                                className="mt-0.5 cursor-pointer"
+                              />
+                            ) : (
+                              <span className="material-symbols-outlined text-xs text-outline mt-0.5" title="Informational critique (no direct parameter patch)">
+                                info
+                              </span>
+                            )}
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="font-bold font-sans text-xs">{rec.description}</div>
+                                <span
+                                  className={`text-[9px] px-1.5 py-0.2 rounded uppercase font-mono font-bold ${
+                                    isActionable
+                                      ? 'bg-primary/20 text-primary border border-primary/40'
+                                      : 'bg-outline-variant/30 text-outline'
+                                  }`}
+                                >
+                                  {isActionable ? 'ACTIONABLE PATCH' : 'INFORMATIONAL'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-outline font-mono">
+                                Target: {rec.dsl_change_type} {rec.evidence ? `• Evidence: ${rec.evidence}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="pt-2 flex justify-between items-center flex-wrap gap-2">
+                      <div className="text-[10px] text-outline">
+                        {isAnalysisStale ? (
+                          <span className="text-amber-400 font-bold">Stale: Play new session to enable patching</span>
+                        ) : (
+                          <span>{selectedPatches.length} of {activeAnalysis.recommendations.filter(r => r.suggested_patch && Object.keys(r.suggested_patch).length > 0).length} actionable patches selected</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {patchSuccessMessage && (
+                          <button
+                            type="button"
+                            onClick={onPlayNewSession}
+                            className="px-3 py-1.5 bg-secondary text-surface font-bold text-xs rounded hover:bg-secondary/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(202,189,255,0.4)]"
+                          >
+                            <span className="material-symbols-outlined text-sm">play_arrow</span>
+                            <span>PLAY PROTOTYPE v{project.currentVersion || 1}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={handleApplySelectedPatches}
+                          disabled={isApplyingPatches || selectedPatches.length === 0 || isAnalysisStale}
+                          className="px-4 py-2 bg-primary text-surface font-bold text-xs rounded hover:bg-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(76,224,210,0.4)] disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined text-sm">build</span>
+                          <span>
+                            {isApplyingPatches
+                              ? 'APPLYING PATCHES...'
+                              : `APPLY ${selectedPatches.length} PATCHES → v${(project.currentVersion || 1) + 1}`}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

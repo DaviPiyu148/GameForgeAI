@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import logging
 from typing import Any, Dict, List, Set, Tuple
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DatabaseError, IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.models.project import Project
@@ -633,36 +633,28 @@ class InspirationSynthesisService:
         prev_version_num = current_version_num
         change_desc = f"Inspiration synthesis applied: {len(inspirations)} reference games ({source_summary_titles})"
 
-        max_attempts = 5
-        for attempt in range(max_attempts):
-            try:
-                max_v = (
-                    db.query(func.max(ProjectVersion.version_number))
-                    .filter(ProjectVersion.project_id == project.id)
-                    .scalar()
-                )
-                new_version_num = max(max_v or 0, project.current_version or 0) + 1
-                
-                project.current_version = new_version_num
-                project.updated_at = datetime.now(timezone.utc)
+        new_version_num = data.base_version_number + 1
+        try:
+            project.current_version = new_version_num
+            project.updated_at = datetime.now(timezone.utc)
 
-                version_rec = ProjectVersion(
-                    project_id=project.id,
-                    version_number=new_version_num,
-                    game_dsl=project.game_dsl or {},
-                    design_spec=project.design_spec,
-                    change_summary=change_desc,
-                    remix_intent=None,
-                )
-                db.add(version_rec)
-                db.commit()
-                db.refresh(project)
-                break
-            except IntegrityError:
-                db.rollback()
-                db.expire_all()
-                if attempt == max_attempts - 1:
-                    raise
+            version_rec = ProjectVersion(
+                project_id=project.id,
+                version_number=new_version_num,
+                game_dsl=project.game_dsl or {},
+                design_spec=project.design_spec,
+                change_summary=change_desc,
+                remix_intent=None,
+            )
+            db.add(version_rec)
+            db.commit()
+            db.refresh(project)
+        except (IntegrityError, DatabaseError, OperationalError):
+            db.rollback()
+            raise StaleProposalError(
+                f"Proposal was generated from base version {data.base_version_number}, "
+                f"but project version was modified concurrently."
+            )
 
         # 8. Construct derived Blueprint
         try:

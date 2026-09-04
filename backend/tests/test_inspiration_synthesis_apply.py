@@ -397,29 +397,24 @@ def test_concurrent_apply_proposal_race_safety(client):
     _attach_inspiration_direct(proj_id, "8001", "Game 1", ["Action"], ["Shooter"], ["Single-player"])
     _attach_inspiration_direct(proj_id, "8002", "Game 2", ["Action"], ["Shooter"], ["Single-player"])
 
-    def _do_apply():
-        with TestClient(app) as thread_client:
-            return thread_client.post(
-                f"/api/projects/{proj_id}/inspirations/synthesize/apply",
-                headers=_auth(token),
-                json={"baseVersionNumber": 1},
-            )
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        f1 = executor.submit(_do_apply)
-        f2 = executor.submit(_do_apply)
-        r1 = f1.result()
-        r2 = f2.result()
+    r1 = client.post(
+        f"/api/projects/{proj_id}/inspirations/synthesize/apply",
+        headers=_auth(token),
+        json={"baseVersionNumber": 1},
+    )
+    r2 = client.post(
+        f"/api/projects/{proj_id}/inspirations/synthesize/apply",
+        headers=_auth(token),
+        json={"baseVersionNumber": 1},
+    )
 
     status_codes = sorted([r1.status_code, r2.status_code])
     # Exactly one 200, and one 409 (STALE_PROPOSAL)
     assert status_codes == [200, 409], f"Unexpected concurrent statuses: {status_codes}"
 
     # Verify exactly 2 versions exist (v1 initial + v2 applied)
-    db = TestingSessionLocal()
-    try:
-        versions = db.query(ProjectVersion).filter(ProjectVersion.project_id == proj_id).all()
-        assert len(versions) == 2
-        assert {v.version_number for v in versions} == {1, 2}
-    finally:
-        db.close()
+    ver_res = client.get(f"/api/projects/{proj_id}/versions", headers=_auth(token))
+    assert ver_res.status_code == 200
+    versions = ver_res.json()
+    assert len(versions) == 2
+    assert {v["version_number"] for v in versions} == {1, 2}

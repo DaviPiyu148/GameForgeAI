@@ -149,6 +149,7 @@ class PlaytestRecommendation(BaseModel):
     dsl_change_type: str = Field(..., max_length=50)
     evidence: Optional[str] = Field(default=None, max_length=300)
     suggested_patch: Dict[str, Any] = Field(default_factory=dict)
+    is_actionable: bool = Field(default=True)
 
     model_config = ConfigDict(extra="ignore")
 
@@ -178,8 +179,10 @@ class PlaytestSessionResponse(BaseModel):
     collectibles_gathered: int
     objectives_completed: int
     outcome: str
+    version_number: Optional[int] = Field(default=1)
     telemetry_events: Optional[List[Dict[str, Any]]] = None
     ai_analysis: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, extra="ignore")
+

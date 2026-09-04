@@ -161,8 +161,9 @@ def test_apply_improvements_and_version_bump(auth_setup):
         res = client.post(f"/api/projects/{project.id}/improvements", json=improve_payload, headers=headers)
         assert res.status_code == 200
         data = res.json()
-        assert data["version_number"] == 2
-        assert data["game_dsl"]["player"]["speed"] == 290
+        assert (data.get("newVersionNumber") or data.get("versionNumber") or data.get("version_number")) == 2
+        dsl_res = data.get("gameDsl") or data.get("game_dsl")
+        assert dsl_res["player"]["speed"] == 290
 
         # Verify version listing
         ver_res = client.get(f"/api/projects/{project.id}/versions", headers=headers)
