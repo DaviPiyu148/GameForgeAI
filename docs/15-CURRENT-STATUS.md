@@ -80,8 +80,8 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 - **Viewport Responsiveness**: Verified down to 1024x768 across `#/`, `#/dashboard`, and `#/profile`. `hasHorizontalOverflow: false` with zero horizontal scrollbars or clipping.
 - **Discovery Candidate Pool Distinction**:
   - `games_catalog.json`: Full raw offline Steam catalog containing ~120k titles (448MB).
-  - `games_index.faiss` (`DiscoveryCandidatePool.POPULAR_20K`): Configured production vector index containing exactly **20,000** 384-dimensional dense vectors (`all-MiniLM-L6-v2`) prioritized by review volume and quality.
-  - `games_index_reviewed_only.faiss` (`DiscoveryCandidatePool.REVIEWED_ONLY`): Secondary candidate pool containing **87,890** vectors representing all titles with >= 1 positive review.
+  - `games_index.faiss` (`DiscoveryCandidatePool.POPULAR_20K`): Configured production vector index containing exactly **20,000** 384-dimensional dense vectors (`all-MiniLM-L6-v2`) prioritized strictly by total review count (`total_reviews`) and tag density (`len(tags)`). It is sorted by popularity and review volume (not quality-ranked; positive review sentiment is evaluated downstream during scoring, not during index slicing).
+  - `games_index_reviewed_only.faiss` (`DiscoveryCandidatePool.REVIEWED_ONLY`): Secondary candidate pool containing exactly **87,890** vectors representing all titles with `total_reviews > 0` (i.e. games having at least 1 total review in the Steam catalog, rather than requiring positive sentiment).
   - Earlier informal references to "14,000+ title FAISS index" in draft documentation are officially superseded by the authoritative 20,000 active vector index count.
 - **AI Generation vs Deterministic Synthesis Boundary**:
   - Step 4 deterministic design synthesis (`DeterministicSynthesisEngine`), Step 5 blueprint apply (`apply_inspiration_proposal`), diffing, synergy calculation, and all Studio UI operations are 100% deterministic, local, and consume zero LLM tokens.
