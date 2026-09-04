@@ -131,8 +131,8 @@ Commit: 4b2e9cf
 
 ### Dedicated Visual Microscope Evidence
 
-#### A. Material Symbols Icon Audit (Representative Sample of 14 Core Functional Glyph Types)
-*Note: These 14 icons represent a curated sample of core functional and interactive glyph types across the navbar, Studio deck, synthesis modals, and accordions (selected from over 40 distinct semantic/decorative glyphs across the entire application).*
+#### A. Material Symbols Icon Audit (Representative Core Sample — Option B)
+*Scope Statement*: **14 core icon types were browser/source-audited; decorative/repeated glyphs were not exhaustively enumerated.** (Curated from over 40 distinct semantic/decorative glyphs across the entire application).
 
 | Icon Name | Markup Location | Semantic Role | Observed Visual State | Audit Result |
 |---|---|---|---|---|
@@ -151,7 +151,9 @@ Commit: 4b2e9cf
 | `chevron_right` | `Navbar.tsx:200` | Drawer Nav Item | Aligned right edge of mobile nav items | `PASS` |
 | `travel_explore` | `Navbar.tsx`, `ProjectStudioModal.tsx:140` | Discover Similar Trigger | Cyan accent, matches Discovery motif | `PASS` |
 
-#### B. Animation & Transition Audit
+#### B. Animation & Transition Audit (Representative Core Transitions)
+*Scope Statement*: **The listed animations represent core visual and modal transitions (representative core transitions, not an exhaustive inventory of every micro-animation in the application).**
+
 **1. Source-Level Animation Audit (CSS Token & Rule Verification):**
 - **Backdrop Tokens (`modal-backdrop-enter` / `modal-backdrop-exit`)**: Uses `fadeIn` / `fadeOut` opacity interpolation (`0 <-> 1`) timed at `--motion-medium` (260ms) with `--ease-cyber` (`cubic-bezier(0.1, 0.9, 0.2, 1)`).
 - **Container Tokens (`modal-enter` / `modal-exit`)**: Applies subtle scale and vertical translate (`translateY(8px) scale(0.96) -> translateY(0) scale(1)`), preventing abrupt pop-in.
@@ -165,13 +167,38 @@ Commit: 4b2e9cf
 - **Accordion Toggle**: Observed `View Specs & Rules` expand/collapse on Version 5 snapshot with smooth icon rotation (`expand_more` -> `expand_less`) and height transition.
 - **Tactile Click Feedback**: Observed `.btn-interactive:active` applying subtle 0.98 scale-down on mouse-down across all primary and modal buttons.
 
-#### C. Interactive States Audit (Hover / Active / Focus / Disabled)
-- **Active Click State**: `.btn-interactive:active:not(:disabled)` applies tactile `scale(0.98)` feedback with enhanced box-shadow glow.
-- **Hover State**: `.btn-interactive:hover:not(:disabled)` elevates `translateY(-1px)` with `brightness(1.1)` and cyan/magenta box-shadows.
-- **Focus Rings**: Standard `focus:outline-none focus:ring-2 focus:ring-primary` on all interactive controls; keyboard Tab navigation remains obvious.
-- **Disabled State**: Disabled controls (e.g. `SAVED IN COLLECTION`, submitting buttons) consistently display `opacity-60` with `cursor-not-allowed` and suppress pointer events.
+#### C. Typography Evidence Audit
+*Scope Statement*: Comprehensive audit of font families, hierarchies, body text, buttons, code/metadata, weights, sizes, line heights, and capitalization conventions across the application surface.
 
-#### D. Full 1024x768 Viewport Responsiveness Matrix (All 9 Major Surfaces & Modals)
+| Element Category | Font Family Token | Rendered Font Family | Weight & Size | Line-Height & Spacing | Capitalization | Consistency Verification | Result |
+|---|---|---|---|---|---|---|---|
+| **H1 / Major Titles** | `--font-display` | `"Press Start 2P", monospace` | 400 (regular); 20px–30px (`text-xl` to `text-3xl`) | `leading-tight tracking-wider` | `UPPERCASE` | Consistent across all 7 routes and modal headers | `PASS` |
+| **H2 / Section Headers** | `--font-display` | `"Press Start 2P", monospace` | 400; 16px–18px (`text-base` to `text-lg`) | `leading-tight tracking-wide` | `UPPERCASE` | Consistent across Studio, Discovery, and Build sections | `PASS` |
+| **H3 / Subsection Headers** | `--font-display` | `"Press Start 2P", monospace` | 400; 12px–14px (`text-xs` to `text-sm`) | `leading-normal tracking-wide` | `UPPERCASE` | Consistent across parameter cards and tabs | `PASS` |
+| **Body / Explanations** | `--font-body` | `"Space Grotesk", sans-serif` | 400/500; 12px–14px (`text-xs` to `text-sm`) | `leading-relaxed` (1.625) | Sentence case | Clean legibility, zero clipped ascenders/descenders | `PASS` |
+| **Primary/Secondary Buttons** | `--font-mono` | `"JetBrains Mono", monospace` | 700 (bold); 11px–12px (`text-xs`) | `leading-none tracking-wider` | `UPPERCASE` | Consistent `.btn-interactive` font across all controls | `PASS` |
+| **Navigation Links** | `--font-mono` | `"JetBrains Mono", monospace` | 700 (bold); 11px–12px (`text-xs`) | `leading-none tracking-widest` | `UPPERCASE` | Consistent desktop and mobile drawer nav links | `PASS` |
+| **Metadata & Code Tokens** | `--font-mono` | `"JetBrains Mono", monospace` | 400/500; 10px–11px (`text-[10px]` to `text-xs`) | `leading-tight` | `UPPERCASE` (tags) / Literal (code) | Uniform token chips, parameters, and telemetry | `PASS` |
+| **Status / Level Badges** | `--font-mono` | `"JetBrains Mono", monospace` | 700 (bold); 9px–11px | `leading-none tracking-wide` | `UPPERCASE` | Consistent high-contrast pill styling | `PASS` |
+
+*Typography Finding*: Equivalent UI elements consistently utilize identical font tokens and conventions. Zero mixed font weights or mismatched capitalization observed.
+
+#### D. Interactive States Audit (Hover, Active, Focus, Disabled, Loading)
+*Scope Statement*: Systematic state audit covering primary buttons, secondary buttons, icon buttons, tabs, toggles, destructive actions, and modal dispatch controls.
+
+| Control Category | Representative Controls | Hover State | Active / Click State | Focus State | Disabled State | Loading State | Audit Result |
+|---|---|---|---|---|---|---|---|
+| **Primary Buttons** | `BUILD A GAME`, `SYNTHESIZE PROPOSAL`, `APPLY TO BLUEPRINT` | `translateY(-1px)`, `brightness(1.1)`, cyan glow `box-shadow: 0 0 20px rgba(76,224,210,0.5)` | `scale(0.98)`, `brightness(1.2)`, enhanced cyan glow `box-shadow: 0 0 30px rgba(76,224,210,0.7)` | `focus:outline-none focus:ring-2 focus:ring-primary` | `opacity-60 cursor-not-allowed pointer-events-none` | `opacity-75 cursor-wait` with `sync` spin icon | `PASS` |
+| **Secondary Buttons** | `CLOSE & REVIEW LATER`, `CANCEL`, `COPY`, `HISTORY` | Border highlights (`border-primary/60`), background tint (`bg-primary/10`), `translateY(-1px)` | `scale(0.98)`, tactile compression | `focus:ring-2 focus:ring-primary/50` | `opacity-50 cursor-not-allowed` | Preserved layout, pointer disabled | `PASS` |
+| **Icon Buttons** | `Close details` (X), `Close Studio` (X), `Close Popover` (X) | `scale(1.05)`, `brightness(1.2)`, text highlight | `scale(0.95)`, tactile depression | Accessible ring indicator on keyboard tab | `opacity-40 cursor-not-allowed` | N/A (instant sync actions) | `PASS` |
+| **Navigation Tabs** | `OVERVIEW & BLUEPRINT`, `PLAYTEST`, `VERSION HISTORY` | Text brightens (`text-white`), subtle container background | Highlight active border (`border-b-2 border-primary`), active teal text | Accessible keyboard tab stop with focus ring | N/A (always available in Studio) | N/A | `PASS` |
+| **Mode Toggles** | `BEST MATCH`, `DISCOVER`, `HIDDEN GEMS`, `POPULAR` | Border brightens (`border-primary/40`), text brightens | Active cyan border, active teal background tint, glow box shadow | Visible tab ring | Suppressed during active query | Subtle loading pulse | `PASS` |
+| **Destructive Actions** | `Remove from saved`, `Delete inspiration` | Red highlight (`text-error border-error/50 bg-error/10`), rose glow | `scale(0.98)`, tactile click | Visible error ring (`focus:ring-error`) | `opacity-50 cursor-not-allowed` | N/A | `PASS` |
+| **Modal Commit Actions** | `CONFIRM & CREATE V5` | `translateY(-1px)`, brightness bump | Dispatches async action, locks backdrop dismissal | Accessible focus ring | Disabled during dispatch (`isApplying=true`) | Active rotating spinner (`animate-spin`), label updates | `PASS` |
+
+*Interactive States Finding*: All interactive controls implement clear, accessible feedback across all 5 interaction states without dead clicks, layout shifts, or focus traps.
+
+#### E. Full 1024x768 Viewport Responsiveness Matrix (All 9 Major Surfaces & Modals)
 | Surface / Component | Container Width Constraint | `window.innerWidth` | `document.documentElement.scrollWidth` | `hasHorizontalOverflow` | Responsive Behavior Observed |
 |---|---|---|---|---|---|
 | **Studio Modal** | `max-w-4xl max-h-[92vh] w-full mx-auto` | 1026px | 1015px | `false` | Modal shrinks smoothly to fit 1024px; tab bar uses horizontal scrollbar if compressed (`overflow-x-auto`) |
