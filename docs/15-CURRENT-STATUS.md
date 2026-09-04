@@ -76,7 +76,7 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 - **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 85 files).
 - **Frontend unit test suites**: 10/10 suites passing (86 assertions across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
 - **Production build**: succeeds (`npm run build`).
-- **Interactive Control Inventory**: 45 meaningful non-auth, non-generation controls inspected; 42 clicked/exercised with PASS result; 1 expected disabled; 3 safely bypassed (generation controls). Zero unhandled runtime exceptions.
+- **Interactive Control Inventory**: 45 meaningful non-auth, non-generation controls inspected; 42 clicked/exercised with PASS result; 1 expected disabled; 2 intentionally excluded (generation controls: PLAY, COMPILE SCENE). Zero unhandled runtime exceptions (42 + 1 + 2 = 45).
 - **Viewport Responsiveness**: Verified down to 1024x768 across `#/`, `#/dashboard`, and `#/profile`. `hasHorizontalOverflow: false` with zero horizontal scrollbars or clipping.
 - **Discovery Candidate Pool Distinction**:
   - `games_catalog.json`: Full raw offline Steam catalog containing ~120k titles (448MB).

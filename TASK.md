@@ -35,7 +35,7 @@ Commit: 4b2e9cf
 
 ## 2. UI QA Subtasks
 
-- [x] 2.1 UI QA Interactive Control Inventory (Cataloged 45 controls across Discovery, Studio, Profile, Docs, Modals; 42 clicked PASS, 1 expected disabled, 3 safely bypassed)
+- [x] 2.1 UI QA Interactive Control Inventory (Cataloged 45 controls across Discovery, Studio, Profile, Docs, Modals; 42 clicked PASS, 1 expected disabled, 2 intentionally excluded; 42 + 1 + 2 = 45)
 - [x] 2.2 Discovery UI & Card Interaction Audit (Search input, modes, cards, save, bookmark, details modal, 0% data bleed across Slay the Spire vs Balatro)
 - [x] 2.3 Profile & Saved Discoveries UI Audit (Saved cards, unsave, XP/progression display, empty state)
 - [x] 2.4 Studio Navigation & Tab Visual Audit (Blueprint, Inspirations, Playtest & History tab transitions, indicators, typography)
@@ -180,6 +180,8 @@ Commit: 4b2e9cf
 - [x] Review git status and git diff
 - [x] Commit created
 - [x] Working tree verified clean
+
+Commit: 2549a93d0ff7cd6470ec08008bd52cc03cb6d3b8
 
 ---
 
