@@ -579,6 +579,7 @@ export interface AppState {
   projectsError?: string | null;
   progress?: UserProgressData | null;
   preferences?: UserPreferencesData | null;
+  pendingInspirationTarget?: DiscoverySearchResult | null;
 }
 
 export interface AppContextType {
@@ -587,6 +588,7 @@ export interface AppContextType {
   updateBuildParams: (params: Partial<BuildParams>) => void;
   setBuildInspirationSource: (source: BuildInspirationSource | null) => void;
   clearBuildInspiration: () => void;
+  setPendingInspirationTarget: (target: DiscoverySearchResult | null) => void;
   setBuildStatus: (status: AppState['buildStatus']) => void;
   addGameProject: (project: GameProject) => void;
   updateGameProject: (project: GameProject) => void;

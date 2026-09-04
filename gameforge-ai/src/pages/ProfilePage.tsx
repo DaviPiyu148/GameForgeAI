@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
@@ -28,12 +28,39 @@ export default function ProfilePage() {
     refreshPreferences,
   } = useAppContext();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
   const [showLikedGamesModal, setShowLikedGamesModal] = useState(false);
   const [selectedSavedGame, setSelectedSavedGame] = useState<DiscoverySearchResult | null>(null);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [displayGames, setDisplayGames] = useState(0);
+  const [highlightSettings, setHighlightSettings] = useState(false);
+
+  useEffect(() => {
+    const triggerHighlight = () => {
+      const el = document.getElementById('account-settings');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightSettings(true);
+        const timer = setTimeout(() => {
+          setHighlightSettings(false);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    if (location.hash === '#account-settings') {
+      triggerHighlight();
+    }
+
+    const onCustomHighlight = () => {
+      triggerHighlight();
+    };
+
+    window.addEventListener('highlight-account-settings', onCustomHighlight);
+    return () => window.removeEventListener('highlight-account-settings', onCustomHighlight);
+  }, [location.hash, location.key]);
 
   // Avatar Management Modal
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -917,7 +944,14 @@ export default function ProfilePage() {
 
           {/* Account Settings (Username & Password) */}
           {state.authStatus === 'AUTHENTICATED' && (
-            <div id="account-settings" className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+            <div
+              id="account-settings"
+              className={`relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel transition-all duration-500 ${
+                highlightSettings
+                  ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(76,224,210,0.6)]'
+                  : ''
+              }`}
+            >
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">manage_accounts</span>

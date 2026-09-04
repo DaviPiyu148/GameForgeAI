@@ -10,6 +10,7 @@ import { InspirationAttachModal } from '../components/Shared/InspirationAttachMo
 import { BrainGearIcon, TargetArrowIcon, FireBurningIcon } from '../components/Shared/FeatureIcons';
 import { projectService } from '../services/projects';
 import { inspirationService } from '../services/inspirations';
+import { normalizeLogicModules } from '../utils/modules';
 import type { DiscoverySearchResult } from '../types';
 
 const INITIAL_VISIBLE_RESULTS = 12;
@@ -38,6 +39,7 @@ const HomePage = () => {
     updateBuildParams,
     setBuildInspirationSource,
     clearBuildInspiration,
+    setPendingInspirationTarget,
     state,
     setState,
     searchDiscovery,
@@ -260,7 +262,7 @@ const HomePage = () => {
       const inspiration = await discoveryService.getBuildInspiration(gameId);
 
       updateBuildParams({
-        modules: inspiration.suggested_modules,
+        modules: normalizeLogicModules(inspiration.suggested_modules),
         ...(inspiration.suggested_art_density !== undefined ? { artDensity: inspiration.suggested_art_density } : {}),
         ...(inspiration.suggested_physics !== undefined ? { physics: inspiration.suggested_physics } : {}),
       });
@@ -1062,6 +1064,9 @@ const HomePage = () => {
             });
           }}
           onSelectProject={() => {
+            if (inspirationTarget) {
+              setPendingInspirationTarget(inspirationTarget);
+            }
             setInspirationTarget(null);
             navigate('/dashboard');
           }}

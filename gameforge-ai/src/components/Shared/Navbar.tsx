@@ -96,7 +96,7 @@ export const Navbar = () => {
         </div>
 
         {/* Center Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-4 h-full" aria-label="Desktop primary navigation">
+        <nav className="hidden md:flex items-center gap-1 h-full" aria-label="Desktop primary navigation">
           {navLinks.map((link) => {
             const active = isActive(link.path);
             return (
@@ -105,15 +105,19 @@ export const Navbar = () => {
                 to={link.path}
                 onClick={link.path === '/build' ? clearBuildInspiration : undefined}
                 aria-current={active ? 'page' : undefined}
-                className={`relative h-full flex items-center font-mono text-xs uppercase tracking-wider transition-colors px-3 ${
+                className={`relative w-24 sm:w-28 h-full flex items-center justify-center font-mono text-xs uppercase tracking-wider transition-colors text-center ${
                   active ? 'text-primary text-glow-cyan font-bold' : 'text-on-surface-variant hover:text-primary'
                 }`}
               >
-                {link.name}
-                {/* Animated active indicator */}
+                <span>{link.name}</span>
+                {/* Upward glow/light projection from below */}
+                {active && (
+                  <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-primary/25 via-primary/10 to-transparent pointer-events-none" />
+                )}
+                {/* Bottom light rail */}
                 <div
-                  className={`absolute bottom-0 left-0 w-full h-[2px] bg-primary transition-transform duration-300 origin-center ${
-                    active ? 'scale-x-100 glow-cyan' : 'scale-x-0'
+                  className={`absolute bottom-0 left-0 right-0 h-[2.5px] bg-primary transition-all duration-300 ${
+                    active ? 'opacity-100 shadow-[0_0_12px_rgba(76,224,210,0.95)]' : 'opacity-0'
                   }`}
                 />
               </Link>
@@ -206,7 +210,15 @@ export const Navbar = () => {
                   <div className="space-y-1 pt-1">
                     <Link
                       to="/profile"
-                      onClick={() => setIsProfilePopoverOpen(false)}
+                      onClick={() => {
+                        setIsProfilePopoverOpen(false);
+                        if (location.pathname === '/profile') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          if (window.location.hash) {
+                            window.history.replaceState(null, '', window.location.pathname);
+                          }
+                        }
+                      }}
                       className="w-full px-2.5 py-2 rounded hover:bg-primary/10 text-on-surface hover:text-primary flex items-center gap-2 transition-colors cursor-pointer"
                       role="menuitem"
                     >
@@ -215,9 +227,17 @@ export const Navbar = () => {
                     </Link>
 
                     <Link
-                      to="/profile"
+                      to="/profile#account-settings"
                       onClick={() => {
                         setIsProfilePopoverOpen(false);
+                        if (location.pathname === '/profile') {
+                          const el = document.getElementById('account-settings');
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            window.dispatchEvent(new CustomEvent('highlight-account-settings'));
+                          }
+                          window.history.replaceState(null, '', '#account-settings');
+                        }
                       }}
                       className="w-full px-2.5 py-2 rounded hover:bg-primary/10 text-on-surface hover:text-primary flex items-center gap-2 transition-colors cursor-pointer"
                       role="menuitem"

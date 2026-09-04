@@ -1,5 +1,6 @@
 """ProjectInspiration data access repository."""
 from typing import List, Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.project_inspiration import ProjectInspiration
@@ -13,7 +14,7 @@ class ProjectInspirationRepository:
         return (
             db.query(ProjectInspiration)
             .filter(ProjectInspiration.project_id == project_id)
-            .order_by(ProjectInspiration.created_at.desc(), ProjectInspiration.id.desc())
+            .order_by(ProjectInspiration.created_at.desc(), text("rowid DESC"))
             .all()
         )
 

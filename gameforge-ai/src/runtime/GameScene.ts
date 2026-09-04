@@ -196,12 +196,13 @@ export class GameScene extends Phaser.Scene {
 
     if (isPlatformer) {
       this.player.setGravityY(this.dsl.world.gravity ?? 800);
+      this.player.setDamping(false);
+      this.player.setDrag(100, 0);
     } else {
       (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+      this.player.setDamping(false);
+      this.player.setDrag(0, 0);
     }
-
-    this.player.setDamping(true);
-    this.player.setDrag(isPlatformer ? 0.001 : 0.0005);
 
     // Camera follow player
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -840,6 +841,9 @@ export class GameScene extends Phaser.Scene {
         }
 
         this.player.setVelocity(vx * currentSpd, vy * currentSpd);
+        if (vx !== 0 || vy !== 0) {
+          this.player.setRotation(Math.atan2(vy, vx) + Math.PI / 2);
+        }
       }
     }
 

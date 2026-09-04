@@ -337,6 +337,35 @@ export const InspirationAttachModal: React.FC<InspirationAttachModalProps> = ({
                 {activeProject.genre}
               </span>
             </div>
+            <div className="flex items-center justify-between gap-2 pt-1 font-mono text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  onSelectProject();
+                }}
+                className="text-primary hover:text-primary-bright underline cursor-pointer"
+              >
+                Choose different project →
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsAttaching(true);
+                    setErrorMessage(null);
+                    await onCreateProject();
+                    handleClose();
+                  } catch (err: unknown) {
+                    setIsAttaching(false);
+                    setErrorMessage(err instanceof Error ? err.message : 'Failed to create project.');
+                  }
+                }}
+                className="text-secondary hover:text-secondary-bright underline cursor-pointer"
+              >
+                Create new project →
+              </button>
+            </div>
           </div>
 
           {/* Divider */}

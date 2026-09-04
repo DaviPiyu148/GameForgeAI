@@ -474,15 +474,15 @@ class DiscoveryService:
         art_density = 75 if "pixel graphics" in tags_lower or "retro" in tags_lower else 50
         physics = 70 if archetype in ("platformer", "shooter") else 40
 
-        modules = ["InventorySystem"]
+        # Canonical Builder Logic Modules based on archetype
         if archetype == "survival":
-            modules.extend(["HealthBar", "CraftingBench", "DayNightCycle"])
+            modules = ["Procedural Generation", "Resource & Score Economy"]
         elif archetype == "shooter":
-            modules.extend(["HealthBar", "WeaponUpgrade", "ScoreTracker"])
+            modules = ["Combat & Dash Mobility", "Enhanced NPC Behavior"]
         elif archetype == "platformer":
-            modules.extend(["DoubleJump", "Checkpoints", "ScoreTracker"])
+            modules = ["Combat & Dash Mobility", "Procedural Generation"]
         else:
-            modules.extend(["ScoreTracker", "ItemMagnet"])
+            modules = ["Resource & Score Economy", "Enhanced NPC Behavior"]
 
         recommended_prompt = (
             f"A 2D {theme.lower()} {archetype} prototype inspired by {title}. "

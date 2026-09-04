@@ -8,6 +8,7 @@ import type {
   LoginRequest,
   RegisterRequest,
   DiscoverySessionContext,
+  DiscoverySearchResult,
 } from '../types';
 import { projectService } from '../services/projects';
 import { buildService } from '../services/builds';
@@ -15,6 +16,7 @@ import { discoveryService } from '../services/discovery';
 import { authService, authStorage, savedDiscoveriesService } from '../services/auth';
 import { profileService, diffUserProgress } from '../services/profile';
 import { pushToast } from '../services/toastBus';
+import { normalizeLogicModules } from '../utils/modules';
 
 const defaultBuildParams: BuildParams = {
   // Must match BuilderPage.tsx's <option> values and backend BuildParams schema defaults.
@@ -53,6 +55,7 @@ const defaultState: AppState = {
   projectsError: null,
   progress: null,
   preferences: null,
+  pendingInspirationTarget: null,
 };
 
 const DRAFT_STORAGE_KEY = 'gameforge_ai_drafts';
@@ -71,7 +74,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.currentPrompt) draftPrompt = parsed.currentPrompt;
-        if (parsed.currentBuildParams) draftParams = parsed.currentBuildParams;
+        if (parsed.currentBuildParams) {
+          draftParams = {
+            ...parsed.currentBuildParams,
+            modules: normalizeLogicModules(parsed.currentBuildParams.modules),
+          };
+        }
       }
     } catch (e) {
       console.error('Failed to parse local drafts from localStorage', e);
@@ -434,11 +442,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const setPrompt = (prompt: string) => setState((s) => ({ ...s, currentPrompt: prompt }));
   const updateBuildParams = (params: Partial<BuildParams>) =>
-    setState((s) => ({ ...s, currentBuildParams: { ...s.currentBuildParams, ...params } }));
+    setState((s) => ({
+      ...s,
+      currentBuildParams: {
+        ...s.currentBuildParams,
+        ...params,
+        ...(params.modules ? { modules: normalizeLogicModules(params.modules) } : {}),
+      },
+    }));
   const setBuildInspirationSource = (source: AppState['buildInspirationSource']) =>
     setState((s) => ({ ...s, buildInspirationSource: source }));
   const clearBuildInspiration = () =>
     setState((s) => ({ ...s, buildInspirationSource: null }));
+  const setPendingInspirationTarget = (target: DiscoverySearchResult | null) =>
+    setState((s) => ({ ...s, pendingInspirationTarget: target }));
   const setBuildStatus = (status: AppState['buildStatus']) => setState((s) => ({ ...s, buildStatus: status }));
   const addGameProject = (project: GameProject) =>
     setState((s) => ({ ...s, myGames: [project, ...s.myGames] }));
@@ -700,6 +717,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updateBuildParams,
         setBuildInspirationSource,
         clearBuildInspiration,
+        setPendingInspirationTarget,
         setBuildStatus,
         addGameProject,
         updateGameProject,

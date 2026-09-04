@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BUILDER_PRESETS, applyPreset, detectActivePreset } from '../data/builderPresets';
 import { BuilderDesignPreview } from '../components/Builder/BuilderDesignPreview';
+import { normalizeLogicModules } from '../utils/modules';
 
 const BuilderPage = () => {
   const {
@@ -39,8 +40,8 @@ const BuilderPage = () => {
   }, [state.compilerLogs]);
 
   const handleModuleToggle = (modName: string) => {
-    const currentModules = state.currentBuildParams.modules;
-    const isEnabled = currentModules.includes(modName);
+    const currentModules = normalizeLogicModules(state.currentBuildParams.modules);
+    const isEnabled = (currentModules as string[]).includes(modName);
     const newModules = isEnabled 
       ? currentModules.filter(m => m !== modName)
       : [...currentModules, modName];
@@ -430,7 +431,7 @@ const BuilderPage = () => {
               {state.compilerLogs.length === 0 ? (
                 <>
                   <div className="text-primary opacity-90">[SYS] Environment ready. GameForge Engine v4.2.1 initialized.</div>
-                  {state.currentBuildParams.modules.map(mod => (
+                  {normalizeLogicModules(state.currentBuildParams.modules).map(mod => (
                     <div key={mod}><span className="text-secondary-soft font-bold">[MOD]</span> Loaded Logic Module: {mod}</div>
                   ))}
                   <div className="opacity-50 text-on-surface-variant">[SYS] Waiting for prompt input...</div>
