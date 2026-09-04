@@ -2156,6 +2156,18 @@ DECISION:             1. Expand to 10%
 ### Status
 COMPLETE
 
+### Recovery Note
+- Previous Antigravity agent was interrupted during verification due to environment restart.
+- Repository state was recovered and inspected (`git status`, `git log -n 5`, `git show 9246a72 --stat`).
+- Completed Phase 8 implementation (`backend/app/config.py`, `backend/tests/test_personalization_experiment.py`, `backend/scripts/run_phase8_ten_percent_expansion.py`) was verified and reused without discarding valid work.
+- Verification was completely rerun from final state:
+  - Focused test suite: `pytest backend/tests/test_personalization_experiment.py -q` -> 74 passed, 1 warning (0.41s).
+  - Full backend test suite: `pytest backend/tests/ -q` -> 565 passed, 1 warning (105.74s).
+  - Frontend TypeScript checking: `npx tsc --noEmit` -> 0 errors.
+  - Frontend linting: `npx oxlint` -> 0 warnings, 0 errors.
+  - Frontend production build: `npm run build` -> built in 2.49s.
+- Working tree remains clean and fully verified.
+
 ### Objective
 Execute controlled 10% treatment expansion and scale validation:
 - Configuration updated: `PERSONALIZATION_TREATMENT_PCT = 10` (expanded from 5%) in `backend/app/config.py`.
@@ -2325,11 +2337,11 @@ Execute controlled 10% treatment expansion and scale validation:
   - Budget Exceedance Rate (> 50 ms): **0.0%**
 
 ### Verification
-- `pytest backend/tests/test_personalization_experiment.py -v`: **74 passed** in 0.63s.
-- `pytest backend/tests/ -q`: **565 passed, 1 warning** in 115.38s.
-- `npx tsc --noEmit`: **0 errors**.
-- `npx oxlint`: **0 warnings, 0 errors** on 72 files.
-- `npm run build`: built in **1.78s**.
+- Focused Suite: `pytest backend/tests/test_personalization_experiment.py -q`: **74 passed, 1 warning** in 0.41s.
+- Full Suite: `pytest backend/tests/ -q`: **565 passed, 1 warning** in 105.74s.
+- Type Check: `npx tsc --noEmit`: **0 errors**.
+- Linting: `npx oxlint`: **0 warnings, 0 errors** on 72 files.
+- Production Build: `npm run build`: built in **2.49s**.
 
 ### Production State
 ```
