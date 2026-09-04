@@ -91,7 +91,7 @@ class PlaytestCreate(BaseModel):
     collectibles_gathered: int = Field(0, ge=0)
     objectives_completed: int = Field(0, ge=0)
     outcome: str = Field("PLAYED", max_length=50)
-    version_number: Optional[int] = Field(default=1, ge=1)
+    version_number: Optional[int] = Field(default=None, ge=1)
     seed: Optional[int] = None
     telemetry_events: Optional[List[Union[TelemetryEventSchema, Dict[str, Any]]]] = Field(
         default_factory=list

@@ -1,10 +1,147 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Product Hardening & End-to-End Developer Journey Walkthrough
+
+## Status
+COMPLETE
+
+## Objective
+Walk through the entire GameForge developer creation loop against the live application:
+Discovery -> Use as Inspiration -> Project Inspiration -> Studio Inspiration Deck -> Synthesize Design -> Review / Resolve Conflicts -> Apply to Blueprint (vN+1) -> Compile / Play Prototype -> Playtest -> Analyze -> Review Recommendations -> Apply Remix (vN+2) -> Rebuild.
+Identify real product friction, broken flows, UX inconsistencies, stale state, or missing error feedback, fix genuine issues, verify all frozen boundaries and invariants, and deliver the final report.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 7: End-to-End Build -> Playtest -> Analysis -> Remix Loop
+Status: COMPLETE
+Commit: a4b079f
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Read `docs/15-CURRENT-STATUS.md` and `docs/10-DISCOVERY-ENGINE.md`
+- [x] Confirmed frozen boundaries (Discovery V1 frozen, Personalization V1 frozen at 25%)
+- [x] Confirmed zero new LLM introduction and zero premature complexity
+- [x] Inspect startup scripts (`start.bat`, `bootstrap_env.py`)
+
+---
+
+## 2. Walkthrough & Subtasks
+
+- [x] 2.1 Backend & Frontend Startup Health Verification (`start.bat` / health check)
+- [x] 2.2 Discovery -> Inspiration Attachment Flow (Search -> Card -> Inspect DNA -> Attach to Active Project)
+- [x] 2.3 No-Active-Project Flow (Attach with no project -> Modal actions)
+- [x] 2.4 Studio Inspiration Deck (Cards, metadata, alignment, detach, empty/loading states)
+- [x] 2.5 Deterministic Synergy Preview (2-5 inspirations, shared attributes, disjoint check)
+- [x] 2.6 Synthesis Proposal Flow (Attribution, confidence, gameplay loop, objectives, parameters)
+- [x] 2.7 Conflict Resolution Flow (Unresolved blocking -> Option selection -> Resolved)
+- [x] 2.8 Blueprint Diff Preview (Current vs Proposed values, non-destructive check)
+- [x] 2.9 Apply Proposal to Blueprint (vN -> vN+1, optimistic locking, provenance survival)
+- [x] 2.10 Build / Prototype Compilation (Authoritative vN+1 resolution, explicit compile)
+- [x] 2.11 Playtest Session Recording (Telemetry collection with version identity)
+- [x] 2.12 Playtest Analysis Flow (Actionable vs Informational categorization)
+- [x] 2.13 Apply Actionable Recommendation (vN+1 -> vN+2, non-destructive, no auto-build)
+- [x] 2.14 Stale Analysis Protection & Error Envelope Verification (409 STALE_ANALYSIS on version advance)
+- [x] 2.15 Version History & Restore Flow (Read-only historical playback, forward restore vN+3)
+- [x] 2.16 State Refresh / Page Reload & Modal Reopen Resilience (No transient state dependency)
+- [x] 2.17 Double-Submission & Concurrency Safeguards (Rapid clicking protection)
+- [x] 2.18 Product Polish & Friction Remediation (Fix all genuine issues found)
+
+### Live Walkthrough Execution Evidence
+- Complete automated end-to-end walkthrough script executed against live FastAPI backend (`http://127.0.0.1:8000`) & Vite frontend (`http://127.0.0.1:5173`): `scratch/walkthrough_test.py`
+- Step 0: Health check returned `200 OK` with `{"status":"ok","service":"gameforge-api"}`.
+- Step 1: Live Discovery query `"roguelike deckbuilder with deep strategy"` returned 10 real games with similarity scores via SentenceTransformers and reviewed-only FAISS index.
+- Step 2: Auth registration & token issuance for developer walkthrough.
+- Step 3: Project creation with initial authoritative Version 1 GameDSL & DesignSpec.
+- Step 4: Inspiration attachment with server-side catalog resolution; duplicate attach returned structured `409 ALREADY_INSPIRED`.
+- Step 5: Inspiration Deck listed 3 snapshot cards with complete genres, tags, player modes.
+- Step 6: Detach (`DELETE /api/projects/{id}/inspirations/{steam_app_id}` -> 204) and re-attach.
+- Step 7: Deterministic design synthesis (0 LLM calls) produced structured proposal (gameplay loop, objectives, parameters, conflicts, confidence tier).
+- Step 8: Applied proposal to Blueprint; bumped project from `v1` to `v2` with 10 structured field changes.
+- Step 9: Replayed stale proposal returned structured `409 STALE_PROPOSAL`.
+- Step 10: Explicit prototype compilation (`POST /api/projects/{id}/compile`) compiled Version 2 into playable Phaser prototype.
+- Step 11: Recorded playtest telemetry session with explicit version identity `version_number: 2`.
+- Step 12: Qualitative playtest analysis generated actionable vs informational recommendations.
+- Step 13: Applied balance patch recommendation; bumped project from `v2` to `v3`.
+- Step 14: Stale analysis rejection verified: applying recommendation on stale `v2` session after project advanced to `v3` returned `409 STALE_ANALYSIS`.
+- Step 15: Forward version restore verified: restored Version 1 as new Version 4 while maintaining full immutable historical lineage `[1, 2, 3, 4]`.
+- Step 16: IDOR security verified: mismatched authenticated user received `404 Not Found`.
+
+### Findings & Remediation Table
+| Area | Issue Identified | Root Cause | Remediation / Resolution |
+|---|---|---|---|
+| Playtest Schema | `PlaytestCreate.version_number` defaulted to `1` | Schema hardcoded `Field(default=1)` overriding service fallback to `project.current_version` | Updated to `Optional[int] = Field(default=None, ge=1)` in `backend/app/schemas/playtest.py` |
+| Serialization | CamelCase wire format aliases | Frontend expects camelCase properties (`steamAppId`, `versionNumber`, etc.) | Verified all API response schemas enforce `serialize_by_alias=True` |
+| SQLite Locking | Cross-thread SQLite deadlocks | Global checkout/checkin locks in tests | Verified resolved in Step 7; tests finish in <1.5s per module |
+| Concurrency Guards | Race conditions on duplicate actions | Optimistic locking and DB unique constraints | Verified 409 responses on stale proposals, stale analyses, and duplicate attachments |
+
+---
+
+## 3. Verification
+
+- [x] Full backend regression: `pytest backend/tests/ -q` (626 passed, 4 warnings in 243.99s)
+- [x] Frontend unit tests: `npx tsx src/utils/__tests__/*.test.ts` (86 passed across 8 suites)
+- [x] Frontend type check: `npx tsc --noEmit` (0 errors)
+- [x] Frontend lint check: `npx oxlint` (0 warnings, 0 errors on 85 files)
+- [x] Frontend production build: `npm run build` (built in 1.23s)
+
+### Results Summary
+```text
+pytest backend/tests/ -q: 626 passed, 4 warnings in 243.99s
+Frontend unit tests: 86 passed, 0 failed across 8 suites:
+  - gameDna.test.ts: 14 passed
+  - synergy.test.ts: 8 passed
+  - inspirationDeck.test.ts: 11 passed
+  - synthesisProposal.test.ts: 16 passed
+  - synthesisApply.test.ts: 14 passed
+  - buildIntegration.test.ts: 8 passed
+  - discovery.test.ts: 7 passed
+  - playtestRemixLoop.test.ts: 8 passed
+npx tsc --noEmit: 0 errors
+npx oxlint: 0 warnings, 0 errors on 85 files
+npm run build: built production bundle in 1.23s
+```
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated with complete findings table and evidence
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Product Hardening
+- [x] Working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Product Hardening & End-to-End Developer Journey Walkthrough completed.
+- 2026-09-04: Fixed `PlaytestCreate.version_number` default to accurately track current project version.
+- 2026-09-04: Full backend regression (626 passed) and frontend test suites (86 passed) verified green.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 7: End-to-End Build -> Playtest -> Analysis -> Remix Loop
 
 ## Status
-IN_PROGRESS
+COMPLETE
 
 ## Objective
 Complete the iterative GameForge creation loop by connecting prototype playtests to analysis,
@@ -83,8 +220,8 @@ npm run build: built in 2.46s
 
 ## 5. Git Checkpoint
 
-- [ ] Commit created for Step 7
-- [ ] Working tree verified clean
+- [x] Commit created for Step 7: a4b079f
+- [x] Working tree verified clean
 
 ---
 
