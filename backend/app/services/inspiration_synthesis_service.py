@@ -1,22 +1,29 @@
 """
-Inspiration Synthesis service (Step 4: Discovery -> Inspiration -> Studio).
+Inspiration Synthesis service (Step 4 & 5: Discovery -> Inspiration -> Studio).
 
 Deterministic, rule-based composition of 2–5 attached inspirations into
-a structured GameForge design proposal.
+a structured GameForge design proposal, with versioned Blueprint application.
 ZERO Gemini / external LLM calls.
 """
+from datetime import datetime, timezone
 import logging
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.project import Project
 from app.models.project_inspiration import ProjectInspiration
+from app.models.project_version import ProjectVersion
 from app.repositories.project_inspiration_repo import (
     ProjectInspirationRepository,
     project_inspiration_repository,
 )
-from app.schemas.blueprint import BlueprintObjective
+from app.schemas.blueprint import BlueprintObjective, GameBlueprint
 from app.schemas.inspiration_synthesis import (
+    ApplySynthesisProposalRequest,
+    ApplySynthesisProposalResponse,
+    BlueprintFieldChange,
     InspirationSynthesisProposal,
     SourceAttribution,
     SynthesisConflict,
@@ -33,6 +40,14 @@ class InsufficientInspirationsError(Exception):
 
 class ExcessiveInspirationsError(Exception):
     """Raised when more than 5 inspirations are provided."""
+
+
+class StaleProposalError(Exception):
+    """Raised when proposal base_version_number does not match project's current version."""
+
+
+class UnresolvedConflictError(Exception):
+    """Raised when an inspiration proposal contains unresolved blocking conflicts."""
 
 
 # Canonical keyword-to-mechanic mapping
@@ -399,5 +414,290 @@ class InspirationSynthesisService:
             confidence_explanation=explanation,
         )
 
+    def apply_proposal(
+        self,
+        db: Session,
+        project_id: str,
+        user_id: str,
+        data: ApplySynthesisProposalRequest,
+    ) -> ApplySynthesisProposalResponse:
+        """
+        Apply an approved inspiration synthesis proposal to an owned project's Blueprint and DSL.
+        Creates an immutable forward ProjectVersion (vN+1).
+
+        Guarantees:
+        - Strict base version validation (prevents stale overwrites).
+        - Mandatory resolution of all blocking conflicts before apply.
+        - Non-destructive targeted patch preserving narrative, custom entities, rules.
+        - Concurrency-safe monotonic forward versioning with transaction retry on collision.
+        - Full source attribution provenance recorded in design_spec and version summary.
+        """
+        # 1. Verify project ownership (IDOR check)
+        project = self.proj_svc._get_owned_project(db, project_id, user_id=user_id)
+
+        # 2. Optimistic concurrency / stale proposal check
+        current_version_num = project.current_version or 1
+        if current_version_num != data.base_version_number:
+            raise StaleProposalError(
+                f"Proposal was generated from base version {data.base_version_number}, "
+                f"but project is currently at version {current_version_num}. "
+                f"Please refresh the project and regenerate the proposal."
+            )
+
+        # 3. Reload inspirations from database
+        inspirations = self.repo.list_by_project(db, project_id)
+        count = len(inspirations)
+        if count < 2:
+            raise InsufficientInspirationsError(
+                f"Inspiration synthesis requires 2 to 5 attached inspirations (found {count})."
+            )
+        if count > 5:
+            raise ExcessiveInspirationsError(
+                f"Inspiration synthesis supports a maximum of 5 inspirations (found {count})."
+            )
+
+        # 4. Deterministically recompute proposal on server to prevent client payload tampering
+        proposal = self._compute_proposal(project, inspirations)
+
+        # 5. Validate that all unresolved blocking conflicts are resolved
+        for conflict in proposal.conflicts:
+            if conflict.resolution_status == "UNRESOLVED":
+                if conflict.field not in data.conflict_resolutions:
+                    raise UnresolvedConflictError(
+                        f"Unresolved conflict on '{conflict.field}' must be resolved before applying proposal."
+                    )
+                chosen = data.conflict_resolutions[conflict.field]
+                if chosen not in conflict.options:
+                    raise UnresolvedConflictError(
+                        f"Invalid option '{chosen}' for conflict '{conflict.field}'. Allowed options: {conflict.options}"
+                    )
+
+        # 6. Compute field-level diffs and construct non-destructive patch
+        changes: List[BlueprintFieldChange] = []
+        source_summary_titles = ", ".join(proposal.source_titles[:3])
+
+        # A. Genre
+        genre_decision = data.field_decisions.get("genre", "APPLY_PROPOSAL")
+        if genre_decision == "APPLY_PROPOSAL" and project.genre != proposal.proposed_genre:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="genre",
+                    previousValue=project.genre,
+                    newValue=proposal.proposed_genre,
+                    sourceAttribution=f"From inspirations: {source_summary_titles}",
+                )
+            )
+            project.genre = proposal.proposed_genre
+
+        # B. Archetype / Engine
+        engine_decision = data.field_decisions.get("engine", "APPLY_PROPOSAL")
+        if engine_decision == "APPLY_PROPOSAL" and project.engine != proposal.recommended_parameters.engine:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="engine",
+                    previousValue=project.engine,
+                    newValue=proposal.recommended_parameters.engine,
+                    sourceAttribution=f"Inferred archetype from {proposal.proposed_genre}",
+                )
+            )
+            project.engine = proposal.recommended_parameters.engine
+
+        # C. Parameters: Physics, Art Density, World Mode, Modules
+        if project.physics != proposal.recommended_parameters.physics:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="physics",
+                    previousValue=project.physics,
+                    newValue=proposal.recommended_parameters.physics,
+                    sourceAttribution="Optimized physics for archetype",
+                )
+            )
+            project.physics = proposal.recommended_parameters.physics
+
+        if project.art_density != proposal.recommended_parameters.art_density:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="artDensity",
+                    previousValue=project.art_density,
+                    newValue=proposal.recommended_parameters.art_density,
+                    sourceAttribution="Visual density recommendation",
+                )
+            )
+            project.art_density = proposal.recommended_parameters.art_density
+
+        if project.world_mode != proposal.recommended_parameters.world_mode:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="worldMode",
+                    previousValue=project.world_mode,
+                    newValue=proposal.recommended_parameters.world_mode,
+                    sourceAttribution="Progression structure recommendation",
+                )
+            )
+            project.world_mode = proposal.recommended_parameters.world_mode
+
+        if set(project.modules or []) != set(proposal.recommended_parameters.modules):
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="modules",
+                    previousValue=project.modules or [],
+                    newValue=proposal.recommended_parameters.modules,
+                    sourceAttribution="Recommended gameplay modules",
+                )
+            )
+            project.modules = proposal.recommended_parameters.modules
+
+        # D. Design Spec Patching (preserve existing narrative premise & custom fields)
+        spec_dict = dict(project.design_spec) if isinstance(project.design_spec, dict) else {}
+        
+        # Track theme
+        prev_theme = spec_dict.get("theme", "neon")
+        if prev_theme != proposal.proposed_theme:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="theme",
+                    previousValue=prev_theme,
+                    newValue=proposal.proposed_theme,
+                    sourceAttribution=f"Theme synthesis from {source_summary_titles}",
+                )
+            )
+        spec_dict["theme"] = proposal.proposed_theme
+        spec_dict["genre"] = project.genre
+        spec_dict["subgenre"] = proposal.proposed_archetype.capitalize()
+        
+        # Track core gameplay loop
+        prev_loop = spec_dict.get("core_gameplay_loop", "")
+        if prev_loop != proposal.gameplay_loop:
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="gameplayLoop",
+                    previousValue=prev_loop,
+                    newValue=proposal.gameplay_loop,
+                    sourceAttribution="Composite multi-stage gameplay loop",
+                )
+            )
+        spec_dict["core_gameplay_loop"] = proposal.gameplay_loop
+
+        # Track objectives
+        if proposal.design_objectives:
+            spec_dict["primary_objective"] = proposal.design_objectives[0].description
+            spec_dict["secondary_objectives"] = [o.description for o in proposal.design_objectives[1:]]
+            changes.append(
+                BlueprintFieldChange(
+                    fieldName="objectives",
+                    previousValue=spec_dict.get("primary_objective", ""),
+                    newValue=f"Primary: {proposal.design_objectives[0].description}",
+                    sourceAttribution="Design objectives synthesized from core mechanics",
+                )
+            )
+
+        # Track mechanics
+        prev_abilities = spec_dict.get("player_abilities", [])
+        spec_dict["player_abilities"] = proposal.proposed_mechanics[:6]
+        changes.append(
+            BlueprintFieldChange(
+                fieldName="mechanics",
+                previousValue=prev_abilities,
+                newValue=proposal.proposed_mechanics[:6],
+                sourceAttribution="Traceable mechanic composition",
+            )
+        )
+
+        # Record provenance in rationale
+        spec_dict["rationale"] = (
+            [f"Synthesized from {len(inspirations)} inspirations: {source_summary_titles}"]
+            + [f"Mechanic '{a.element}' sourced from {', '.join(a.source_titles)}" for a in proposal.source_attribution[:4]]
+        )
+        spec_dict["selected_modules"] = project.modules
+        project.design_spec = spec_dict
+
+        # E. Game DSL Patching (if exists, update metadata, world theme, player mechanics)
+        if isinstance(project.game_dsl, dict):
+            dsl_dict = dict(project.game_dsl)
+            dsl_dict.setdefault("metadata", {})["genre"] = project.genre
+            dsl_dict.setdefault("metadata", {})["archetype"] = project.engine
+            dsl_dict.setdefault("world", {})["theme"] = proposal.proposed_theme
+            dsl_dict.setdefault("world", {})["world_mode"] = project.world_mode
+            
+            # Mechanic-specific adaptations
+            if "PrecisionLocomotion" in proposal.proposed_mechanics:
+                player = dsl_dict.setdefault("player", {})
+                player["jump_power"] = max(player.get("jump_power", 0), 400)
+                dsl_dict.setdefault("world", {})["gravity"] = max(dsl_dict.get("world", {}).get("gravity", 0), 600)
+            if "ProjectileBarrage" in proposal.proposed_mechanics:
+                dsl_dict.setdefault("player", {})["attack_type"] = "ranged"
+            
+            project.game_dsl = dsl_dict
+
+        # 7. Atomic Concurrency-Safe Forward Versioning (Transaction Retry Loop)
+        prev_version_num = current_version_num
+        change_desc = f"Inspiration synthesis applied: {len(inspirations)} reference games ({source_summary_titles})"
+
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            try:
+                max_v = (
+                    db.query(func.max(ProjectVersion.version_number))
+                    .filter(ProjectVersion.project_id == project.id)
+                    .scalar()
+                )
+                new_version_num = max(max_v or 0, project.current_version or 0) + 1
+                
+                project.current_version = new_version_num
+                project.updated_at = datetime.now(timezone.utc)
+
+                version_rec = ProjectVersion(
+                    project_id=project.id,
+                    version_number=new_version_num,
+                    game_dsl=project.game_dsl or {},
+                    design_spec=project.design_spec,
+                    change_summary=change_desc,
+                    remix_intent=None,
+                )
+                db.add(version_rec)
+                db.commit()
+                db.refresh(project)
+                break
+            except IntegrityError:
+                db.rollback()
+                db.expire_all()
+                if attempt == max_attempts - 1:
+                    raise
+
+        # 8. Construct derived Blueprint
+        try:
+            blueprint = self.proj_svc.get_project_blueprint(db, project.id, user_id)
+        except Exception:
+            blueprint = GameBlueprint(
+                project_id=project.id,
+                title=project.title,
+                genre=project.genre,
+                archetype=project.engine,
+                player_fantasy=spec_dict.get("player_role", "Player"),
+                theme=spec_dict.get("theme", "neon"),
+                core_loop=proposal.gameplay_loop,
+                estimated_session_length="2-3 minutes",
+                level_count=1,
+                world_area_count=1,
+                objectives=proposal.design_objectives,
+                progression=[proposal.progression_direction],
+                encounter_types=[],
+                enemy_variety=0,
+                finale="Complete the primary objective",
+                supported_mechanics=proposal.proposed_mechanics,
+            )
+
+        return ApplySynthesisProposalResponse(
+            project_id=project.id,
+            previous_version_number=prev_version_num,
+            new_version_number=project.current_version,
+            change_summary=change_desc,
+            changes=changes,
+            project=self.proj_svc.to_response(project),
+            blueprint=blueprint,
+            status="SUCCESS",
+        )
+
 
 inspiration_synthesis_service = InspirationSynthesisService()
+

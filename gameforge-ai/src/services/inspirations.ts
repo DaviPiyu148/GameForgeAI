@@ -1,5 +1,10 @@
 import { apiClient } from './api';
-import type { InspirationSynthesisProposal, ProjectInspirationRecord } from '../types';
+import type {
+  ApplySynthesisProposalRequest,
+  ApplySynthesisProposalResponse,
+  InspirationSynthesisProposal,
+  ProjectInspirationRecord,
+} from '../types';
 
 interface ProjectInspirationListApiResponse {
   inspirations: ProjectInspirationRecord[];
@@ -42,4 +47,19 @@ export const inspirationService = {
       `/projects/${projectId}/inspirations/synthesize`
     );
   },
+
+  /**
+   * Apply an approved inspiration synthesis proposal to an owned project's Blueprint.
+   * Creates a new forward ProjectVersion (vN+1).
+   */
+  async applySynthesis(
+    projectId: string,
+    data: ApplySynthesisProposalRequest
+  ): Promise<ApplySynthesisProposalResponse> {
+    return await apiClient.post<ApplySynthesisProposalResponse>(
+      `/projects/${projectId}/inspirations/synthesize/apply`,
+      data
+    );
+  },
 };
+

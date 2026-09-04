@@ -1,11 +1,11 @@
 """
 Inspiration Synthesis request and proposal schemas (Step 4: Discovery -> Inspiration -> Studio).
 """
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.blueprint import BlueprintObjective
-from app.schemas.project import BuildParams
+from app.schemas.blueprint import BlueprintObjective, GameBlueprint
+from app.schemas.project import BuildParams, ProjectResponse
 
 
 class SourceAttribution(BaseModel):
@@ -75,3 +75,53 @@ class InspirationSynthesisProposal(BaseModel):
         populate_by_name=True,
         serialize_by_alias=True,
     )
+
+
+class BlueprintFieldChange(BaseModel):
+    """Represents a specific field change made by applying the proposal."""
+    field_name: str = Field(..., alias="fieldName")
+    previous_value: Any = Field(..., alias="previousValue")
+    new_value: Any = Field(..., alias="newValue")
+    source_attribution: Optional[str] = Field(default=None, alias="sourceAttribution")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
+class ApplySynthesisProposalRequest(BaseModel):
+    """
+    Request payload to apply an approved inspiration synthesis proposal to the Blueprint.
+    Client supplies base_version_number for optimistic concurrency, conflict_resolutions
+    for any unresolved conflicts, and optional field decision overrides.
+    """
+    base_version_number: int = Field(..., alias="baseVersionNumber", ge=1)
+    conflict_resolutions: Dict[str, str] = Field(default_factory=dict, alias="conflictResolutions")
+    field_decisions: Dict[str, Literal["APPLY_PROPOSAL", "KEEP_CURRENT"]] = Field(
+        default_factory=dict, alias="fieldDecisions"
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+        extra="forbid",
+    )
+
+
+class ApplySynthesisProposalResponse(BaseModel):
+    """Response returned upon successfully versioning the project with the proposal applied."""
+    project_id: str = Field(..., alias="projectId")
+    previous_version_number: int = Field(..., alias="previousVersionNumber")
+    new_version_number: int = Field(..., alias="newVersionNumber")
+    change_summary: str = Field(..., alias="changeSummary")
+    changes: List[BlueprintFieldChange] = Field(default_factory=list)
+    project: ProjectResponse
+    blueprint: GameBlueprint
+    status: Literal["SUCCESS"] = "SUCCESS"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+

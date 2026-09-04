@@ -26,7 +26,11 @@ from app.schemas.project_inspiration import (
     ProjectInspirationListResponse,
     ProjectInspirationResponse,
 )
-from app.schemas.inspiration_synthesis import InspirationSynthesisProposal
+from app.schemas.inspiration_synthesis import (
+    ApplySynthesisProposalRequest,
+    ApplySynthesisProposalResponse,
+    InspirationSynthesisProposal,
+)
 from app.services.project_service import ProjectNotFoundError
 from app.services.project_inspiration_service import (
     DuplicateInspirationError,
@@ -38,6 +42,8 @@ from app.services.inspiration_synthesis_service import (
     ExcessiveInspirationsError,
     InspirationSynthesisService,
     InsufficientInspirationsError,
+    StaleProposalError,
+    UnresolvedConflictError,
     inspiration_synthesis_service,
 )
 
@@ -185,3 +191,44 @@ def synthesize_inspirations(
     except Exception as e:
         logger.exception("Failed to synthesize inspirations for project %s", project_id)
         return _error("SYNTHESIS_FAILED", "Failed to synthesize inspiration proposal.", status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore
+
+
+@router.post(
+    "/synthesize/apply",
+    response_model=ApplySynthesisProposalResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Apply an approved inspiration synthesis proposal to project Blueprint as a new immutable version",
+)
+def apply_synthesis_proposal(
+    project_id: str,
+    data: ApplySynthesisProposalRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: InspirationSynthesisService = Depends(lambda: inspiration_synthesis_service),
+) -> ApplySynthesisProposalResponse:
+    """
+    Apply an approved inspiration synthesis proposal to an owned project.
+    Validates base_version_number for optimistic concurrency, ensures all conflicts are resolved,
+    and creates an immutable forward ProjectVersion (vN+1).
+    """
+    try:
+        return service.apply_proposal(
+            db=db,
+            project_id=project_id,
+            user_id=current_user.id,
+            data=data,
+        )
+    except ProjectNotFoundError as e:
+        return _error("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except StaleProposalError as e:
+        return _error("STALE_PROPOSAL", str(e), status.HTTP_409_CONFLICT)  # type: ignore
+    except UnresolvedConflictError as e:
+        return _error("UNRESOLVED_CONFLICT", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+    except InsufficientInspirationsError as e:
+        return _error("INSUFFICIENT_INSPIRATIONS", str(e), status.HTTP_422_UNPROCESSABLE_ENTITY)  # type: ignore
+    except ExcessiveInspirationsError as e:
+        return _error("EXCESSIVE_INSPIRATIONS", str(e), status.HTTP_422_UNPROCESSABLE_ENTITY)  # type: ignore
+    except Exception as e:
+        logger.exception("Failed to apply inspiration proposal for project %s", project_id)
+        return _error("APPLY_FAILED", "Failed to apply inspiration proposal to project.", status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore
+

@@ -26,12 +26,15 @@ interface StudioInspirationDeckProps {
   project: GameProject;
   /** Optional callback to close the Studio modal before navigating */
   onCloseStudio?: () => void;
+  onProjectUpdated?: (updated: GameProject) => void;
 }
 
 export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
   project,
   onCloseStudio,
+  onProjectUpdated,
 }) => {
+
   const navigate = useNavigate();
   const [inspirations, setInspirations] = useState<ProjectInspirationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -472,14 +475,22 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
         </div>
       )}
 
-      {/* Step 4: Structured Proposal Preview Modal */}
+      {/* Step 4 & 5: Structured Proposal Preview & Apply Modal */}
       {synthesisProposal && (
         <StudioSynthesisModal
           proposal={synthesisProposal}
           project={project}
           onClose={() => setSynthesisProposal(null)}
+          onApplied={(res) => {
+            setSynthesisProposal(null);
+            if (onProjectUpdated) {
+              onProjectUpdated(res.project);
+            }
+          }}
+          onRegenerate={handleSynthesize}
         />
       )}
     </div>
   );
 };
+

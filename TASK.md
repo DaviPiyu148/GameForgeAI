@@ -1,6 +1,101 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 5: Review & Apply Structured Inspiration Proposal to Blueprint
+
+## Status
+COMPLETE
+
+## Objective
+Implement versioned, auditable application of approved inspiration synthesis proposals to the project's
+Blueprint and DSL. Supports interactive conflict resolution, field-level diff preview, optimistic
+concurrency validation (`base_version_number`), atomic forward versioning (vN -> vN+1), non-destructive
+field merging, traceable source attribution survival, and post-apply Studio state updates with zero Gemini/LLM calls.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 4: Inspiration Synthesis -> Structured Design Proposal
+Status: COMPLETE
+Commit: 764b17e
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Audited existing project versioning, `ProjectVersion`, `project_service.py`, `GameDesignSpec`, and `GameDSL`
+- [x] Established strict constraints:
+  1. Mandatory explicit developer approval (never auto-applied).
+  2. Creates immutable forward `ProjectVersion` (vN -> vN+1) via transaction.
+  3. Server-side authoritative proposal revalidation and bound checks (2–5 inspirations).
+  4. Optimistic concurrency & stale proposal protection (`base_version_number`).
+  5. Unresolved conflicts strictly block apply until resolved by developer.
+  6. Non-destructive field-level diff and patch (preserves narrative, custom entities, audio, etc.).
+  7. Preserves traceable source attributions in resulting design spec / change summary.
+  8. Zero Gemini / external LLM calls.
+  9. Zero automatic prototype building / playtesting.
+  10. Discovery V1 and Personalization V1 remain strictly frozen.
+
+---
+
+## 2. Implementation
+
+- [x] 2.1 Backend Schemas: `backend/app/schemas/inspiration_synthesis.py` (Added `ApplySynthesisProposalRequest`, `ApplySynthesisProposalResponse`, `BlueprintFieldChange`)
+- [x] 2.2 Backend Service Extension: `backend/app/services/inspiration_synthesis_service.py` (Added `apply_proposal` with conflict validation, field-level diffing, DSL/spec patching, version bump, and transactional rollback protection)
+- [x] 2.3 Backend API Endpoint: `POST /api/projects/{project_id}/inspirations/synthesize/apply` in `backend/app/api/project_inspirations.py` (with auth, IDOR, and stale version 409 error handling)
+- [x] 2.4 Frontend Types & Service: `gameforge-ai/src/types/index.ts` & `gameforge-ai/src/services/inspirations.ts` (Added apply method & types)
+- [x] 2.5 Frontend Conflict Resolution & Diff UI: Updated `StudioSynthesisModal.tsx` with interactive option selectors, blueprint diff preview, confirmation dialog, and stale proposal retry flow
+- [x] 2.6 Frontend Studio Integration: Connected apply success to `ProjectStudioModal` to refresh project, blueprint, and version number
+- [x] 2.7 Tests: Backend test suite in `backend/tests/test_inspiration_synthesis_apply.py` (8 tests) & frontend unit tests in `src/utils/__tests__/synthesisApply.test.ts` (14 tests)
+
+---
+
+## 3. Verification
+
+- [x] Backend Step 5 tests (8 passed): `backend/tests/test_inspiration_synthesis_apply.py`
+- [x] Full backend regression (612 passed, 0 failures): `pytest backend/tests/ -q`
+- [x] Frontend unit tests (63 passed across 5 suites): `npx tsx src/utils/__tests__/*.test.ts`
+  - `gameDna.test.ts` (14 passed)
+  - `synergy.test.ts` (8 passed)
+  - `inspirationDeck.test.ts` (11 passed)
+  - `synthesisProposal.test.ts` (16 passed)
+  - `synthesisApply.test.ts` (14 passed)
+- [x] Frontend type check (0 errors): `npx tsc --noEmit`
+- [x] Frontend lint check (0 warnings, 0 errors on 83 files): `npx oxlint`
+- [x] Frontend build (built production assets in 1.02s): `npm run build`
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Step 5
+- [x] Working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Step 5 started following user authorization for versioned proposal application to Blueprint.
+- 2026-09-04: Implemented versioned apply endpoint, conflict resolution flow, blueprint diff preview, and test suites.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 4: Inspiration Synthesis -> Structured Design Proposal
 
 ## Status
@@ -43,29 +138,10 @@ Commit: ede3e29
 ## 2. Implementation
 
 - [x] 2.1 Backend Schema: `backend/app/schemas/inspiration_synthesis.py`
-  - `SourceAttribution`: element, category, sourceSteamAppIds, sourceTitles, triggerAttributes
-  - `SynthesisConflict`: field, description, conflictingSources, options, resolutionStatus, resolvedValue
-  - `InspirationSynthesisProposal`: full strongly-typed proposal structure
 - [x] 2.2 Backend Service: `backend/app/services/inspiration_synthesis_service.py`
-  - Canonical `MECHANIC_RULES` mapping
-  - Shared and complementary anchor extraction
-  - Traceable multi-source mechanics attribution
-  - Conflict detection for player modes and combat tempo
-  - Single-source dominance (>75%) balance guard
-  - Abstract gameplay loop and design objectives generation
-  - Recommended parameter calculation (physics, art density, world mode, modules)
-  - Confidence scoring and explanation
 - [x] 2.3 Backend API Router: `POST /api/projects/{project_id}/inspirations/synthesize` in `backend/app/api/project_inspirations.py`
-  - Ownership & IDOR check
-  - 422 validation on <2 or >5 inspirations
 - [x] 2.4 Frontend Types & Service: `gameforge-ai/src/types/index.ts` & `gameforge-ai/src/services/inspirations.ts`
 - [x] 2.5 Frontend Synthesis Modal: `gameforge-ai/src/components/Studio/StudioSynthesisModal.tsx`
-  - Full proposal review preview with confidence badge
-  - Traceable source cards for mechanics
-  - Multi-phase gameplay loop visual flow
-  - Design objectives & build specifications
-  - Unresolved conflict options display
-  - Disabled "Apply to Blueprint (Step 5)" button with review-only notice
 - [x] 2.6 Studio Deck Integration: Wire `[ Synthesize Design Proposal ]` button in `StudioInspirationDeck.tsx`
 - [x] 2.7 Tests: Backend synthesis unit/integration tests & frontend synthesis utility tests
 
@@ -76,13 +152,22 @@ Commit: ede3e29
 - [x] Backend synthesis tests (9 passed): `backend/tests/test_inspiration_synthesis.py`
 - [x] Full backend regression (604 passed, 0 failures): `pytest backend/tests/ -q`
 - [x] Frontend unit tests (49 passed, 0 failures across 4 test suites): `npx tsx src/utils/__tests__/*.test.ts`
-  - `gameDna.test.ts` (14 passed)
-  - `synergy.test.ts` (8 passed)
-  - `inspirationDeck.test.ts` (11 passed)
-  - `synthesisProposal.test.ts` (16 passed)
 - [x] Frontend type check (0 errors): `npx tsc --noEmit`
 - [x] Frontend lint check (0 warnings, 0 errors on 82 files): `npx oxlint`
 - [x] Frontend build (built production assets in 912ms): `npm run build`
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Step 4
+- [x] Working tree verified clean
 
 ---
 

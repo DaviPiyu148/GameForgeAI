@@ -6,9 +6,14 @@ import { StudioInspirationDeck } from './StudioInspirationDeck';
 interface StudioOverviewTabProps {
   project: GameProject;
   onCloseStudio?: () => void;
+  onProjectUpdated?: (updated: GameProject) => void;
 }
 
-export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project, onCloseStudio }) => {
+export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({
+  project,
+  onCloseStudio,
+  onProjectUpdated,
+}) => {
   const [blueprint, setBlueprint] = useState<GameBlueprint | null>(null);
   const [isLoadingBlueprint, setIsLoadingBlueprint] = useState(false);
 
@@ -30,7 +35,8 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project, o
     return () => {
       mounted = false;
     };
-  }, [project.id]);
+  }, [project.id, project.currentVersion]);
+
 
   const designSpec = project.designSpec;
   const coreLoop = blueprint?.core_loop || designSpec?.core_gameplay_loop;
@@ -190,7 +196,12 @@ export const StudioOverviewTab: React.FC<StudioOverviewTabProps> = ({ project, o
       </div>
 
       {/* Inspiration Deck & Synergy Section */}
-      <StudioInspirationDeck project={project} onCloseStudio={onCloseStudio} />
+      <StudioInspirationDeck
+        project={project}
+        onCloseStudio={onCloseStudio}
+        onProjectUpdated={onProjectUpdated}
+      />
     </div>
   );
 };
+

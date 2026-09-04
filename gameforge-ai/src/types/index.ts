@@ -97,6 +97,30 @@ export interface InspirationSynthesisProposal {
   confidenceExplanation: string;
 }
 
+export interface BlueprintFieldChange {
+  fieldName: string;
+  previousValue: any;
+  newValue: any;
+  sourceAttribution?: string | null;
+}
+
+export interface ApplySynthesisProposalRequest {
+  baseVersionNumber: number;
+  conflictResolutions?: Record<string, string>;
+  fieldDecisions?: Record<string, 'APPLY_PROPOSAL' | 'KEEP_CURRENT'>;
+}
+
+export interface ApplySynthesisProposalResponse {
+  projectId: string;
+  previousVersionNumber: number;
+  newVersionNumber: number;
+  changeSummary: string;
+  changes: BlueprintFieldChange[];
+  project: GameProject;
+  blueprint: GameBlueprint;
+  status: 'SUCCESS';
+}
+
 export interface UserProfile {
   id: string;
   username: string;
