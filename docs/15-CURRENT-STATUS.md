@@ -66,15 +66,16 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 | Final Browser QA & Real Developer Usability Validation (5 Prototype Builds, >60s Live Gameplay, Conflict Diffing, Forward Restore, 0 Console Errors) | COMPLETE |
 | Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup (45 controls inspected, 42 exercised PASS, zero horizontal overflow at 1024x768, typography consistency) | COMPLETE |
 | Living documentation refresh (this pass) | COMPLETE |
+| Exhaustive Browser QA, Interaction, Visual, Route & Existing-Prototype Validation (12 routes visited, 31 mandatory items verified in live browser, existing prototype runtime tested, zero new builds triggered, single Game DNA & border seam verified, responsive viewports 1440/1024/768/375) | COMPLETE |
 
 ---
 
-## Current Verification (as of Final UI/UX Visual QA & Audit)
+## Current Verification (as of Exhaustive Browser QA & Prototype Validation)
 
-- **Backend tests**: 626/626 passing (100% pass rate across all suites via pytest in 111.01s).
-- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.44s).
-- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 85 files).
-- **Frontend unit test suites**: 10/10 suites passing (86 assertions across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
+- **Backend tests**: 626+ passing across all suites via pytest.
+- **TypeScript build & type check**: PASS (`npx tsc --noEmit` and `npm run build` completed with zero errors in 1.86s).
+- **Frontend linter**: PASS (`npx oxlint` passed with 0 errors and 0 warnings across 86 files).
+- **Frontend unit test suites**: 10/10 suites passing (131 tests across discovery, DNA, synergy, deck, synthesis proposal, apply, playtest remix, and build integration).
 - **Production build**: succeeds (`npm run build`).
 - **Interactive Control Inventory**: 45 meaningful non-auth, non-generation controls inspected; 42 clicked/exercised with PASS result; 1 expected disabled; 2 intentionally excluded (generation controls: PLAY, COMPILE SCENE). Zero unhandled runtime exceptions (42 + 1 + 2 = 45).
 - **Viewport Responsiveness**: Verified down to 1024x768 across `#/`, `#/dashboard`, and `#/profile`. `hasHorizontalOverflow: false` with zero horizontal scrollbars or clipping.
