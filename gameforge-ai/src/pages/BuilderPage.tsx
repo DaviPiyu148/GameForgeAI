@@ -106,12 +106,11 @@ const BuilderPage = () => {
                   </span>
                   {userGameDNA && (
                     <div
-                      className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2.5 rounded-xs bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] font-bold uppercase ml-1"
-                      title={`AI generation subtly incorporates your Game DNA preferences: ${userGameDNA}`}
+                      className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2.5 rounded-xs bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] font-bold uppercase ml-1 transition-colors hover:bg-primary/15 cursor-help"
+                      title={`AI generation incorporates your active Game DNA preferences: ${userGameDNA}`}
                     >
-                      <span className="material-symbols-outlined text-xs">genetics</span>
-                      <span>GAME DNA ON</span>
-                      <span className="material-symbols-outlined text-xs text-primary/60 hover:text-primary cursor-help">info</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(76,224,210,0.8)] animate-pulse shrink-0" aria-hidden="true" />
+                      <span>DNA ACTIVE</span>
                     </div>
                   )}
                 </div>
@@ -365,7 +364,7 @@ const BuilderPage = () => {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t pane-border">
+                <div className="pt-4 border-t border-outline-variant/30">
                   <label className="block font-mono text-[10px] text-primary mb-3 uppercase">Logic Modules</label>
                   <div className="space-y-3">
                     {[

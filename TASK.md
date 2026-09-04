@@ -67,7 +67,7 @@ Execute the most comprehensive browser-based QA pass of GameForge AI in live Chr
 - [x] Subtask 7.3: Account Settings cards & buttons visual consistency — Symmetrical cards, uniform input and button heights.
 
 ### Batch 8: Builder UI Audit (No Game Generation)
-- [x] Subtask 8.1: Header chips & single Game DNA status indicator (`[🧬 GAME DNA ON ⓘ]`) — Exactly 1 Game DNA indicator in document (`hidden sm:inline-flex items-center gap-1.5 h-6 px-2.5`), 0 in bottom footer.
+- [x] Subtask 8.1: Header chips & single Game DNA status indicator — Refined 'DNA ACTIVE' badge to match PROMPT MODE shape (h-6, rounded-xs, border-primary/30) and cyber terminal vibe with a pulsing status LED (zero icon distortion). Removed unintended 4-sided pane-border box around Logic Modules in configuration sidebar, restoring a single clean top divider.
 - [x] Subtask 8.2: Natural Logic Editor / Output console single clean separator (no double border) — Seam meets at y=498.6px with computed width 0.8px (~1px), 0 double border.
 - [x] Subtask 8.3: Typography audit (semantic font system) — Space Grotesk headings, JetBrains Mono code/editor, Press Start 2P accents.
 
