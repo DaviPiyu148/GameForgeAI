@@ -26,12 +26,19 @@ from app.schemas.project_inspiration import (
     ProjectInspirationListResponse,
     ProjectInspirationResponse,
 )
+from app.schemas.inspiration_synthesis import InspirationSynthesisProposal
 from app.services.project_service import ProjectNotFoundError
 from app.services.project_inspiration_service import (
     DuplicateInspirationError,
     InspirationNotFoundError,
     ProjectInspirationService,
     project_inspiration_service,
+)
+from app.services.inspiration_synthesis_service import (
+    ExcessiveInspirationsError,
+    InspirationSynthesisService,
+    InsufficientInspirationsError,
+    inspiration_synthesis_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,3 +151,37 @@ def detach_inspiration(
     except Exception as e:
         logger.exception("Failed to detach inspiration for project %s game %s", project_id, steam_app_id)
         return _error("INSPIRATION_DELETE_FAILED", "Failed to detach inspiration.", status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore
+
+
+@router.post(
+    "/synthesize",
+    response_model=InspirationSynthesisProposal,
+    status_code=status.HTTP_200_OK,
+    summary="Synthesize a structured design proposal from 2-5 attached project inspirations",
+)
+def synthesize_inspirations(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    service: InspirationSynthesisService = Depends(lambda: inspiration_synthesis_service),
+) -> InspirationSynthesisProposal:
+    """
+    Synthesize a structured GameForge design proposal from 2-5 attached inspirations.
+    Deterministic, rule-based output with traceable source attributions.
+    Does NOT modify the project Blueprint.
+    """
+    try:
+        return service.synthesize(
+            db=db,
+            project_id=project_id,
+            user_id=current_user.id,
+        )
+    except ProjectNotFoundError as e:
+        return _error("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
+    except InsufficientInspirationsError as e:
+        return _error("INSUFFICIENT_INSPIRATIONS", str(e), status.HTTP_422_UNPROCESSABLE_ENTITY)  # type: ignore
+    except ExcessiveInspirationsError as e:
+        return _error("EXCESSIVE_INSPIRATIONS", str(e), status.HTTP_422_UNPROCESSABLE_ENTITY)  # type: ignore
+    except Exception as e:
+        logger.exception("Failed to synthesize inspirations for project %s", project_id)
+        return _error("SYNTHESIS_FAILED", "Failed to synthesize inspiration proposal.", status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore

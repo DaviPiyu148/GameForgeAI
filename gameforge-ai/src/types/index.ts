@@ -52,6 +52,51 @@ export interface ProjectInspirationRecord {
   createdAt: string;
 }
 
+export interface SourceAttribution {
+  element: string;
+  category: string;
+  sourceSteamAppIds: string[];
+  sourceTitles: string[];
+  triggerAttributes: string[];
+}
+
+export interface SynthesisConflict {
+  field: string;
+  description: string;
+  conflictingSources: string[];
+  options: string[];
+  resolutionStatus: 'UNRESOLVED' | 'RESOLVED_BY_PROJECT_CONTEXT';
+  resolvedValue?: string | null;
+}
+
+export interface InspirationSynthesisProposal {
+  projectId: string;
+  inspirationCount: number;
+  sourceTitles: string[];
+  proposedTitle: string;
+  proposedGenre: string;
+  proposedArchetype: string;
+  proposedTheme: string;
+  proposedPlayerModes: string[];
+  proposedMechanics: string[];
+  gameplayLoop: string;
+  progressionDirection: string;
+  designObjectives: Array<{
+    level_number?: number;
+    type: string;
+    description: string;
+  }>;
+  recommendedParameters: BuildParams;
+  sharedAnchors: string[];
+  complementaryAnchors: string[];
+  conflicts: SynthesisConflict[];
+  sourceAttribution: SourceAttribution[];
+  isSingleSourceDominant: boolean;
+  dominantSourceTitle?: string | null;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  confidenceExplanation: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;

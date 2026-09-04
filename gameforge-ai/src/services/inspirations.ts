@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { ProjectInspirationRecord } from '../types';
+import type { InspirationSynthesisProposal, ProjectInspirationRecord } from '../types';
 
 interface ProjectInspirationListApiResponse {
   inspirations: ProjectInspirationRecord[];
@@ -31,5 +31,15 @@ export const inspirationService = {
    */
   async detach(projectId: string, steamAppId: string): Promise<void> {
     await apiClient.delete<void>(`/projects/${projectId}/inspirations/${steamAppId}`);
+  },
+
+  /**
+   * Synthesize a structured GameForge design proposal from 2-5 attached project inspirations.
+   * Deterministic proposal for developer review; does not modify the Blueprint.
+   */
+  async synthesize(projectId: string): Promise<InspirationSynthesisProposal> {
+    return await apiClient.post<InspirationSynthesisProposal>(
+      `/projects/${projectId}/inspirations/synthesize`
+    );
   },
 };

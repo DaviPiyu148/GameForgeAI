@@ -1,7 +1,8 @@
 /**
  * StudioInspirationDeck.tsx
  *
- * Step 3: Project Studio Inspiration Deck & Deterministic Synergy Preview
+ * Step 3 & 4: Project Studio Inspiration Deck, Deterministic Synergy Preview,
+ * and Structured Inspiration Synthesis Proposal.
  *
  * Rules:
  * - Consumes persisted project inspirations via GET /api/projects/{id}/inspirations.
@@ -9,15 +10,17 @@
  * - Card deletion calls DELETE /api/projects/{id}/inspirations/{steam_app_id}.
  * - Alignment with project is derived at display time from stored genres vs current project.genre.
  * - Synergy is purely deterministic overlap across >= 2 inspirations (zero LLM, zero Gemini).
+ * - Synthesis produces a review-only proposal; does not automatically write to Blueprint.
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { GameProject, ProjectInspirationRecord } from '../../types';
+import type { GameProject, InspirationSynthesisProposal, ProjectInspirationRecord } from '../../types';
 import { inspirationService } from '../../services/inspirations';
 import { pushToast } from '../../services/toastBus';
 import { computeProjectAlignment, extractGameDNA } from '../../utils/gameDna';
 import { computeInspirationSynergy } from '../../utils/synergy';
+import { StudioSynthesisModal } from './StudioSynthesisModal';
 
 interface StudioInspirationDeckProps {
   project: GameProject;
@@ -37,6 +40,10 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
   // Deletion interaction states
   const [confirmingAppId, setConfirmingAppId] = useState<string | null>(null);
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
+
+  // Step 4: Synthesis proposal states
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [synthesisProposal, setSynthesisProposal] = useState<InspirationSynthesisProposal | null>(null);
 
   const fetchInspirations = useCallback(async () => {
     if (!project.id) return;
@@ -87,6 +94,24 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
     }
   };
 
+  const handleSynthesize = async () => {
+    if (inspirations.length < 2) return;
+    try {
+      setIsSynthesizing(true);
+      const proposal = await inspirationService.synthesize(project.id);
+      setSynthesisProposal(proposal);
+    } catch (err: unknown) {
+      console.error('Synthesis failed:', err);
+      pushToast({
+        variant: 'error',
+        title: 'SYNTHESIS FAILED',
+        description: 'Failed to synthesize design proposal. Please try again.',
+      });
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
   // Compute deterministic synergy for 2+ inspirations
   const synergy = computeInspirationSynergy(inspirations);
   const hasSynergy =
@@ -110,14 +135,38 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleNavigateToDiscovery}
-          className="px-2.5 py-1 bg-surface border border-primary/40 hover:border-primary text-primary hover:bg-primary/10 font-mono text-[11px] font-bold rounded flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-xs">add</span>
-          <span>ADD INSPIRATION</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {inspirations.length >= 2 && (
+            <button
+              type="button"
+              onClick={handleSynthesize}
+              disabled={isSynthesizing}
+              className="px-3 py-1 bg-primary text-surface font-mono text-[11px] font-bold rounded flex items-center gap-1.5 hover:bg-primary/90 transition-all cursor-pointer shadow-[0_0_15px_rgba(76,224,210,0.3)] glow-cyan disabled:opacity-60"
+              data-testid="synthesize-button"
+            >
+              {isSynthesizing ? (
+                <>
+                  <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                  <span>SYNTHESIZING...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                  <span>SYNTHESIZE PROPOSAL</span>
+                </>
+              )}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleNavigateToDiscovery}
+            className="px-2.5 py-1 bg-surface border border-primary/40 hover:border-primary text-primary hover:bg-primary/10 font-mono text-[11px] font-bold rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-xs">add</span>
+            <span>ADD INSPIRATION</span>
+          </button>
+        </div>
       </div>
 
       {/* Loading State */}
@@ -421,6 +470,15 @@ export const StudioInspirationDeck: React.FC<StudioInspirationDeckProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Step 4: Structured Proposal Preview Modal */}
+      {synthesisProposal && (
+        <StudioSynthesisModal
+          proposal={synthesisProposal}
+          project={project}
+          onClose={() => setSynthesisProposal(null)}
+        />
       )}
     </div>
   );

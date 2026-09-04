@@ -1,6 +1,117 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Discovery -> Inspiration -> Studio // Step 4: Inspiration Synthesis -> Structured Design Proposal
+
+## Status
+COMPLETE
+
+## Objective
+Implement deterministic, rule-based Inspiration Synthesis that transforms 2–5 deliberately attached
+project inspirations into a structured GameForge design proposal (genre direction, mechanics,
+player modes, theme, gameplay loop, progression, design objectives, parameter recommendations,
+source attributions, conflict detection, no-copy balance guard, and confidence scoring).
+The proposal is previewed in Studio for developer review and is NOT automatically applied to the Blueprint.
+
+## Started
+2026-09-04
+
+---
+
+## Previous Phase
+Discovery -> Inspiration -> Studio // Step 3: Project Studio Inspiration Deck
+Status: COMPLETE
+Commit: ede3e29
+
+---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md
+- [x] Audited GameBlueprint, GameDesignSpec, and GameDSL models
+- [x] Established strict constraints:
+  1. Synthesis requires 2–5 inspirations (rejects 0, 1, or >5 with 422).
+  2. 100% deterministic (0 Gemini, 0 external LLM).
+  3. Proposal is review-only (not automatically written to Blueprint).
+  4. Every proposed element has traceable source attribution.
+  5. Incompatible modes/tempos produce structured conflicts, not silent overrides.
+  6. No-copy guard flags single-source dominance.
+  7. No discovery or personalization ranking changes.
+
+---
+
+## 2. Implementation
+
+- [x] 2.1 Backend Schema: `backend/app/schemas/inspiration_synthesis.py`
+  - `SourceAttribution`: element, category, sourceSteamAppIds, sourceTitles, triggerAttributes
+  - `SynthesisConflict`: field, description, conflictingSources, options, resolutionStatus, resolvedValue
+  - `InspirationSynthesisProposal`: full strongly-typed proposal structure
+- [x] 2.2 Backend Service: `backend/app/services/inspiration_synthesis_service.py`
+  - Canonical `MECHANIC_RULES` mapping
+  - Shared and complementary anchor extraction
+  - Traceable multi-source mechanics attribution
+  - Conflict detection for player modes and combat tempo
+  - Single-source dominance (>75%) balance guard
+  - Abstract gameplay loop and design objectives generation
+  - Recommended parameter calculation (physics, art density, world mode, modules)
+  - Confidence scoring and explanation
+- [x] 2.3 Backend API Router: `POST /api/projects/{project_id}/inspirations/synthesize` in `backend/app/api/project_inspirations.py`
+  - Ownership & IDOR check
+  - 422 validation on <2 or >5 inspirations
+- [x] 2.4 Frontend Types & Service: `gameforge-ai/src/types/index.ts` & `gameforge-ai/src/services/inspirations.ts`
+- [x] 2.5 Frontend Synthesis Modal: `gameforge-ai/src/components/Studio/StudioSynthesisModal.tsx`
+  - Full proposal review preview with confidence badge
+  - Traceable source cards for mechanics
+  - Multi-phase gameplay loop visual flow
+  - Design objectives & build specifications
+  - Unresolved conflict options display
+  - Disabled "Apply to Blueprint (Step 5)" button with review-only notice
+- [x] 2.6 Studio Deck Integration: Wire `[ Synthesize Design Proposal ]` button in `StudioInspirationDeck.tsx`
+- [x] 2.7 Tests: Backend synthesis unit/integration tests & frontend synthesis utility tests
+
+---
+
+## 3. Verification
+
+- [x] Backend synthesis tests (9 passed): `backend/tests/test_inspiration_synthesis.py`
+- [x] Full backend regression (604 passed, 0 failures): `pytest backend/tests/ -q`
+- [x] Frontend unit tests (49 passed, 0 failures across 4 test suites): `npx tsx src/utils/__tests__/*.test.ts`
+  - `gameDna.test.ts` (14 passed)
+  - `synergy.test.ts` (8 passed)
+  - `inspirationDeck.test.ts` (11 passed)
+  - `synthesisProposal.test.ts` (16 passed)
+- [x] Frontend type check (0 errors): `npx tsc --noEmit`
+- [x] Frontend lint check (0 warnings, 0 errors on 82 files): `npx oxlint`
+- [x] Frontend build (built production assets in 912ms): `npm run build`
+
+---
+
+## 4. Documentation
+
+- [x] TASK.md updated upon completion
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Commit created for Step 4
+- [x] Working tree verified clean
+
+---
+
+## Change Log
+- 2026-09-04: Step 4 started following user authorization for structured deterministic synthesis.
+- 2026-09-04: Implemented backend synthesis schemas, service, REST endpoint, frontend proposal review modal, Studio Deck integration, and comprehensive test suites.
+
+---
+
+---
+
+## Previous Phase Ledgers (archived below)
+
+# GameForge AI — Task Execution Ledger
+
+## Task
 Discovery -> Inspiration -> Studio // Step 3: Project Studio Inspiration Deck
 
 ## Status
@@ -2955,6 +3066,7 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
+
 
 
 
