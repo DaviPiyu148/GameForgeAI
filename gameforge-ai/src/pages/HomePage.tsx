@@ -160,10 +160,30 @@ const HomePage = () => {
   };
 
   const handleFeedback = async (gameId: string, feedbackType: 'like' | 'dislike' | 'less_like_this') => {
+    // 1. If clicking Like or Dislike when already active, clear/untoggle back to neutral
+    if ((feedbackType === 'like' || feedbackType === 'dislike') && feedbackGiven[gameId] === feedbackType) {
+      setFeedbackGiven((prev) => {
+        const next = { ...prev };
+        delete next[gameId];
+        return next;
+      });
+      pushToast({
+        variant: 'info',
+        title: 'Feedback Cleared',
+        description: 'Preference reset to neutral.',
+      });
+      return;
+    }
+
     setFeedbackGiven((prev) => ({ ...prev, [gameId]: feedbackType }));
     try {
       await discoveryService.submitFeedback(gameId, feedbackType);
       if (feedbackType === 'less_like_this') {
+        const targetResult = (state.discoveryResults || []).find(
+          (r) => r.game.id === gameId || r.game.external_id === gameId
+        );
+        const gameTitle = targetResult?.game.display_title || targetResult?.game.title || 'Game';
+
         // Add to session context and filter out immediately
         setState((s) => ({
           ...s,
@@ -178,6 +198,40 @@ const HomePage = () => {
             ],
           },
         }));
+
+        pushToast({
+          variant: 'info',
+          title: 'Game Hidden',
+          description: `Excluded "${gameTitle}" from recommendations.`,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              // Restore card without creating any second feedback event
+              if (targetResult) {
+                setState((s) => ({
+                  ...s,
+                  discoveryResults: [
+                    targetResult,
+                    ...(s.discoveryResults || []).filter(
+                      (r) => (r.game.external_id || r.game.id) !== gameId
+                    ),
+                  ],
+                  discoverySession: {
+                    ...s.discoverySession,
+                    less_like_this_game_ids: (s.discoverySession?.less_like_this_game_ids || []).filter(
+                      (id) => id !== gameId
+                    ),
+                  },
+                }));
+                setFeedbackGiven((prev) => {
+                  const next = { ...prev };
+                  delete next[gameId];
+                  return next;
+                });
+              }
+            },
+          },
+        });
       }
     } catch (err) {
       console.warn('Failed to submit discovery feedback:', err);
@@ -333,12 +387,12 @@ const HomePage = () => {
 
       {/* 3. Suggestion & Refinement Chips */}
       {!hasResults && !state.isSearching && (
-        <section className="flex flex-wrap items-center justify-center gap-3 w-full max-w-3xl mx-auto mb-16 sm:mb-20 stagger-enter stagger-3">
+        <section className="flex flex-wrap items-center justify-center gap-2.5 w-full max-w-3xl mx-auto mb-16 sm:mb-20 stagger-enter stagger-3">
           <button
             type="button"
             aria-label="Search prompt: Cozy farming without horror"
             onClick={() => handleChipClick('Cozy farming without horror')}
-            className="border border-secondary text-secondary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            className="h-8 px-4 border border-secondary text-secondary font-mono text-xs rounded-full hover:bg-secondary/10 hover:shadow-[0_0_10px_rgba(255,61,129,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
             <span aria-hidden="true" className="font-bold">&gt;</span>
             <span>Cozy farming without horror</span>
@@ -348,7 +402,7 @@ const HomePage = () => {
             type="button"
             aria-label="Search prompt: Cyberpunk co-op shooter"
             onClick={() => handleChipClick('Cyberpunk co-op shooter')}
-            className="border border-tertiary text-tertiary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-tertiary/10 hover:shadow-[0_0_10px_rgba(255,194,76,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            className="h-8 px-4 border border-tertiary text-tertiary font-mono text-xs rounded-full hover:bg-tertiary/10 hover:shadow-[0_0_10px_rgba(255,194,76,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
             <span aria-hidden="true" className="font-bold">&gt;</span>
             <span>Cyberpunk co-op shooter</span>
@@ -358,7 +412,7 @@ const HomePage = () => {
             type="button"
             aria-label="Search prompt: Space exploration no pvp"
             onClick={() => handleChipClick('Space exploration no pvp')}
-            className="border border-primary text-primary font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
+            className="h-8 px-4 border border-primary text-primary font-mono text-xs rounded-full hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(76,224,210,0.2)] transition-all cursor-pointer inline-flex items-center gap-1.5 icon-interactive"
           >
             <span aria-hidden="true" className="font-bold">&gt;</span>
             <span>Space exploration no pvp</span>
@@ -367,9 +421,9 @@ const HomePage = () => {
           <button
             type="button"
             onClick={() => setIsOnboardingModalOpen(true)}
-            className="bg-primary/20 border border-primary text-primary-bright font-mono text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/30 hover:shadow-[0_0_12px_rgba(76,224,210,0.4)] transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold"
+            className="h-8 px-4 bg-primary/20 border border-primary text-primary-bright font-mono text-xs rounded-full hover:bg-primary/30 hover:shadow-[0_0_12px_rgba(76,224,210,0.4)] transition-all cursor-pointer inline-flex items-center gap-1.5 font-bold"
           >
-            <span className="material-symbols-outlined text-xs" aria-hidden="true">dna</span>
+            <span className="material-symbols-outlined text-sm leading-none" aria-hidden="true">genetics</span>
             <span>Build Game DNA</span>
           </button>
         </section>
@@ -377,12 +431,12 @@ const HomePage = () => {
 
       {/* Quick Mood & Discovery Explorer Bar */}
       {!hasResults && !state.isSearching && (
-        <section className="w-full max-w-3xl mx-auto mb-12 text-center space-y-3 stagger-enter stagger-3">
+        <section className="w-full max-w-4xl mx-auto mb-12 text-center space-y-3 stagger-enter stagger-3">
           <div className="flex items-center justify-center gap-2 text-xs font-mono text-on-surface-variant uppercase tracking-wider font-bold">
             <span className="material-symbols-outlined text-primary text-sm">bolt</span>
             <span>QUICK MOOD DISCOVERY</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
             {[
               { label: 'Relax & Chill', prompt: 'relaxing cozy simulation no combat' },
               { label: 'High Intensity', prompt: 'fast paced action adrenaline bullet hell' },
@@ -395,7 +449,7 @@ const HomePage = () => {
                 key={m.label}
                 type="button"
                 onClick={() => handleChipClick(m.prompt)}
-                className="px-3 py-1 bg-surface-container-highest/40 hover:bg-surface-container-highest border border-outline-variant/50 hover:border-primary/50 text-on-surface hover:text-white font-mono text-xs rounded transition-colors cursor-pointer"
+                className="h-8 px-2 bg-surface-container-highest/40 hover:bg-surface-container-highest border border-outline-variant/50 hover:border-primary/50 text-on-surface hover:text-white font-mono text-xs rounded transition-colors cursor-pointer flex items-center justify-center text-center truncate"
               >
                 {m.label}
               </button>
@@ -810,7 +864,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-cyan flex flex-col items-start transition-colors hover:border-primary-bright hover:shadow-[0_0_20px_rgba(76,224,210,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-primary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-primary/10 transition-colors">
-                <span className="material-symbols-outlined text-primary text-2xl">psychology</span>
+                <span className="material-symbols-outlined text-primary text-2xl animate-synaptic-pulse">psychology</span>
               </div>
               <h3 className="text-primary text-glow-cyan font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Understand Intent
@@ -822,7 +876,7 @@ const HomePage = () => {
 
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-magenta flex flex-col items-start transition-colors hover:border-secondary hover:shadow-[0_0_20px_rgba(255,61,129,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-secondary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-secondary/10 transition-colors">
-                <span className="material-symbols-outlined text-secondary text-2xl">radar</span>
+                <span className="material-symbols-outlined text-secondary text-2xl animate-radar-sweep">radar</span>
               </div>
               <h3 className="text-secondary text-glow-magenta font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Multi-Signal Ranking
@@ -834,7 +888,7 @@ const HomePage = () => {
 
             <div className="bg-terminal-bg rounded-lg p-6 glow-box-amber flex flex-col items-start transition-colors hover:border-tertiary-bright hover:shadow-[0_0_20px_rgba(255,194,76,0.5)] group">
               <div className="w-12 h-12 rounded-lg bg-terminal-header border border-tertiary/40 flex items-center justify-center mb-5 shrink-0 group-hover:bg-tertiary/10 transition-colors">
-                <span className="material-symbols-outlined text-tertiary text-2xl">architecture</span>
+                <span className="material-symbols-outlined text-tertiary text-2xl animate-build-flicker">architecture</span>
               </div>
               <h3 className="text-tertiary text-glow-amber font-display text-sm md:text-base mb-3 leading-snug uppercase">
                 Build & Remix

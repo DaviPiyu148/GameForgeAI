@@ -132,9 +132,29 @@ export const StudioVersionsTab: React.FC<StudioVersionsTabProps> = ({
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-on-surface-variant font-sans">
-                    {ver.change_summary || (ver.version_number === 1 ? 'Initial prototype generated from prompt.' : 'Revision update.')}
-                  </div>
+                  {(() => {
+                    const text = ver.change_summary || (ver.version_number === 1 ? 'Initial prototype generated from prompt.' : 'Revision update.');
+                    const parts = text.split(';').map((p) => p.trim()).filter(Boolean);
+                    if (parts.length <= 1) {
+                      return (
+                        <div className="text-xs text-on-surface-variant font-mono leading-relaxed">
+                          {text}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-1 flex flex-wrap gap-1.5 items-center">
+                        {parts.map((part, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[11px] font-mono px-2 py-0.5 rounded-xs bg-surface-container border border-outline-variant/40 text-on-surface-variant"
+                          >
+                            {part}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="text-[10px] text-outline text-right">

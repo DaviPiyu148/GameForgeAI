@@ -11,7 +11,7 @@ Invariants:
 """
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm import Session
 
 from app.models.project_inspiration import ProjectInspiration
@@ -156,7 +156,7 @@ class ProjectInspirationService:
         try:
             created = self.repo.create(db, record)
             return self._to_response(created)
-        except IntegrityError:
+        except (IntegrityError, InvalidRequestError):
             db.rollback()
             raise DuplicateInspirationError(
                 f"Game '{steam_app_id}' is already attached as inspiration to project '{project_id}'."

@@ -529,6 +529,52 @@
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* Subtle Feature Card Icon Keyframes (Non-distracting, zero layout shift) */
+@keyframes synapticPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(76, 224, 210, 0.4));
+    opacity: 0.9;
+  }
+  50% {
+    filter: drop-shadow(0 0 7px rgba(76, 224, 210, 0.85));
+    opacity: 1;
+  }
+}
+
+@keyframes radarSweepPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(255, 61, 129, 0.4));
+    opacity: 0.88;
+  }
+  50% {
+    filter: drop-shadow(0 0 7px rgba(255, 61, 129, 0.9));
+    opacity: 1;
+  }
+}
+
+@keyframes buildRemixFlicker {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(255, 194, 76, 0.4));
+    opacity: 0.9;
+  }
+  50% {
+    filter: drop-shadow(0 0 7px rgba(255, 194, 76, 0.85));
+    opacity: 1;
+  }
+}
+
+.animate-synaptic-pulse {
+  animation: synapticPulse 4s ease-in-out infinite;
+}
+
+.animate-radar-sweep {
+  animation: radarSweepPulse 4.5s ease-in-out infinite;
+}
+
+.animate-build-flicker {
+  animation: buildRemixFlicker 5s ease-in-out infinite;
+}
+
 /* ─── Reduced Motion ─── */
 @media (prefers-reduced-motion: reduce) {
   /* Disable translation/scaling keyframe animations and rapid loops while keeping state feedback */
@@ -555,7 +601,10 @@
   .mic-listening,
   .crt-flicker,
   .scan-sweep::before,
-  .terminal-cursor {
+  .terminal-cursor,
+  .animate-synaptic-pulse,
+  .animate-radar-sweep,
+  .animate-build-flicker {
     animation: none !important;
   }
 

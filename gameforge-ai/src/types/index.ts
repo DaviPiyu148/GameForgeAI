@@ -623,6 +623,6 @@ export interface AppContextType {
   deleteProject: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<void>;
   // Toast notifications
-  pushToast: (toast: { variant: 'info' | 'success' | 'xp' | 'levelup' | 'milestone' | 'error'; title: string; description?: string }) => void;
+  pushToast: (toast: { variant: 'info' | 'success' | 'xp' | 'levelup' | 'milestone' | 'error'; title: string; description?: string; action?: { label: string; onClick: () => void } }) => void;
 }
 

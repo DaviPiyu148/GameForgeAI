@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
+import { SavedDiscoveryCover } from '../components/Shared/SavedDiscoveryCover';
+import { GameDetailsModal } from '../components/Shared/GameDetailsModal';
 import { discoveryService } from '../services/discovery';
-import type { GameProject } from '../types';
+import type { GameProject, DiscoverySearchResult } from '../types';
 
 
 export default function ProfilePage() {
@@ -16,6 +18,7 @@ export default function ProfilePage() {
     openAuthModal,
     logout,
     removeSavedDiscovery,
+    saveDiscovery,
     updateGameProject,
     uploadAvatar,
     deleteAvatar,
@@ -28,6 +31,7 @@ export default function ProfilePage() {
 
   const [selectedPlayProject, setSelectedPlayProject] = useState<GameProject | null>(null);
   const [showLikedGamesModal, setShowLikedGamesModal] = useState(false);
+  const [selectedSavedGame, setSelectedSavedGame] = useState<DiscoverySearchResult | null>(null);
   const [isClosingModal, setIsClosingModal] = useState(false);
   const [displayGames, setDisplayGames] = useState(0);
 
@@ -132,6 +136,39 @@ export default function ProfilePage() {
       setShowLikedGamesModal(false);
       setIsClosingModal(false);
     }, 250);
+  };
+
+  const openSavedGameDetails = (discovery: typeof state.savedDiscoveries[0]) => {
+    const existingResult = (state.discoveryResults || []).find(
+      (r) => (r.game.external_id || r.game.id) === discovery.steam_app_id
+    );
+    const steamCapsule = discovery.steam_app_id
+      ? `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${discovery.steam_app_id}/header.jpg`
+      : undefined;
+
+    const resultToOpen: DiscoverySearchResult = existingResult ?? {
+      game: {
+        id: discovery.steam_app_id || discovery.id,
+        external_id: discovery.steam_app_id || discovery.id,
+        source: 'steam',
+        title: discovery.title,
+        display_title: discovery.title,
+        description: `Saved game from your curated collection: ${discovery.title}.`,
+        genres: discovery.genres,
+        display_genres: discovery.genres,
+        tags: discovery.genres,
+        player_modes: ['Single-player'],
+        platforms: ['Windows'],
+        release_year: 2024,
+        is_free: false,
+        cover_image_url: steamCapsule,
+        hero_image_url: steamCapsule,
+      },
+      score: 1.0,
+      match_highlights: ['Saved in collection'],
+      explanation: 'From your curated saved games collection',
+    };
+    setSelectedSavedGame(resultToOpen);
   };
 
   useEffect(() => {
@@ -288,29 +325,41 @@ export default function ProfilePage() {
                   <span>Level {currentLevel} • {progressData?.creator_title || 'Novice Creator'}</span>
                 </div>
                 <span className="font-mono text-xs text-on-surface-variant">{email}</span>
+                {state.authStatus === 'AUTHENTICATED' && (
+                  <button
+                    onClick={() => {
+                      document.getElementById('account-settings')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1 text-xs font-mono text-primary/80 hover:text-primary hover:underline cursor-pointer border border-primary/30 hover:border-primary/60 px-2.5 py-1 rounded-sm bg-primary/5 transition-colors"
+                    title="Jump to Account Settings"
+                  >
+                    <span className="material-symbols-outlined text-sm">settings</span>
+                    <span>Settings</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
           {/* Right: Stat boxes & Auth Action */}
           <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
-              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Total XP</div>
-              <div className="font-display text-tertiary text-lg font-bold">{progressData?.total_xp || 0}</div>
+            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
+              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Total XP</div>
+              <div className="font-display text-tertiary text-base font-bold">{progressData?.total_xp || 0}</div>
             </div>
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
-              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Milestones</div>
-              <div className="font-display text-tertiary">
+            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
+              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Milestones</div>
+              <div className="font-display text-tertiary text-base font-bold">
                 {progressData?.unlocked_milestone_count || 0} / {progressData?.total_milestone_count || 8}
               </div>
             </div>
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
-              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Saved Items</div>
-              <div className="font-display text-primary">{state.savedDiscoveries.length}</div>
+            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
+              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Saved Items</div>
+              <div className="font-display text-primary text-base font-bold">{state.savedDiscoveries.length}</div>
             </div>
-            <div className="bg-surface-container-highest p-4 border border-outline-variant flex-1 md:flex-none min-w-[130px] text-center rounded-sm">
-              <div className="text-sm text-on-surface-variant uppercase tracking-wider mb-1">Games Built</div>
-              <div className="font-display text-secondary">{displayGames}</div>
+            <div className="bg-surface-container-highest h-24 p-3 border border-outline-variant flex-1 md:flex-none min-w-[130px] flex flex-col items-center justify-center text-center rounded-sm">
+              <div className="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Games Built</div>
+              <div className="font-display text-secondary text-base font-bold">{displayGames}</div>
             </div>
 
             {state.authStatus === 'AUTHENTICATED' ? (
@@ -683,11 +732,20 @@ export default function ProfilePage() {
                 {state.savedDiscoveries.slice(0, 4).map((sd) => (
                   <div
                     key={sd.id}
-                    className="flex items-center justify-between gap-3 p-3 bg-surface-container-highest/50 border border-outline-variant/50 rounded-sm hover:bg-surface-container-highest hover:border-secondary/30 transition-colors group"
+                    onClick={() => openSavedGameDetails(sd)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openSavedGameDetails(sd);
+                      }
+                    }}
+                    className="flex items-center justify-between gap-3 p-3 bg-surface-container-highest/50 border border-outline-variant/50 rounded-sm hover:bg-surface-container-highest hover:border-secondary/50 transition-colors group cursor-pointer focus:outline-none focus:ring-1 focus:ring-secondary"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="w-10 h-10 bg-secondary-container border border-secondary/40 rounded flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-secondary text-lg">sports_esports</span>
+                      <div className="w-10 h-10 bg-secondary-container border border-secondary/40 rounded flex items-center justify-center shrink-0 overflow-hidden relative">
+                        <SavedDiscoveryCover discovery={sd} className="w-full h-full object-cover" />
                       </div>
                       <div className="overflow-hidden">
                         <h3 className="font-semibold text-on-surface text-xs group-hover:text-primary transition-colors truncate" title={sd.title}>
@@ -700,7 +758,10 @@ export default function ProfilePage() {
                     </div>
 
                     <button
-                      onClick={() => removeSavedDiscovery(sd.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSavedDiscovery(sd.id);
+                      }}
                       className="p-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer shrink-0"
                       title="Remove from saved"
                       aria-label="Remove from saved"
@@ -861,7 +922,7 @@ export default function ProfilePage() {
 
           {/* Account Settings (Username & Password) */}
           {state.authStatus === 'AUTHENTICATED' && (
-            <div className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
+            <div id="account-settings" className="relative arcade-border bg-surface-container-low p-5 md:p-6 arcade-panel">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">manage_accounts</span>
@@ -870,10 +931,10 @@ export default function ProfilePage() {
                 <span className="font-mono text-xs text-on-surface-variant">Profile & Security</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
                 {/* 1. Username Section */}
-                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between">
-                  <div>
+                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between h-full">
+                  <div className="flex-1 flex flex-col">
                     <h3 className="font-mono text-xs text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-sm">badge</span>
                       Display Username
@@ -882,7 +943,7 @@ export default function ProfilePage() {
                       Change your public creator handle. 2–50 characters, letters, numbers, hyphens, and underscores.
                     </p>
 
-                    <form onSubmit={handleSaveUsername} className="space-y-3">
+                    <form onSubmit={handleSaveUsername} className="space-y-3 flex-1 flex flex-col justify-between">
                       <div>
                         <label htmlFor="profile-username" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
                           Username
@@ -908,7 +969,7 @@ export default function ProfilePage() {
                       <button
                         type="submit"
                         disabled={isUpdatingUsername || !newUsername.trim() || newUsername.trim() === state.user?.username}
-                        className="px-4 py-2 bg-primary text-on-primary font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive glow-cyan disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center gap-1.5"
+                        className="h-9 px-4 bg-primary text-on-primary font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive glow-cyan disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-1.5 self-start"
                       >
                         {isUpdatingUsername ? (
                           <>
@@ -927,8 +988,8 @@ export default function ProfilePage() {
                 </div>
 
                 {/* 2. Password Change Section */}
-                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between">
-                  <div>
+                <div className="p-4 bg-surface border border-outline-variant/60 rounded-sm flex flex-col justify-between h-full">
+                  <div className="flex-1 flex flex-col">
                     <h3 className="font-mono text-xs text-primary uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-sm" aria-hidden="true">lock</span>
                       Security & Password
@@ -937,72 +998,74 @@ export default function ProfilePage() {
                       Update your password. Requires current password verification.
                     </p>
 
-                    <form onSubmit={handleChangePassword} className="space-y-3">
-                      <div>
-                        <label htmlFor="profile-current-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
-                          Current Password
-                        </label>
-                        <input
-                          id="profile-current-password"
-                          type="password"
-                          autoComplete="current-password"
-                          value={currentPassword}
-                          onChange={(e) => {
-                            setCurrentPassword(e.target.value);
-                            setPasswordError(null);
-                          }}
-                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
-                          placeholder="••••••••"
-                          disabled={isChangingPassword}
-                        />
-                      </div>
+                    <form onSubmit={handleChangePassword} className="space-y-3 flex-1 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="profile-current-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                            Current Password
+                          </label>
+                          <input
+                            id="profile-current-password"
+                            type="password"
+                            autoComplete="current-password"
+                            value={currentPassword}
+                            onChange={(e) => {
+                              setCurrentPassword(e.target.value);
+                              setPasswordError(null);
+                            }}
+                            className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                            placeholder="••••••••"
+                            disabled={isChangingPassword}
+                          />
+                        </div>
 
-                      <div>
-                        <label htmlFor="profile-new-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
-                          New Password
-                        </label>
-                        <input
-                          id="profile-new-password"
-                          type="password"
-                          autoComplete="new-password"
-                          value={newPassword}
-                          onChange={(e) => {
-                            setNewPassword(e.target.value);
-                            setPasswordError(null);
-                          }}
-                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
-                          placeholder="•••••••• (min 8 chars)"
-                          disabled={isChangingPassword}
-                        />
-                      </div>
+                        <div>
+                          <label htmlFor="profile-new-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                            New Password
+                          </label>
+                          <input
+                            id="profile-new-password"
+                            type="password"
+                            autoComplete="new-password"
+                            value={newPassword}
+                            onChange={(e) => {
+                              setNewPassword(e.target.value);
+                              setPasswordError(null);
+                            }}
+                            className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                            placeholder="•••••••• (min 8 chars)"
+                            disabled={isChangingPassword}
+                          />
+                        </div>
 
-                      <div>
-                        <label htmlFor="profile-confirm-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
-                          Confirm New Password
-                        </label>
-                        <input
-                          id="profile-confirm-password"
-                          type="password"
-                          autoComplete="new-password"
-                          value={confirmPassword}
-                          onChange={(e) => {
-                            setConfirmPassword(e.target.value);
-                            setPasswordError(null);
-                          }}
-                          className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
-                          placeholder="••••••••"
-                          disabled={isChangingPassword}
-                        />
-                      </div>
+                        <div>
+                          <label htmlFor="profile-confirm-password" className="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">
+                            Confirm New Password
+                          </label>
+                          <input
+                            id="profile-confirm-password"
+                            type="password"
+                            autoComplete="new-password"
+                            value={confirmPassword}
+                            onChange={(e) => {
+                              setConfirmPassword(e.target.value);
+                              setPasswordError(null);
+                            }}
+                            className="w-full bg-terminal-bg border border-outline-variant px-3 py-2 text-on-surface font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none rounded-xs"
+                            placeholder="••••••••"
+                            disabled={isChangingPassword}
+                          />
+                        </div>
 
-                      {passwordError && (
-                        <p role="alert" className="font-mono text-[10px] text-error mt-1">{passwordError}</p>
-                      )}
+                        {passwordError && (
+                          <p role="alert" className="font-mono text-[10px] text-error mt-1">{passwordError}</p>
+                        )}
+                      </div>
 
                       <button
                         type="submit"
                         disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-                        className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center gap-1.5"
+                        className="h-9 px-4 border border-primary text-primary hover:bg-primary/10 font-mono text-xs uppercase font-bold tracking-wide rounded-sm btn-interactive disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-1.5 self-start"
                       >
                         {isChangingPassword ? (
                           <>
@@ -1162,14 +1225,38 @@ export default function ProfilePage() {
               </div>
               <div className="p-6 bg-terminal-bg max-h-[60vh] overflow-y-auto space-y-3">
                 {state.savedDiscoveries.map((sd) => (
-                  <div key={sd.id} className="flex items-center justify-between p-3 bg-surface border border-outline-variant rounded-sm">
-                    <div>
-                      <h4 className="font-mono text-xs text-primary font-bold">{sd.title}</h4>
-                      <p className="font-mono text-[10px] text-on-surface-variant">{sd.genres.join(', ') || 'Game'}</p>
+                  <div
+                    key={sd.id}
+                    onClick={() => {
+                      setShowLikedGamesModal(false);
+                      openSavedGameDetails(sd);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setShowLikedGamesModal(false);
+                        openSavedGameDetails(sd);
+                      }
+                    }}
+                    className="flex items-center justify-between p-3 bg-surface border border-outline-variant hover:border-secondary/50 rounded-sm cursor-pointer group transition-colors focus:outline-none focus:ring-1 focus:ring-secondary"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-10 h-10 bg-secondary-container border border-secondary/40 rounded flex items-center justify-center shrink-0 overflow-hidden relative">
+                        <SavedDiscoveryCover discovery={sd} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="overflow-hidden">
+                        <h4 className="font-mono text-xs text-primary font-bold group-hover:text-primary-bright truncate">{sd.title}</h4>
+                        <p className="font-mono text-[10px] text-on-surface-variant truncate">{sd.genres.join(', ') || 'Game'}</p>
+                      </div>
                     </div>
                     <button
-                      onClick={() => removeSavedDiscovery(sd.id)}
-                      className="text-error hover:underline font-mono text-xs cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSavedDiscovery(sd.id);
+                      }}
+                      className="text-error hover:underline font-mono text-xs cursor-pointer p-1 shrink-0"
                       aria-label={`Remove ${sd.title} from saved`}
                     >
                       Remove
@@ -1181,6 +1268,31 @@ export default function ProfilePage() {
           </div>,
           document.body
         )}
+
+      {selectedSavedGame && (
+        <GameDetailsModal
+          result={selectedSavedGame}
+          isSaved={state.savedDiscoveries.some(
+            (sd) => sd.steam_app_id === (selectedSavedGame.game.external_id || selectedSavedGame.game.id)
+          )}
+          onClose={() => setSelectedSavedGame(null)}
+          onSave={() => {
+            if (selectedSavedGame.game.external_id) {
+              saveDiscovery(selectedSavedGame.game.external_id);
+            }
+          }}
+          onBuildSimilar={(res) => {
+            setSelectedSavedGame(null);
+            setPrompt(`Create a game inspired by ${res.game.title}: ${res.game.description.slice(0, 150)}`);
+            navigate('/build');
+          }}
+          onUseAsInspiration={(res) => {
+            setSelectedSavedGame(null);
+            setPrompt(`Create a game inspired by ${res.game.title}`);
+            navigate('/build');
+          }}
+        />
+      )}
     </div>
   );
 }

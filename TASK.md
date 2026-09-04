@@ -1,15 +1,18 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup
+UI/UX Visual Inconsistencies, Interaction Audit & Polish (12 Approved Items)
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute a comprehensive browser-based UI/UX visual QA, interaction audit, and documentation cleanup on the live running GameForge application.
-Explicitly excluded: Authentication and Game Generation/Compilation/Play.
-Systematically click every meaningful user-facing control, inspect every screen visually, record an accurate interactive control inventory with exact counts, identify and remediate genuine UI/UX defects, and resolve the 4 documentation items (Git SHA, Discovery index terminology, button inventory, AI generation boundary).
+Address 12 approved visual inconsistencies, interaction defects, and icon animation enhancements identified in user feedback (uploaded_media_0 to uploaded_media_15). Strictly enforce exclusions: Authentication, Game Generation, and Game Runtime/Controls (Items 8, 9, 10, 11 deferred to separate Game Runtime backlog).
+
+## Explicit Exclusions
+- **Authentication**: Registration, Login, Logout, Password reset/change flows (bypassed per scope rules).
+- **Game Generation & Compilation**: Code generation, LLM prompts, build job SSE streams (bypassed).
+- **Game Runtime & Controls (Items 8, 9, 10, 11)**: W/S movement, R restart canvas focus, canvas-specific fullscreen, and Phaser Remix panel docking are deferred to the Future Game Runtime Backlog.
 
 ## Started
 2026-09-04
@@ -17,23 +20,82 @@ Systematically click every meaningful user-facing control, inspect every screen 
 ---
 
 ## Previous Phase
-Final Browser QA & Real Developer Usability Validation
+Final UI/UX Visual QA, Interaction Audit & Documentation Cleanup
 Status: COMPLETE
-Commit: 4b2e9cf
+Commit: 2f1c0b8
 
 ---
 
 ## 1. Pre-Implementation
 
-- [x] Read AGENTS.md
-- [x] Confirm explicit exclusions (Authentication and Game Generation excluded)
-- [x] Verify running Chrome instance and DevTools bridge
-- [x] Identify documentation cleanup requirements (Git SHA, Discovery index terminology, control inventory, AI boundary)
-- [x] Formulate checkable UI QA subtasks
+- [x] Read AGENTS.md Constitution & guidelines
+- [x] Inspect all 16 user-uploaded screenshots (uploaded_media_0 to uploaded_media_15)
+- [x] Trace root causes across frontend components, CSS tokens, and layout trees
+- [x] Formulate initial 16-item plan and receive user review
+- [x] Reconcile scope: Remove Items 8, 9, 10, 11 to Game Runtime Backlog; refine Items 1, 2, 3, 4, 12, 14, 16
+- [x] Receive explicit user approval for 12-item scope across 4 batches
 
 ---
 
-## 2. UI QA Subtasks
+## 2. Implementation Batches (12 Approved Items)
+
+### Batch 1: Home Page & Discovery UX (Items 1, 2, 16)
+- [x] Subtask 1.1 (Defect): Fix Build Game DNA pill alignment, uniform height (`h-8 px-4 inline-flex items-center gap-1.5`), and verify replacement Material Symbol glyph in `HomePage.tsx` (Item 1)
+- [x] Subtask 1.2 (UX/Functional Defect): Fix Quick Mood Discovery 6-button responsive grid, Like/Dislike double-click neutral toggle, and Hide undo toast with zero duplicate feedback in `HomePage.tsx` (Item 2)
+- [x] Subtask 1.3 (Visual Enhancement): Add subtle, non-distracting keyframe animations in `styles/index.css` & `HomePage.tsx` for 3 feature card icons with `@media (prefers-reduced-motion)` support and zero layout shift (Item 16)
+
+### Batch 2: Modals & Dashboard Actions (Items 3, 4, 5, 6)
+- [x] Subtask 2.1 (Visual Defect): Align Game Details Modal footer buttons to `h-10` with distinct semantic styling (primary vs secondary vs close utility) and close icon in `GameDetailsModal.tsx` (Item 3)
+- [x] Subtask 2.2 (UX/Functional Defect): Add cover art display hierarchy (persisted cover -> catalog image -> Steam CDN -> stylized placeholder via `SavedDiscoveryCover.tsx`) and interactive detail modal click to Saved Discoveries in `DashboardPage.tsx` & `ProfilePage.tsx` (Item 4)
+- [x] Subtask 2.3 (Visual Defect): Normalize Dashboard project card action bar controls to shared `h-9 font-mono text-xs font-bold tracking-wider` system across PLAY, STUDIO, REMIX, with fixed 36x36px icon buttons in `DashboardPage.tsx` (Item 5)
+- [x] Subtask 2.4 (Interaction Defect): Implement robust document `mousedown` listener using actual dropdown ref + Escape key dismiss with proper cleanup on unmount in `DashboardPage.tsx` (Item 6)
+
+### Batch 3: Profile & Account Settings UX (Items 12, 13)
+- [x] Subtask 3.1 (UX/Visual Defect): Add `#account-settings` smooth-scroll anchor button in Profile Header and balance Username/Password box heights (`items-stretch`, `h-full`) with uniform `h-9` submit buttons in `ProfilePage.tsx` (Item 12)
+- [x] Subtask 3.2 (Visual Defect): Normalize 4 profile stat boxes with uniform typography (`font-display text-base font-bold`) and uniform container dimensions (`h-24 p-3`) in `ProfilePage.tsx` (Item 13)
+
+### Batch 4: Studio & Builder UI (Items 7, 14, 15)
+- [x] Subtask 4.1 (Visual Defect): Fix Version History tab typography (`font-mono text-xs text-on-surface-variant`) and safely split semicolon-delimited changes into tags in `StudioVersionsTab.tsx` (Item 7)
+- [x] Subtask 4.2 (UX/Visual Defect): Normalize Builder header chips to `h-6`, and format "Using Game DNA" as a styled non-interactive status indicator with `genetics` icon and info hover tooltip in `BuilderPage.tsx` (Item 14)
+- [x] Subtask 4.3 (Visual Defect): Remove redundant `border-t` between editor footer and compiler output console in `BuilderPage.tsx` (Item 15)
+
+---
+
+## Deferred: Future Game Runtime Backlog (Items 8, 9, 10, 11)
+- **Item 8**: Prototype Modal / Remix Panel overlap & docking (`PrototypeModal.tsx`)
+- **Item 9**: Game Controls: W/S and Up/Down controls in top-down archetypes (`GameScene.ts`)
+- **Item 10**: Game Restart: Canvas focus restoration on 'R' restart & button blur (`PhaserCanvas.tsx`)
+- **Item 11**: Fullscreen Button: Directing fullscreen to canvas viewport rather than outer modal (`PrototypeModal.tsx`)
+
+---
+
+## 3. Verification Evidence (All 12 Remediated Items)
+
+- [x] TypeScript check (`npx tsc --noEmit`): 0 errors
+- [x] Frontend lint check (`npx oxlint`): 0 warnings, 0 errors across 86 files
+- [x] Frontend unit tests (`npx tsx --test src/utils/__tests__/*.test.ts src/services/__tests__/*.test.ts`): 10 suites, 86 assertions passed
+- [x] Frontend production build (`npm run build`): Vite build completed cleanly in 2.20s
+- [x] Backend regression tests (`pytest backend/tests/ -q`): 626 passed in 142.04s
+- [x] Concurrent race bug fixed: `project_inspiration_service.py` handles `InvalidRequestError` alongside `IntegrityError` (verified via `test_concurrent_api_duplicate_attachment_race` PASS)
+- [x] Live browser visual verification: All 12 items verified PASS in live Chrome session with DOM computed styles, layout dimensions, and user interaction tests by Browser QA agent:
+  - Item 1: Suggestion chips normalized to 32px (`h-8`), verified `genetics` Material Symbol ligature
+  - Item 2: Quick Mood Discovery 6-button responsive grid (no orphaned button), like/dislike untoggle to neutral with toast, hide card removal with undo toast (0 duplicate feedback)
+  - Item 3: GameDetailsModal footer buttons normalized to 40px (`h-10`) with close icon
+  - Item 4: SavedDiscoveries cover art hierarchy via `SavedDiscoveryCover.tsx` and interactive detail modal click in both Dashboard and Profile
+  - Item 5: Dashboard action bar normalized across PLAY, STUDIO, REMIX (36px `h-9`) with fixed 36x36px icon buttons
+  - Item 6: Dashboard 3-dots dropdown closes on outside click and Escape key without backdrop overlay bugs
+  - Item 7: Studio Version History typography updated from `font-sans` to `font-mono text-xs text-on-surface-variant` with semicolon-separated change tags
+  - Item 12: Profile `#account-settings` smooth scroll button, Username and Password cards matched at exactly 340px (`items-stretch`, `h-full`), submit buttons aligned at 36px (`h-9`)
+  - Item 13: 4 Profile stat boxes normalized to 96px height (`h-24 p-3`) with uniform `16px font-bold` typography
+  - Item 14: Builder header chips normalized to 24px (`h-6 font-mono text-[10px] uppercase font-bold`), Using Game DNA rendered with `genetics` icon and info hover tooltip
+  - Item 15: Removed redundant `border-t` at line 413 of `BuilderPage.tsx`, eliminating the double border between logic editor and output console
+  - Item 16: Non-shifting CSS animations in `styles/index.css` verified with zero layout shift and `@media (prefers-reduced-motion)` support
+- [x] Review git diff and git status
+- [x] Git checkpoint commit with clean working tree
+
+---
+
+## Historical Audit Records (Completed Phases)
 
 - [x] 2.1 UI QA Interactive Control Inventory (Cataloged 45 controls across Discovery, Studio, Profile, Docs, Modals; 42 clicked PASS, 1 expected disabled, 2 intentionally excluded; 42 + 1 + 2 = 45)
 - [x] 2.2 Discovery UI & Card Interaction Audit (Search input, modes, cards, save, bookmark, details modal, 0% data bleed across Slay the Spire vs Balatro)

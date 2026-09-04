@@ -399,7 +399,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                 type="button"
                 onClick={onSave}
                 disabled={isSaved}
-                className={`px-4 py-2.5 font-mono text-xs uppercase font-bold rounded border transition-colors flex items-center gap-2 cursor-pointer ${
+                className={`h-10 px-4 font-mono text-xs uppercase font-bold rounded border transition-colors inline-flex items-center gap-2 cursor-pointer ${
                   isSaved
                     ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-default'
                     : 'border-outline-variant hover:border-primary text-on-surface hover:text-primary hover:bg-primary/5'
@@ -419,7 +419,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                     handleClose();
                     onUseAsInspiration(result);
                   }}
-                  className="px-3.5 py-2.5 border border-tertiary/50 text-tertiary hover:bg-tertiary/10 font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-3.5 border border-tertiary/50 text-tertiary hover:bg-tertiary/10 font-mono text-xs uppercase font-bold rounded inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   title="Use this game as design inspiration for a project"
                   aria-label={`Use ${game.display_title || game.title} as inspiration`}
                 >
@@ -436,7 +436,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                     handleClose();
                     onMoreLikeThis(game.external_id || game.id, game.title);
                   }}
-                  className="px-3.5 py-2.5 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-xs uppercase font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-3.5 border border-secondary/50 text-secondary hover:bg-secondary/10 font-mono text-xs uppercase font-bold rounded inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   title="Discover games similar to this title"
                 >
                   <span className="material-symbols-outlined text-sm">scatter_plot</span>
@@ -445,14 +445,15 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {/* Close Button */}
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2.5 border border-outline-variant hover:border-on-surface text-on-surface-variant hover:text-white font-mono text-xs uppercase rounded transition-colors cursor-pointer"
+                className="h-10 px-4 border border-outline-variant/60 hover:border-on-surface text-on-surface-variant hover:text-white font-mono text-xs uppercase font-bold rounded inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                Close
+                <span className="material-symbols-outlined text-sm" aria-hidden="true">close</span>
+                <span>Close</span>
               </button>
 
               {/* Build Similar Primary Button */}
@@ -460,7 +461,7 @@ export const GameDetailsModal: React.FC<GameDetailsModalProps> = ({
                 type="button"
                 onClick={() => onBuildSimilar(result)}
                 disabled={isActionLoading}
-                className="px-5 py-2.5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-cyan flex items-center gap-2 cursor-pointer shadow-lg"
+                className="h-10 px-5 bg-primary text-on-primary font-mono text-xs uppercase font-bold rounded btn-interactive energy-sweep glow-cyan inline-flex items-center gap-2 cursor-pointer shadow-lg"
               >
                 <span className="material-symbols-outlined text-sm">construction</span>
                 <span>{isActionLoading ? 'Preparing Build...' : 'Build Similar'}</span>

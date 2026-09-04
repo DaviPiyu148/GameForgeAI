@@ -1,13 +1,15 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { PrototypeModal } from '../components/Shared/PrototypeModal';
 import { ProjectStudioModal, type StudioTabId } from '../components/Shared/ProjectStudioModal';
 import { ProjectCoverArt } from '../components/Shared/ProjectCoverArt';
+import { SavedDiscoveryCover } from '../components/Shared/SavedDiscoveryCover';
+import { GameDetailsModal } from '../components/Shared/GameDetailsModal';
 import { projectService } from '../services/projects';
 import { pushToast } from '../services/toastBus';
 import { buildDiscoverySeed } from '../utils/discovery';
-import type { GameProject, ProjectVersionSummary } from '../types';
+import type { GameProject, ProjectVersionSummary, DiscoverySearchResult } from '../types';
 
 // ─────────────────────────────────────────────────────────
 // Inline Rename component — lives inside each card
@@ -34,41 +36,31 @@ function RenameInput({ initialTitle, onSave, onCancel }: RenameInputProps) {
     <div className="flex items-center gap-1 w-full">
       <input
         ref={inputRef}
-        autoFocus
-        className="flex-1 bg-terminal-bg border border-primary/60 text-primary font-display text-base uppercase px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary min-w-0"
+        type="text"
         value={value}
-        maxLength={255}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === 'NumpadEnter') { e.preventDefault(); handleSave(); }
-          if (e.key === 'Escape') { onCancel(); }
-        }}
-        onBlur={() => {
-          // Blur → save if changed, else cancel
-          const trimmed = value.trim();
-          if (trimmed && trimmed !== initialTitle) { handleSave(); } else { onCancel(); }
+          if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
         }}
         disabled={saving}
-        aria-label="Rename project"
+        className="flex-1 bg-terminal-bg border border-primary/60 text-primary font-mono text-xs px-2 py-1 outline-none rounded-xs focus:ring-1 focus:ring-primary"
+        autoFocus
+        maxLength={255}
       />
       <button
-        type="button"
         onClick={handleSave}
-        disabled={saving || !value.trim()}
-        className="text-primary hover:text-on-primary hover:bg-primary p-1 transition-colors cursor-pointer rounded-sm"
-        aria-label="Save project title"
-        title="Save name (Enter)"
+        disabled={saving}
+        className="px-2 py-1 bg-primary text-on-primary font-mono text-[10px] uppercase font-bold rounded-xs cursor-pointer hover:bg-primary-bright disabled:opacity-50"
       >
-        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">check</span>
+        {saving ? '…' : '✓'}
       </button>
       <button
-        type="button"
         onClick={onCancel}
-        className="text-on-surface-variant hover:text-error p-1 transition-colors cursor-pointer rounded-sm"
-        aria-label="Cancel title rename"
-        title="Cancel (Esc)"
+        disabled={saving}
+        className="px-2 py-1 border border-outline-variant text-on-surface-variant font-mono text-[10px] uppercase rounded-xs cursor-pointer hover:text-white disabled:opacity-50"
       >
-        <span className="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>
+        ✕
       </button>
     </div>
   );
@@ -119,6 +111,7 @@ const DashboardPage = () => {
     updateBuildParams,
     openAuthModal,
     removeSavedDiscovery,
+    saveDiscovery,
     updateGameProject,
     deleteProject,
     duplicateProject,
@@ -132,14 +125,73 @@ const DashboardPage = () => {
   const [playbackVersion, setPlaybackVersion] = useState<ProjectVersionSummary | null>(null);
   const [studioProject, setStudioProject] = useState<GameProject | null>(null);
   const [studioInitialTab, setStudioInitialTab] = useState<StudioTabId>('overview');
+  const [selectedSavedGame, setSelectedSavedGame] = useState<DiscoverySearchResult | null>(null);
 
   // Per-card UI state: rename / delete confirm / duplicating
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  // Per-card contextual action menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Global click-outside & Escape dismiss for 3-dots dropdown
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    const handlePointerDownOutside = (e: MouseEvent) => {
+      if (menuContainerRef.current && menuContainerRef.current.contains(e.target as Node)) {
+        return;
+      }
+      setOpenMenuId(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openMenuId]);
+
+  const openSavedGameDetails = (discovery: typeof state.savedDiscoveries[0]) => {
+    const existingResult = (state.discoveryResults || []).find(
+      (r) => (r.game.external_id || r.game.id) === discovery.steam_app_id
+    );
+    const steamCapsule = discovery.steam_app_id
+      ? `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${discovery.steam_app_id}/header.jpg`
+      : undefined;
+
+    const resultToOpen: DiscoverySearchResult = existingResult ?? {
+      game: {
+        id: discovery.steam_app_id || discovery.id,
+        external_id: discovery.steam_app_id || discovery.id,
+        source: 'steam',
+        title: discovery.title,
+        display_title: discovery.title,
+        description: `Saved game from your curated collection: ${discovery.title}.`,
+        genres: discovery.genres,
+        display_genres: discovery.genres,
+        tags: discovery.genres,
+        player_modes: ['Single-player'],
+        platforms: ['Windows'],
+        release_year: 2024,
+        is_free: false,
+        cover_image_url: steamCapsule,
+        hero_image_url: steamCapsule,
+      },
+      score: 1.0,
+      match_highlights: ['Saved in collection'],
+      explanation: 'In your curated saved games library',
+    };
+    setSelectedSavedGame(resultToOpen);
+  };
 
   const handleOpenStudio = (game: GameProject, initialTab: StudioTabId = 'overview') => {
     setOpenMenuId(null);
@@ -358,28 +410,29 @@ const DashboardPage = () => {
                     {/* Primary: PLAY */}
                     <button
                       onClick={() => handlePlay(game)}
-                      className="flex-1 bg-primary text-on-primary font-mono text-xs py-2 uppercase shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer btn-interactive energy-sweep glow-cyan text-center"
+                      className="h-9 flex-1 bg-primary text-on-primary font-mono text-xs font-bold uppercase rounded shadow-[0_0_10px_rgba(76,224,210,0.2)] cursor-pointer btn-interactive energy-sweep glow-cyan inline-flex items-center justify-center gap-1"
                     >
-                      PLAY
+                      <span className="material-symbols-outlined text-sm">play_arrow</span>
+                      <span>PLAY</span>
                     </button>
 
                     {/* Secondary: STUDIO */}
                     <button
                       onClick={() => handleOpenStudio(game)}
-                      className="px-3 py-2 border border-primary/60 text-primary font-mono text-xs hover:bg-primary/10 uppercase cursor-pointer btn-interactive text-center flex items-center justify-center gap-1"
+                      className="h-9 px-3 border border-primary/60 text-primary font-mono text-xs font-bold hover:bg-primary/10 uppercase cursor-pointer btn-interactive rounded inline-flex items-center justify-center gap-1"
                       title="Open Project Studio workspace"
                     >
-                      <span className="material-symbols-outlined text-[13px]">developer_board</span>
+                      <span className="material-symbols-outlined text-sm">developer_board</span>
                       <span>STUDIO</span>
                     </button>
 
                     {/* Tertiary: REMIX */}
                     <button
                       onClick={() => handleDirectRemix(game)}
-                      className="flex-1 border border-secondary text-secondary font-mono text-xs py-2 hover:bg-secondary/10 uppercase cursor-pointer btn-interactive text-center flex items-center justify-center gap-1"
+                      className="h-9 flex-1 border border-secondary text-secondary font-mono text-xs font-bold hover:bg-secondary/10 uppercase cursor-pointer btn-interactive rounded inline-flex items-center justify-center gap-1"
                       title="Directly remix and evolve this game"
                     >
-                      <span className="material-symbols-outlined text-[13px]">shuffle</span>
+                      <span className="material-symbols-outlined text-sm">shuffle</span>
                       <span>REMIX</span>
                     </button>
 
@@ -387,87 +440,87 @@ const DashboardPage = () => {
                     <button
                       type="button"
                       onClick={() => handleDiscoverSimilar(game)}
-                      className="border border-outline-variant text-on-surface-variant p-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center justify-center shrink-0"
+                      className="h-9 w-9 border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive rounded transition-colors inline-flex items-center justify-center shrink-0"
                       title="Discover similar games from catalog"
                       aria-label={`Discover games similar to ${game.title}`}
                     >
-                      <span className="material-symbols-outlined text-[16px]">explore</span>
+                      <span className="material-symbols-outlined text-sm">explore</span>
                     </button>
 
                     {/* Contextual: ⋮ menu */}
-                    <div className="relative">
+                    <div className="relative" ref={openMenuId === game.id ? menuContainerRef : undefined}>
                       <button
                         id={`menu-btn-${game.id}`}
                         type="button"
                         onClick={() => setOpenMenuId(openMenuId === game.id ? null : game.id)}
-                        className="border border-outline-variant text-on-surface-variant p-2 hover:text-primary hover:border-primary uppercase cursor-pointer btn-interactive transition-colors flex items-center justify-center shrink-0"
+                        className={`h-9 w-9 border rounded uppercase cursor-pointer btn-interactive transition-colors inline-flex items-center justify-center shrink-0 ${
+                          openMenuId === game.id
+                            ? 'border-primary text-primary bg-primary/10'
+                            : 'border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary'
+                        }`}
                         title="More actions"
                         aria-label={`More actions for ${game.title}`}
                         aria-expanded={openMenuId === game.id}
                         aria-controls={`actions-dropdown-${game.id}`}
                       >
-                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">more_vert</span>
+                        <span className="material-symbols-outlined text-sm" aria-hidden="true">more_vert</span>
                       </button>
 
                       {openMenuId === game.id && (
-                        <>
-                          {/* Click-away backdrop */}
-                          <div className="fixed inset-0 z-20" onClick={() => setOpenMenuId(null)} />
-                          <div
-                            id={`actions-dropdown-${game.id}`}
-                            className="absolute right-0 bottom-full mb-1 w-44 bg-surface-container border border-primary/40 shadow-xl z-30 flex flex-col modal-enter rounded-sm overflow-hidden"
+                        <div
+                          id={`actions-dropdown-${game.id}`}
+                          className="absolute right-0 bottom-full mb-1 w-44 bg-surface-container border border-primary/40 shadow-xl z-30 flex flex-col modal-enter rounded-sm overflow-hidden"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStudio(game)}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left"
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleOpenStudio(game)}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">developer_board</span>
-                              Project Studio
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { handleContinueEditing(game); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
-                              Edit in Builder
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">label</span>
-                              Rename
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDirectRemix(game)}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">shuffle</span>
-                              Remix Prototype
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicate(game.id)}
-                              disabled={duplicatingId === game.id}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left disabled:opacity-50"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">content_copy</span>
-                              {duplicatingId === game.id ? 'Duplicating…' : 'Duplicate'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setDeleteConfirmId(game.id); setOpenMenuId(null); }}
-                              className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-error hover:bg-error/10 transition-colors cursor-pointer text-left border-t border-primary/10"
-                            >
-                              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>
-                              Delete
-                            </button>
-                          </div>
-                        </>
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">developer_board</span>
+                            Project Studio
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { handleContinueEditing(game); setOpenMenuId(null); }}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                          >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>
+                            Edit in Builder
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setRenamingId(game.id); setOpenMenuId(null); }}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                          >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">label</span>
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDirectRemix(game)}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left"
+                          >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">shuffle</span>
+                            Remix Prototype
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicate(game.id)}
+                            disabled={duplicatingId === game.id}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-left disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">content_copy</span>
+                            {duplicatingId === game.id ? 'Duplicating…' : 'Duplicate'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDeleteConfirmId(game.id); setOpenMenuId(null); }}
+                            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] text-error hover:bg-error/10 transition-colors cursor-pointer text-left border-t border-primary/10"
+                          >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>
+                            Delete
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -507,7 +560,16 @@ const DashboardPage = () => {
             {state.savedDiscoveries.map((discovery) => (
               <div
                 key={discovery.id}
-                className="bg-surface-container-low border border-outline-variant hover:border-secondary transition-colors p-0 rounded-sm flex flex-col justify-between overflow-hidden group"
+                onClick={() => openSavedGameDetails(discovery)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openSavedGameDetails(discovery);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="bg-surface-container-low border border-outline-variant hover:border-secondary transition-colors p-0 rounded-sm flex flex-col justify-between overflow-hidden group cursor-pointer focus:outline-none focus:ring-1 focus:ring-secondary"
               >
                 <div className="bg-terminal-header px-3 py-1.5 flex justify-between items-center border-b border-outline-variant/50">
                   <div className="flex items-center gap-1.5">
@@ -517,8 +579,11 @@ const DashboardPage = () => {
                     </span>
                   </div>
                   <button
-                    onClick={() => removeSavedDiscovery(discovery.id)}
-                    className="text-on-surface-variant hover:text-error text-[10px] font-mono cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSavedDiscovery(discovery.id);
+                    }}
+                    className="text-on-surface-variant hover:text-error text-[10px] font-mono cursor-pointer p-0.5"
                     title="Delete bookmark"
                     aria-label="Delete bookmark"
                   >
@@ -526,12 +591,10 @@ const DashboardPage = () => {
                   </button>
                 </div>
                 <div className="p-3 flex flex-col gap-2 h-full">
-                  <div className="aspect-video bg-surface-dim border border-outline-variant overflow-hidden flex items-center justify-center">
-                    <span className="material-symbols-outlined text-2xl text-secondary/40">
-                      sports_esports
-                    </span>
+                  <div className="aspect-video bg-surface-dim border border-outline-variant group-hover:border-secondary/50 transition-colors overflow-hidden flex items-center justify-center relative">
+                    <SavedDiscoveryCover discovery={discovery} />
                   </div>
-                  <h4 className="font-mono text-xs text-on-surface uppercase truncate mt-1 font-bold" title={discovery.title}>
+                  <h4 className="font-mono text-xs text-on-surface uppercase truncate mt-1 font-bold group-hover:text-secondary transition-colors" title={discovery.title}>
                     {discovery.title}
                   </h4>
                   <div className="flex justify-between items-center mt-auto">
@@ -597,6 +660,30 @@ const DashboardPage = () => {
           onProjectUpdated={(updated) => {
             updateGameProject(updated);
             setStudioProject(updated);
+          }}
+        />
+      )}
+      {selectedSavedGame && (
+        <GameDetailsModal
+          result={selectedSavedGame}
+          isSaved={state.savedDiscoveries.some(
+            (sd) => sd.steam_app_id === (selectedSavedGame.game.external_id || selectedSavedGame.game.id)
+          )}
+          onClose={() => setSelectedSavedGame(null)}
+          onSave={() => {
+            if (selectedSavedGame.game.external_id) {
+              saveDiscovery(selectedSavedGame.game.external_id);
+            }
+          }}
+          onBuildSimilar={(res) => {
+            setSelectedSavedGame(null);
+            setPrompt(`Create a game inspired by ${res.game.title}: ${res.game.description.slice(0, 150)}`);
+            navigate('/build');
+          }}
+          onUseAsInspiration={(res) => {
+            setSelectedSavedGame(null);
+            setPrompt(`Create a game inspired by ${res.game.title}`);
+            navigate('/build');
           }}
         />
       )}

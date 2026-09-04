@@ -8,6 +8,10 @@ export interface ToastMessage {
   variant: ToastVariant;
   title: string;
   description?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 type Listener = (toast: ToastMessage) => void;

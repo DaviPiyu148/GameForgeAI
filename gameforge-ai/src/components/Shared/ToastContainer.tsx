@@ -147,6 +147,19 @@ export const ToastContainer = () => {
                   {toast.description}
                 </div>
               )}
+              {toast.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.action?.onClick();
+                    handleDismiss(toast.id);
+                  }}
+                  className="mt-2 px-2.5 py-1 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary-bright font-mono text-[10px] uppercase font-bold rounded cursor-pointer transition-colors inline-flex items-center gap-1 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[13px]" aria-hidden="true">undo</span>
+                  <span>{toast.action.label}</span>
+                </button>
+              )}
             </div>
             <button
               type="button"

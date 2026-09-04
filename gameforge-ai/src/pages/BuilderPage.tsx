@@ -101,31 +101,34 @@ const BuilderPage = () => {
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm text-primary">terminal</span>
                   <span className="font-mono text-xs text-primary font-bold tracking-wider uppercase">Natural Logic Editor</span>
-                  <span className="bg-primary/10 border border-primary/30 text-primary font-mono text-[9px] px-1.5 py-0.5 rounded-xs ml-2">PROMPT MODE</span>
+                  <span className="h-6 px-2.5 inline-flex items-center bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] uppercase font-bold rounded-xs ml-1">
+                    PROMPT MODE
+                  </span>
                   {userGameDNA && (
                     <div
-                      className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary text-[10px] font-mono ml-2"
-                      title="AI generation subtly incorporates your Game DNA preferences as secondary flavor"
+                      className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2.5 rounded-xs bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] font-bold uppercase ml-1"
+                      title={`AI generation subtly incorporates your Game DNA preferences: ${userGameDNA}`}
                     >
                       <span className="material-symbols-outlined text-xs">genetics</span>
-                      <span>Personalized: {userGameDNA}</span>
+                      <span>Using Game DNA</span>
+                      <span className="material-symbols-outlined text-xs text-primary/60 hover:text-primary cursor-help">info</span>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setShowHistory(!showHistory)} 
-                    className="text-primary/70 hover:text-primary font-mono text-[10px] flex items-center gap-1 uppercase transition-colors cursor-pointer"
+                    className="h-6 px-2.5 inline-flex items-center gap-1 text-primary/80 hover:text-primary border border-primary/20 hover:border-primary/50 bg-primary/5 rounded-xs font-mono text-[10px] uppercase transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[14px]">history</span>
-                    History ({promptHistory.length})
+                    <span className="material-symbols-outlined text-[13px]">history</span>
+                    <span>History ({promptHistory.length})</span>
                   </button>
                   <button 
                     onClick={handleCopy} 
-                    className="text-primary/70 hover:text-primary font-mono text-[10px] flex items-center gap-1 uppercase transition-colors cursor-pointer"
+                    className="h-6 px-2.5 inline-flex items-center gap-1 text-primary/80 hover:text-primary border border-primary/20 hover:border-primary/50 bg-primary/5 rounded-xs font-mono text-[10px] uppercase transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[14px]">{copyFeedback ? 'check' : 'content_copy'}</span>
-                    {copyFeedback ? 'Copied' : 'Copy'}
+                    <span className="material-symbols-outlined text-[13px]">{copyFeedback ? 'check' : 'content_copy'}</span>
+                    <span>{copyFeedback ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
                 
@@ -204,9 +207,13 @@ const BuilderPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="text-primary/60 font-mono text-[10px]">TOKENS: {state.currentPrompt.length} / 8192</div>
                   {userGameDNA && (
-                    <div className="hidden md:inline-flex items-center gap-1 font-mono text-[10px] text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/20">
-                      <span className="material-symbols-outlined text-[12px] text-primary">auto_awesome</span>
+                    <div
+                      className="hidden md:inline-flex items-center gap-1.5 h-6 px-2.5 rounded-xs bg-primary/10 border border-primary/30 font-mono text-[10px] font-bold text-primary uppercase"
+                      title={`AI generation subtly incorporates your Game DNA preferences: ${userGameDNA}`}
+                    >
+                      <span className="material-symbols-outlined text-xs text-primary">genetics</span>
                       <span>Using Game DNA</span>
+                      <span className="material-symbols-outlined text-xs text-primary/60 hover:text-primary cursor-help">info</span>
                     </div>
                   )}
                 </div>
@@ -403,7 +410,7 @@ const BuilderPage = () => {
           </div>
 
           {/* ═══ Output Console (Left, Row 2) ═══ */}
-          <div className={`hidden lg:flex col-start-1 col-end-2 row-start-2 row-end-3 border-t border-r pane-border bg-terminal-bg flex-col h-full relative overflow-hidden ${state.buildStatus === 'COMPILING' ? 'crt-flicker delay-2' : ''}`}>
+          <div className={`hidden lg:flex col-start-1 col-end-2 row-start-2 row-end-3 border-r pane-border bg-terminal-bg flex-col h-full relative overflow-hidden ${state.buildStatus === 'COMPILING' ? 'crt-flicker delay-2' : ''}`}>
             {state.buildStatus === 'COMPILING' && <div className="absolute inset-0 scanline-effect opacity-30 pointer-events-none"></div>}
             <div className="flex justify-between items-center px-4 py-1.5 border-b border-primary/20 bg-terminal-header relative z-10">
               <h2 className="font-mono text-[10px] uppercase text-primary flex items-center gap-2">
