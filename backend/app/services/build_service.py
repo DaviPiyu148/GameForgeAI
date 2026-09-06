@@ -1,8 +1,11 @@
 import asyncio
 from datetime import datetime, timezone
 import json
+import logging
 from typing import AsyncGenerator, Callable, Dict, List, Optional, Set
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import SessionLocal
 from app.models.build import BuildJob
@@ -568,6 +571,7 @@ class BuildService:
             raise
         except Exception as e:
             # Fatal unhandled error handling
+            logger.exception("Fatal unhandled error in build worker for build %s: %s", build_id, e)
             try:
                 self.repo.transition_status(
                     db=db,
@@ -576,7 +580,7 @@ class BuildService:
                     to_status="ERROR",
                     completed_at=datetime.now(timezone.utc),
                     error_code="INTERNAL_BUILD_ERROR",
-                    error_message=str(e),
+                    error_message="Internal build error occurred. Please try again.",
                 )
                 self.broadcaster.broadcast(
                     build_id,
@@ -585,7 +589,7 @@ class BuildService:
                         "build_id": build_id,
                         "status": "ERROR",
                         "error_code": "INTERNAL_BUILD_ERROR",
-                        "error_message": str(e),
+                        "error_message": "Internal build error occurred. Please try again.",
                     },
                 )
             except Exception:
@@ -596,7 +600,7 @@ class BuildService:
             db.close()
 
     async def stream_events(
-        self, build_id: str, user_id: Optional[str] = None
+        self, build_id: str, user_id: Optional[str] = None, keep_alive_timeout: float = 30.0
     ) -> AsyncGenerator[str, None]:
         """
         SSE Generator that yields historical persisted events first,
@@ -649,8 +653,108 @@ class BuildService:
             # Stream live events from the queue (deduplicating anything <= last_seq)
             while True:
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    event = await asyncio.wait_for(queue.get(), timeout=keep_alive_timeout)
                 except asyncio.TimeoutError:
+                    # Inspect active build state in database to prevent infinite dead keep-alive loops (ADV-REL-001)
+                    db: Session = self.session_factory()
+                    try:
+                        current_build = self.repo.get_build_by_id(db, build_id)
+                        if not current_build:
+                            terminal_data = {
+                                "build_id": build_id,
+                                "status": "ERROR",
+                                "error_code": "BUILD_NOT_FOUND",
+                                "error_message": "Build job no longer exists.",
+                            }
+                            yield f"event: status\ndata: {json.dumps(terminal_data)}\n\n"
+                            break
+
+                        # Terminal state reached in DB (e.g. status broadcast was dropped or arrived out-of-band)
+                        if current_build.status in ("SUCCESS", "ERROR", "CANCELLED"):
+                            terminal_data = {
+                                "build_id": build_id,
+                                "status": current_build.status,
+                            }
+                            if current_build.project_id:
+                                terminal_data["project_id"] = current_build.project_id
+                            if current_build.error_code:
+                                terminal_data["error_code"] = current_build.error_code
+                            if current_build.error_message:
+                                terminal_data["error_message"] = current_build.error_message
+                            yield f"event: status\ndata: {json.dumps(terminal_data)}\n\n"
+                            break
+
+                        # Check worker lifecycle: if build is stuck in non-terminal state but no worker is active
+                        task = self._active_tasks.get(build_id)
+                        worker_dead = False
+                        if task is not None and task.done():
+                            worker_dead = True
+                        elif task is None and build_id not in self._running_builds:
+                            # Allow a startup grace period for freshly QUEUED builds where worker registration may still be completing
+                            created_dt = current_build.created_at
+                            if created_dt:
+                                if created_dt.tzinfo is None:
+                                    created_dt = created_dt.replace(tzinfo=timezone.utc)
+                                elapsed_since_creation = (datetime.now(timezone.utc) - created_dt).total_seconds()
+                            else:
+                                elapsed_since_creation = 999.0
+
+                            if current_build.status == "QUEUED" and elapsed_since_creation < 15.0:
+                                # Within registration grace window: yield keep-alive and allow worker to start
+                                worker_dead = False
+                            else:
+                                worker_dead = True
+
+                        if worker_dead:
+                            now = datetime.now(timezone.utc)
+                            self.repo.transition_status(
+                                db=db,
+                                build_id=build_id,
+                                from_statuses=["QUEUED", "RUNNING", "VALIDATING"],
+                                to_status="ERROR",
+                                completed_at=now,
+                                error_code="WORKER_TERMINATED",
+                                error_message="Build worker terminated unexpectedly.",
+                            )
+                            terminal_data = {
+                                "build_id": build_id,
+                                "status": "ERROR",
+                                "error_code": "WORKER_TERMINATED",
+                                "error_message": "Build worker terminated unexpectedly.",
+                            }
+                            yield f"event: status\ndata: {json.dumps(terminal_data)}\n\n"
+                            break
+
+                        # Check for build deadline timeout (5 minutes max duration)
+                        created_dt = current_build.created_at
+                        if created_dt:
+                            if created_dt.tzinfo is None:
+                                created_dt = created_dt.replace(tzinfo=timezone.utc)
+                            elapsed = (datetime.now(timezone.utc) - created_dt).total_seconds()
+                            if elapsed > 300.0:
+                                if task and not task.done():
+                                    task.cancel()
+                                now = datetime.now(timezone.utc)
+                                self.repo.transition_status(
+                                    db=db,
+                                    build_id=build_id,
+                                    from_statuses=["QUEUED", "RUNNING", "VALIDATING"],
+                                    to_status="ERROR",
+                                    completed_at=now,
+                                    error_code="BUILD_TIMEOUT",
+                                    error_message="Build exceeded maximum execution time.",
+                                )
+                                terminal_data = {
+                                    "build_id": build_id,
+                                    "status": "ERROR",
+                                    "error_code": "BUILD_TIMEOUT",
+                                    "error_message": "Build exceeded maximum execution time.",
+                                }
+                                yield f"event: status\ndata: {json.dumps(terminal_data)}\n\n"
+                                break
+                    finally:
+                        db.close()
+
                     # Keep-alive comment ping
                     yield ": keep-alive\n\n"
                     continue

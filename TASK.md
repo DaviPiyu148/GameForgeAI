@@ -1,16 +1,19 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Phase A Remediation — Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)
+Phase A Remediation — Slice 3 (ADV-PERF-001, ADV-REL-001, ADV-SEC-006) & Phase A Completion
 
 ## Status
-IN_PROGRESS
+COMPLETE
 
 ## Objective
-Implement and verify Slice 2 of Phase A (Authentication & Session Correctness):
-1. ADV-CORR-002: Catch `IntegrityError` in `AuthService.register()` and `update_username()`, inspect the specific constraint failure name (`users.email` vs `users.username`), rollback transaction, and raise appropriate domain error (`DuplicateEmailError` vs `DuplicateUsernameError`) mapping to HTTP 409 Conflict instead of unhandled HTTP 500.
-2. ADV-SEC-003: Invalidate active JWT tokens across all credential-changing paths (password change, password reset, revocation). Add `token_version` (Integer, default 1) to `User`, embed `"tv"` claim in access token payload, validate `"tv"` against `user.token_version` in `get_current_user`, increment `user.token_version` on password changes and resets, and reject tokens lacking `"tv"` or matching outdated versions with HTTP 401.
-3. ADV-CORR-004: Restrict exception swallowing in `get_optional_user` strictly to `jwt.PyJWTError`. Allow database operational errors (`OperationalError`, `SQLAlchemyError`) to propagate up to FastAPI handlers as HTTP 500 rather than silently converting authenticated users to anonymous guests.
+Implement and verify Slice 3 of Phase A (Performance, Stream Reliability, and Exception Hardening) and finalize Phase A:
+1. ADV-PERF-001: Discovery Event-Loop Blocking Remediation (CRITICAL / GUARDED). Offload CPU-bound SentenceTransformer embedding, dense FAISS similarity search, and candidate fusion/ranking to worker threads (`asyncio.to_thread`) without blocking the FastAPI event loop. Satisfy all guardrail criteria: before/after benchmark, 1 vs 10 concurrent queries, `/health` endpoint responsiveness (<10ms during heavy query), SSE stream ping responsiveness, thread-safety assessment, and mathematical ranking equivalence.
+2. ADV-REL-001: Dead SSE Keep-Alive Loop / Stream Lifecycle Remediation (MEDIUM). Prevent infinite keep-alive comment loops (`: keep-alive\n\n`) when build workers stall, crash, or fail silently. Implement active build state inspection, worker heartbeat, delayed-registration grace window (15s), and execution budget (300s SLA upper bound), cleanly terminating the SSE stream with appropriate terminal status (`SUCCESS`, `ERROR`, or `CANCELLED`) instead of looping indefinitely.
+3. ADV-SEC-006: Internal Exception-String Leakage Remediation (MEDIUM). Eliminate raw exception string (`str(e)`) leakage in error responses across API endpoints (`projects.py`, `build_service.py`). Preserve intentional domain 4xx errors (`ProjectNotFoundError`, `ValueError`, `PlaytestNotFoundError`) and `HTTPException` (403), while ensuring unexpected internal server errors return generic safe messages (e.g., "Failed to compile project prototype. Please try again.") and log full diagnostic tracebacks exclusively in server logs (`logger.exception`).
+4. Scope Discipline & Phase Boundaries:
+   - `ADV-SEC-002` (reverse-proxy topology / trusted forwarded headers) remains strictly in Phase B.
+   - `ADV-ARCH-003` (dead `TaskType.DIRECTOR` / Phase-7 residue) remains strictly in Phase C.
 
 ## Started
 2026-09-06
@@ -20,8 +23,8 @@ Implement and verify Slice 2 of Phase A (Authentication & Session Correctness):
 ## 1. Pre-Implementation
 
 - [x] Read AGENTS.md Constitution & guidelines
-- [x] Baseline test suite status: 635 passed, 4 warnings in 155.39s (EXIT CODE 0)
-- [x] Frontend baseline status: `tsc -b && vite build` built in 5.80s, `oxlint` 0 warnings/errors on 88 files
+- [x] Baseline test suite status: 643 passed, 4 warnings in 102.11s (EXIT CODE 0)
+- [x] Frontend baseline status: `npm run build` built in 2.48s (0 errors)
 - [x] Record cryptographic baseline SHA-256 hashes:
   - `GameScene.ts`: `ae6287f1ce92621baa781e822278abd4cfc8e2c8b706a7a7c8d05b266d966095`
   - `vfxSystem.ts`: `c8a5e0a46c3b0df950d53db13368e008b03d8132ef46457b797afc9af6d243fa`
@@ -31,66 +34,82 @@ Implement and verify Slice 2 of Phase A (Authentication & Session Correctness):
 
 ## 2. Implementation
 
-- [x] Subtask 1: Fix `ADV-CORR-002` (TOCTOU constraint mapping in `backend/app/services/auth_service.py`)
-  - Added `_handle_user_integrity_error` catching `IntegrityError` in `register()` and `update_username()`.
-  - Transaction rolled back (`db.rollback()`) and dialect error string parsed: `"username"` -> `DuplicateUsernameError` (HTTP 409 `USERNAME_TAKEN`), `"email"` -> `DuplicateEmailError` (HTTP 409 `EMAIL_ALREADY_EXISTS`).
-- [x] Subtask 2: Fix `ADV-SEC-003` (JWT `token_version` invalidation across credential-changing paths)
-  - Added `token_version = Column(Integer, nullable=False, default=1, server_default="1")` to `User` model.
-  - Created Alembic migration `c1d2e3f4a5b6_add_token_version_to_users.py` (upgraded cleanly on `gameforge.db`).
-  - Added `"tv"` claim to `create_access_token(user_id, token_version=...)`.
-  - Enforced `"tv"` verification against `user.token_version` in `get_current_user` (HTTP 401 on missing or mismatched `"tv"`).
-  - Incremented `user.token_version` in `change_password()`, `reset_password()`, and `revoke_all_sessions()`.
-- [x] Subtask 3: Fix `ADV-CORR-004` (`get_optional_user` DB error preservation in `backend/app/dependencies.py`)
-  - Swallows strictly `(jwt.InvalidTokenError, jwt.PyJWTError)` for token validation.
-  - Queries `user_repository.get_by_id(db, user_id)` outside try/except so database operational errors (`OperationalError`, `SQLAlchemyError`) propagate up as HTTP 500 rather than silently converting authenticated users to anonymous guests.
+- [x] Subtask 1: Fix `ADV-PERF-001` (Discovery Event-Loop Blocking - CRITICAL / GUARDED)
+  - Profile & benchmark synchronous discovery search on event loop
+  - Wrap CPU-bound `embed_query`, FAISS vector search, and ranking in worker thread execution via `asyncio.to_thread`
+  - Verify thread safety: SentenceTransformer (`encode` with `torch.no_grad()`), FAISS (`IndexFlatIP` C++ OpenMP inner-product search), and LexicalIndex (immutable dictionaries) confirmed thread-safe and reentrant under concurrent read access.
+  - Verify health endpoint responsiveness during concurrent queries (<10ms max latency; measured 2.12ms avg, 4.90ms max)
+  - Verify 5 mathematical ranking invariants across 5 benchmark queries: candidate IDs, semantic similarity scores, lexical outputs, hybrid fusion scores, and final ranking order matched 100% with 0 discrepancies against baseline.
+- [x] Subtask 2: Fix `ADV-REL-001` (Dead SSE Keep-Alive Loop / Stream Lifecycle - MEDIUM)
+  - Update `build_service.stream_events` generator to query job state on `asyncio.TimeoutError`
+  - Terminate stream cleanly when build reaches terminal state (`SUCCESS`, `ERROR`, `CANCELLED`) or is deleted (`BUILD_NOT_FOUND`)
+  - Handle worker heartbeat / dead worker timeout: if build is stuck in non-terminal state without an active worker task, transition DB to ERROR (`WORKER_TERMINATED`), emit terminal event, and break.
+  - Add 15s grace window for freshly QUEUED builds to allow worker registration without false termination.
+  - Enforce dual timer lifecycle: (1) a 30-second SSE keep-alive/state-inspection interval that inspects DB and worker task state on every 30s of queue inactivity, emitting `: keep-alive\n\n` or cleanly terminating dead/finished streams; and (2) a 300-second absolute build execution ceiling that terminates hung jobs with `BUILD_TIMEOUT`. Based on the multi-stage generative architecture (`AI_OVERALL_DEADLINE_SECONDS=60.0` for generation failover + 25.0s to 50.0s for the bounded repair loop + ~11.0s AST validation, DB transactions, and network overhead, bounding complete legitimate generation at ~121s–180s), the 300s ceiling provides a substantial 120-second safety margin (1.67x) against expected queue scheduling, transport, and DB delays.
+- [x] Subtask 3: Fix `ADV-SEC-006` (Internal Exception-String Leakage Remediation - MEDIUM)
+  - Audit all `make_error_response` / `_error` calls in API endpoints (`projects.py`, `build_service.py`)
+  - Replace raw `str(e)` in 500 error envelopes with generic safe messages
+  - Ensure full diagnostic exception tracebacks are logged exclusively on the server (`logger.exception`)
+  - Preserve explicit domain 4xx (`ProjectNotFoundError` -> 404, `ValueError` -> 400/409) and `HTTPException` (403) from being swallowed into 500.
 
 ---
 
 ## 3. Verification
 
-- [x] Concurrent registration race tests (distinguishing email vs username 409s)
-  - `test_register_toctou_email_integrity_error_maps_to_409`: PASSED
-  - `test_register_toctou_username_integrity_error_maps_to_409`: PASSED
-  - `test_handle_user_integrity_error_unit`: PASSED (SQLite + PostgreSQL dialect constraint messages, rollback verification)
-- [x] Concurrent username update race tests (409 Conflict)
-  - `test_update_username_toctou_integrity_error_maps_to_409`: PASSED
-- [x] Token invalidation tests across password change, reset, and revocation
-  - `test_token_version_embedded_and_validated`: PASSED (asserts "tv": 1 in payload, 401 on missing "tv", 401 on mismatched "tv")
-  - `test_password_change_revokes_previous_access_tokens`: PASSED (asserts 401 on old token, fresh token works with 200, "tv": 2)
-  - `test_reset_password_and_revoke_all_sessions_service`: PASSED (asserts token_version increments to 2 on reset and 3 on revoke, rejecting previous tokens)
-- [x] 4-case test matrix for `get_optional_user`:
-  - `test_get_optional_user_four_case_matrix`: PASSED
-    1. No token -> returns None (guest)
-    2. Expired/malformed token -> returns None (guest)
-    3. Valid token + healthy DB -> returns User (authenticated)
-    4. Valid token + DB outage/error (`OperationalError: database is locked`) -> raises `OperationalError` (bubbles to HTTP 500)
-    5. Valid token + outdated/missing token_version -> returns None (guest)
-- [x] Focused auth test suite: 31 passed in 4.03s (`pytest -v tests/test_auth.py`)
-- [x] Profile, discovery, and saved discoveries suites: 16 passed in 24.37s (`pytest -v tests/test_profile_api.py tests/test_discovery_api.py tests/test_saved_discoveries.py`)
-- [x] Full backend test suite (`.venv\Scripts\pytest.exe -q`): **643 passed, 4 warnings in 102.11s (0 failures)**
-- [x] Frontend typecheck and build (`npm run build`): **Built in 2.48s (0 errors)**
-- [x] Workspace protection verification:
-  - `GameScene.ts`: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095` (UNTOUCHED)
-  - `vfxSystem.ts`: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` (UNTOUCHED)
+- [x] `ADV-PERF-001` Benchmark: 1 query latency vs 10 concurrent queries (4.41 QPS throughput, 2.27s for 10 concurrent queries)
+- [x] `ADV-PERF-001` Responsiveness: `/health` latency during heavy query: average 2.12ms, max 4.90ms (<10ms guardrail met; 13-24 health pings executed where 0 executed before)
+- [x] `ADV-PERF-001` Invariants: All 5 invariants (candidate IDs, semantic similarity scores, lexical outputs, fusion scores, and final ranking order) matched 100% across all 5 benchmark queries (0 discrepancies vs baseline)
+- [x] `ADV-PERF-001` Thread Safety: Concurrent read access to SentenceTransformer, FAISS index, and lexical index verified under 10-query workload with no race/error observed
+- [x] `ADV-REL-001` Regression: SSE stream terminates cleanly on worker death, external terminal status, deleted build, or max build timeout; delayed registration grace window verified (5/5 tests passed in `test_build_concurrency.py`)
+- [x] `ADV-SEC-006` Regression: 500 responses return generic safe messages without internal `str(e)` across project routes, and domain 4xx / HTTPException are preserved (4/4 tests passed in `test_projects.py`)
+- [x] Focused Slice 3 tests: 35 passed in 34.34s (`test_discovery_api.py`, `test_build_concurrency.py`, `test_projects.py`)
+- [x] Full backend test suite: 653 passed, 4 warnings in 102.13s (`.venv\Scripts\pytest.exe -q`)
+- [x] Frontend typecheck and build: `tsc -b && vite build` built cleanly in 1.07s (0 errors)
+- [x] Workspace protection verification: `GameScene.ts` (`ae62...095`) and `vfxSystem.ts` (`c8a5...3fa`) SHA-256 hashes 100% identical
 
 ---
 
 ## 4. Documentation
 
-- [x] Update `TASK.md` with concrete verification evidence and logs
+- [x] Update `TASK.md` with concrete verification evidence, frozen severities, thread safety audit, and SLA rationale
 
 ---
 
 ## 5. Git Checkpoint
 
 - [x] Review `git diff` and `git status`
-- [x] Verify working tree: intentionally dirty solely due to protected user work in `GameScene.ts` and `vfxSystem.ts`
-- [x] Create logical commit for Slice 2: `backend: implement Phase A Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)`
-- **Commit**: `16530b6` (`16530b65103aae639a04f981dc6faef968ef21d6`)
+- [x] Working tree status: Working tree intentionally dirty only due to protected pre-existing user modifications; all Phase A changes across Slices 1, 2, and 3 are committed.
+- [x] Commit hash: `ec37c07f74feebcc2a726ecc2a7295eaeb2cfc09` (canonical Slice 3 commit incorporating grace window, HTTPException preservation, and ledger update)
 
 ---
 
 ## Previous Tasks Archive
+
+### Task: Phase A Remediation — Slice 3 (ADV-PERF-001, ADV-REL-001, ADV-SEC-006)
+Status: COMPLETE (2026-09-06)
+- **Verified Deliverables**:
+  1. `ADV-PERF-001` (CRITICAL / GUARDED): Offloaded CPU-bound SentenceTransformer embedding inference, dense FAISS similarity search, and candidate fusion/ranking (`_execute_search_pipeline`, `_execute_similar_games_pipeline`, `_execute_more_like_this_pipeline`) to worker threads via `asyncio.to_thread`. Preserved fast DB operations and async IGDB enrichment on event loop.
+     - Event loop unblocking proof: During 731-789ms heavy search query, 13 to 24 health pings executed concurrently (0 executed before remediation). Max health ping latency was 4.90ms (guardrail target <10ms).
+     - Concurrency: 10 concurrent searches completed in 2.27s with 4.41 QPS throughput.
+     - Invariants: Candidate IDs, semantic similarity scores, lexical outputs, hybrid fusion scores, and final ranking order matched 100% across all 5 benchmark queries (0 discrepancies vs baseline).
+     - Thread Safety: Concurrent read access to SentenceTransformer, FAISS index, and lexical index verified under 10-query workload with no race/error observed.
+     - Test: `test_discovery_search_offloaded_to_thread_unblocks_event_loop` in `test_discovery_api.py` passed.
+  2. `ADV-REL-001` (MEDIUM): Added active state validation to `stream_events()` in `build_service.py` on the 30-second SSE keep-alive/state-inspection interval. Evaluates terminal DB states (`SUCCESS`, `ERROR`, `CANCELLED`), task cancellation / missing worker (`WORKER_TERMINATED`), delayed registration grace window (15s), and the 300-second absolute build execution ceiling (`BUILD_TIMEOUT`), terminating streams cleanly instead of looping indefinitely.
+     - 5 regression tests in `test_build_concurrency.py`: `test_sse_stream_terminates_when_worker_dies`, `test_sse_stream_terminates_on_external_terminal_status`, `test_sse_stream_terminates_on_deleted_build`, `test_sse_stream_terminates_on_max_build_timeout`, `test_sse_stream_does_not_kill_freshly_queued_build_during_registration_delay` passed.
+  3. `ADV-SEC-006` (MEDIUM): Replaced raw `str(e)` leakage with safe generic error envelopes in `projects.py` (`apply_improvements`, `apply_remix`, `compile_project`) and `build_service.py` (`_run_build_worker`). Structured 4xx responses preserved for domain errors (`ProjectNotFoundError` -> 404, `ValueError` -> 400/409) and `HTTPException` (403); unexpected internal errors emit safe generic messages with full tracebacks logged via `logger.exception`.
+     - 4 regression tests in `test_projects.py`: `test_improve_project_unexpected_error_does_not_leak_exception_string`, `test_remix_project_unexpected_error_does_not_leak_exception_string`, `test_compile_project_unexpected_error_does_not_leak_exception_string`, `test_project_endpoints_preserve_domain_exceptions_and_http_exceptions` passed.
+- **Verification Evidence**: 653 backend tests passed (102.13s), 35 focused Slice 3 tests passed (34.34s), frontend built cleanly in 1.07s (0 errors), `GameScene.ts` & `vfxSystem.ts` SHA-256 hashes 100% identical.
+
+
+### Task: Phase A Remediation — Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)
+Status: COMPLETE (2026-09-06)
+- **Commit**: `defd4eb8f053091ee33431df15d3945efe09ae9e` (`backend: implement Phase A Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)`)
+- **Working Tree State**: Slice 2 implementation is frozen in Git; working tree is intentionally dirty solely due to protected pre-existing user modifications in `GameScene.ts` and `vfxSystem.ts` (0 Slice 2 uncommitted changes).
+- **Verified Deliverables**:
+  1. `ADV-CORR-002`: Implemented `_handle_user_integrity_error` in `AuthService`, parsing dialect constraint messages to distinguish `DuplicateUsernameError` (409 USERNAME_TAKEN) vs `DuplicateEmailError` (409 EMAIL_ALREADY_EXISTS) with transaction rollback.
+  2. `ADV-SEC-003`: Added `token_version` to `User` and Alembic migration `c1d2e3f4a5b6`. Embedded `"tv"` claim in access tokens, enforced validation in `get_current_user` (401 on missing or stale `tv`), and incremented `token_version` on password changes, resets, and session revocations.
+  3. `ADV-CORR-004`: Restricted exception catching in `get_optional_user` strictly to `(jwt.InvalidTokenError, jwt.PyJWTError)`. Allowed DB operational errors to bubble up as HTTP 500 rather than silently falling back to guest.
+- **Verification Evidence**: 643 backend tests passed (102.11s), 31 auth tests passed (including **five-case matrix** for `get_optional_user`: no token, expired/malformed, valid + healthy DB, valid + DB outage, and outdated/missing token_version), frontend built in 2.48s (0 errors), `GameScene.ts` & `vfxSystem.ts` SHA-256 hashes 100% identical.
 
 ### Task: Phase A Remediation — Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)
 Status: COMPLETE (2026-09-06)

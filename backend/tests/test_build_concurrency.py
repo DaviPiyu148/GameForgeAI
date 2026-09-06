@@ -11,7 +11,7 @@ Verifies:
 - SSE stream replay, ordering, and terminal completion
 """
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -464,3 +464,195 @@ def test_idor_protection_on_build_endpoints(test_context):
     # 5. User B tries to request SSE token for User A's build -> 404
     res_sse_token = client.post(f"/api/builds/{build_id}/sse-token", json={}, headers=headers_b)
     assert res_sse_token.status_code == 404
+
+
+# -----------------------------------------------------------------------------
+# 7. ADV-REL-001: SSE Stream Lifecycle & Dead Keep-Alive Termination
+# -----------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sse_stream_terminates_when_worker_dies():
+    """Verify ADV-REL-001: stream terminates with WORKER_TERMINATED instead of infinite keep-alive loop when worker disappears."""
+    db = TestingSessionLocal()
+    try:
+        build = BuildJob(prompt="Worker dead test", status="RUNNING")
+        db.add(build)
+        db.commit()
+        db.refresh(build)
+        build_id = build.id
+
+        # Ensure no worker task is registered in memory
+        build_service._active_tasks.pop(build_id, None)
+        build_service._running_builds.discard(build_id)
+
+        # Consume the stream with a short keep-alive timeout
+        events = []
+        async for chunk in build_service.stream_events(build_id, keep_alive_timeout=0.05):
+            events.append(chunk)
+
+        # Stream must have terminated
+        joined = "".join(events)
+        assert "WORKER_TERMINATED" in joined
+        assert "Build worker terminated unexpectedly." in joined
+
+        # Database record must have transitioned to ERROR
+        db.refresh(build)
+        assert build.status == "ERROR"
+        assert build.error_code == "WORKER_TERMINATED"
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_terminates_on_external_terminal_status():
+    """Verify ADV-REL-001: stream detects terminal state from database on timeout even if broadcaster event missed."""
+    db = TestingSessionLocal()
+    try:
+        build = BuildJob(prompt="External status test", status="RUNNING")
+        db.add(build)
+        db.commit()
+        db.refresh(build)
+        build_id = build.id
+
+        # Register a mock running task so worker_dead is False initially
+        dummy_task = asyncio.create_task(asyncio.sleep(10))
+        build_service._active_tasks[build_id] = dummy_task
+        build_service._running_builds.add(build_id)
+
+        # Mark build as SUCCESS directly in DB
+        build.status = "SUCCESS"
+        build.project_id = "test-proj-123"
+        db.commit()
+
+        events = []
+        async for chunk in build_service.stream_events(build_id, keep_alive_timeout=0.05):
+            events.append(chunk)
+
+        dummy_task.cancel()
+        build_service._active_tasks.pop(build_id, None)
+        build_service._running_builds.discard(build_id)
+
+        joined = "".join(events)
+        assert '"status": "SUCCESS"' in joined
+        assert "test-proj-123" in joined
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_terminates_on_deleted_build():
+    """Verify ADV-REL-001: stream terminates with BUILD_NOT_FOUND if build is deleted during keep-alive timeout."""
+    db = TestingSessionLocal()
+    try:
+        build = BuildJob(prompt="Delete test", status="RUNNING")
+        db.add(build)
+        db.commit()
+        db.refresh(build)
+        build_id = build.id
+
+        # Register a mock running task so worker_dead is False initially
+        dummy_task = asyncio.create_task(asyncio.sleep(10))
+        build_service._active_tasks[build_id] = dummy_task
+        build_service._running_builds.add(build_id)
+
+        events = []
+        gen = build_service.stream_events(build_id, keep_alive_timeout=0.05)
+
+        # 1. Read initial status event
+        initial_status = await anext(gen)
+        assert "status" in initial_status
+
+        # 2. Delete the build from DB while stream is live
+        db.delete(build)
+        db.commit()
+
+        # 3. Next timeout cycle detects deletion in DB
+        async for chunk in gen:
+            events.append(chunk)
+
+        if not dummy_task.done():
+            dummy_task.cancel()
+        build_service._active_tasks.pop(build_id, None)
+        build_service._running_builds.discard(build_id)
+
+        joined = "".join(events)
+        assert "BUILD_NOT_FOUND" in joined
+        assert "Build job no longer exists." in joined
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_terminates_on_max_build_timeout():
+    """Verify ADV-REL-001: stream terminates with BUILD_TIMEOUT if build exceeds max execution budget."""
+    db = TestingSessionLocal()
+    try:
+        # Create a build that has exceeded 300s
+        old_created = datetime.now(timezone.utc) - timedelta(seconds=350)
+        build = BuildJob(prompt="Timeout test", status="RUNNING", created_at=old_created)
+        db.add(build)
+        db.commit()
+        db.refresh(build)
+        build_id = build.id
+
+        dummy_task = asyncio.create_task(asyncio.sleep(10))
+        build_service._active_tasks[build_id] = dummy_task
+        build_service._running_builds.add(build_id)
+
+        events = []
+        async for chunk in build_service.stream_events(build_id, keep_alive_timeout=0.05):
+            events.append(chunk)
+
+        if not dummy_task.done():
+            dummy_task.cancel()
+        build_service._active_tasks.pop(build_id, None)
+        build_service._running_builds.discard(build_id)
+
+        joined = "".join(events)
+        assert "BUILD_TIMEOUT" in joined
+        assert "Build exceeded maximum execution time." in joined
+
+        db.refresh(build)
+        assert build.status == "ERROR"
+        assert build.error_code == "BUILD_TIMEOUT"
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_does_not_kill_freshly_queued_build_during_registration_delay():
+    """Verify ADV-REL-001: freshly QUEUED build without worker task registered yet gets grace period and does not fail."""
+    db = TestingSessionLocal()
+    try:
+        # Build created 2 seconds ago, status QUEUED, no worker in _active_tasks yet
+        fresh_created = datetime.now(timezone.utc) - timedelta(seconds=2)
+        build = BuildJob(prompt="Fresh queued build", status="QUEUED", created_at=fresh_created)
+        db.add(build)
+        db.commit()
+        db.refresh(build)
+        build_id = build.id
+
+        # Ensure no task is registered
+        build_service._active_tasks.pop(build_id, None)
+        build_service._running_builds.discard(build_id)
+
+        # Stream with short timeout (0.05s)
+        gen = build_service.stream_events(build_id, keep_alive_timeout=0.05)
+
+        # 1. Read initial status event
+        initial_status = await anext(gen)
+        assert "status" in initial_status
+        assert "QUEUED" in initial_status
+
+        # 2. Timeout triggers: should yield keep-alive, NOT WORKER_TERMINATED
+        timeout_event = await anext(gen)
+        assert timeout_event == ": keep-alive\n\n"
+
+        # 3. Verify DB state is still QUEUED
+        db.refresh(build)
+        assert build.status == "QUEUED"
+
+        await gen.aclose()
+    finally:
+        db.close()
+

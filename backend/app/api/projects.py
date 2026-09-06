@@ -8,7 +8,7 @@ IDOR protection: owner mismatch on GET/PATCH returns 404 (not 403).
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -382,8 +382,15 @@ async def apply_improvements(
         if "stale" in err_msg.lower():
             return make_error_response("STALE_ANALYSIS", err_msg, status.HTTP_409_CONFLICT)  # type: ignore
         return make_error_response("IMPROVEMENT_FAILED", err_msg, status.HTTP_400_BAD_REQUEST)  # type: ignore
+    except HTTPException:
+        raise
     except Exception as e:
-        return make_error_response("IMPROVEMENT_FAILED", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+        logger.exception("Unexpected error improving project %s: %s", project_id, e)
+        return make_error_response(
+            "IMPROVEMENT_FAILED",
+            "Failed to improve project prototype. Please try again.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )  # type: ignore
 
 
 @router.get(
@@ -450,8 +457,17 @@ async def apply_remix(
         return remix_res
     except ProjectNotFoundError as e:
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
-    except Exception as e:
+    except ValueError as e:
         return make_error_response("REMIX_FAILED", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error remixing project %s: %s", project_id, e)
+        return make_error_response(
+            "REMIX_FAILED",
+            "Failed to remix project prototype. Please try again.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )  # type: ignore
 
 
 @router.get(
@@ -539,8 +555,14 @@ def compile_project(
         return make_error_response("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except ValueError as e:
         return make_error_response("COMPILATION_ERROR", str(e), status.HTTP_400_BAD_REQUEST)  # type: ignore
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Unexpected error compiling project %s: %s", project_id, e)
-        return make_error_response("COMPILATION_FAILED", str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)  # type: ignore
+        return make_error_response(
+            "COMPILATION_FAILED",
+            "Failed to compile project prototype. Please try again.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )  # type: ignore
 
 

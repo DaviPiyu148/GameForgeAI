@@ -6,6 +6,7 @@ Tests now create projects directly via ORM (as the build service would) and
 test GET/PATCH with proper authentication.
 """
 import time
+from unittest.mock import patch
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -425,6 +426,118 @@ def test_create_project_api(client):
     list_res = client.get("/api/projects", headers=_auth(token))
     assert list_res.status_code == 200
     assert any(p["id"] == data["id"] for p in list_res.json()["projects"])
+
+
+def test_improve_project_unexpected_error_does_not_leak_exception_string(client):
+    """Verify ADV-SEC-006: unexpected internal errors return generic 500 without leaking str(e)."""
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id)
+
+    with patch("app.api.projects.project_service.apply_project_improvement", side_effect=RuntimeError("CRITICAL_INTERNAL_LEAK_SECRET_123")):
+        res = client.post(
+            f"/api/projects/{proj_id}/improvements",
+            json={"recommendations": [{"id": "rec-1", "action": "tune_speed"}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 500
+        data = res.json()
+        assert data["error"]["code"] == "IMPROVEMENT_FAILED"
+        assert data["error"]["message"] == "Failed to improve project prototype. Please try again."
+        assert "CRITICAL_INTERNAL_LEAK_SECRET_123" not in res.text
+
+
+def test_remix_project_unexpected_error_does_not_leak_exception_string(client):
+    """Verify ADV-SEC-006: unexpected internal errors during remix return generic 500 without leaking str(e)."""
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id)
+
+    with patch("app.api.projects.project_service.apply_project_remix", side_effect=RuntimeError("INTERNAL_DATABASE_LEAK_PASSWORD_XYZ")):
+        res = client.post(
+            f"/api/projects/{proj_id}/remix",
+            json={"intents": [{"type": "increase_combat", "strength": 0.5}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 500
+        data = res.json()
+        assert data["error"]["code"] == "REMIX_FAILED"
+        assert data["error"]["message"] == "Failed to remix project prototype. Please try again."
+        assert "INTERNAL_DATABASE_LEAK_PASSWORD_XYZ" not in res.text
+
+
+def test_compile_project_unexpected_error_does_not_leak_exception_string(client):
+    """Verify ADV-SEC-006: unexpected internal errors during compilation return generic 500 without leaking str(e)."""
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id)
+
+    with patch("app.api.projects.project_service.compile_project_version", side_effect=RuntimeError("SEGFAULT_COMPILER_INTERNAL_PATH_ABC")):
+        res = client.post(
+            f"/api/projects/{proj_id}/compile",
+            json={"versionNumber": 1},
+            headers=_auth(token),
+        )
+        assert res.status_code == 500
+        data = res.json()
+        assert data["error"]["code"] == "COMPILATION_FAILED"
+        assert data["error"]["message"] == "Failed to compile project prototype. Please try again."
+        assert "SEGFAULT_COMPILER_INTERNAL_PATH_ABC" not in res.text
+
+
+def test_project_endpoints_preserve_domain_exceptions_and_http_exceptions(client):
+    """Verify ADV-SEC-006: exception hardening preserves domain 4xx and HTTPException without turning them into 500."""
+    from fastapi import HTTPException
+
+    token, user_id = _register_and_token(client)
+    proj_id = _create_project_in_db(user_id)
+
+    # 1. ValueError with "stale" maps to 409 STALE_ANALYSIS
+    with patch("app.api.projects.project_service.apply_project_improvement", side_effect=ValueError("Analysis is stale")):
+        res = client.post(
+            f"/api/projects/{proj_id}/improvements",
+            json={"recommendations": [{"id": "rec-1", "action": "tune_speed"}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 409
+        assert res.json()["error"]["code"] == "STALE_ANALYSIS"
+
+    # 2. General ValueError maps to 400 IMPROVEMENT_FAILED
+    with patch("app.api.projects.project_service.apply_project_improvement", side_effect=ValueError("Invalid recommendation format")):
+        res = client.post(
+            f"/api/projects/{proj_id}/improvements",
+            json={"recommendations": [{"id": "rec-1", "action": "tune_speed"}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 400
+        assert res.json()["error"]["code"] == "IMPROVEMENT_FAILED"
+
+    # 3. Explicit HTTPException(403) propagates untouched
+    with patch("app.api.projects.project_service.apply_project_improvement", side_effect=HTTPException(status_code=403, detail="Forbidden operation")):
+        res = client.post(
+            f"/api/projects/{proj_id}/improvements",
+            json={"recommendations": [{"id": "rec-1", "action": "tune_speed"}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 403
+
+    # 4. Remix ValueError maps to 400 REMIX_FAILED
+    with patch("app.api.projects.project_service.apply_project_remix", side_effect=ValueError("Unsupported remix intent")):
+        res = client.post(
+            f"/api/projects/{proj_id}/remix",
+            json={"intents": [{"type": "increase_combat", "strength": 0.5}]},
+            headers=_auth(token),
+        )
+        assert res.status_code == 400
+        assert res.json()["error"]["code"] == "REMIX_FAILED"
+
+    # 5. Compile ValueError maps to 400 COMPILATION_ERROR
+    with patch("app.api.projects.project_service.compile_project_version", side_effect=ValueError("AST validation failed")):
+        res = client.post(
+            f"/api/projects/{proj_id}/compile",
+            json={"versionNumber": 1},
+            headers=_auth(token),
+        )
+        assert res.status_code == 400
+        assert res.json()["error"]["code"] == "COMPILATION_ERROR"
+
 
 
 

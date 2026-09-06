@@ -1,6 +1,8 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 from app.schemas.discovery import (
     BuildInspirationResponse,
@@ -97,6 +99,99 @@ class DiscoveryService:
         _ = self.lexical_index
         _ = self.query_parser
 
+    def _execute_search_pipeline(
+        self,
+        raw_prompt: str,
+        mode: str,
+        candidate_pool: DiscoveryCandidatePool,
+        limit: int,
+        filters: Optional[Any],
+        session_context: Optional[Any],
+        user_prefs: Optional[Any],
+        user_liked_vec: Optional[np.ndarray],
+        user_disliked_vec: Optional[np.ndarray],
+        single_channel_damping: float,
+        low_review_confidence_floor: Optional[float],
+        personalized: bool,
+    ) -> Tuple[ParsedQuery, List[DiscoverySearchResult], Optional[str]]:
+        top_k = max(limit * 5, 50)
+        semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
+
+        # 1. Deterministic Query Understanding
+        parsed_query = self.query_parser.parse(raw_prompt)
+        logger.info(
+            "Parsed query '%s' as %s (target=%s, pool=%s)",
+            raw_prompt,
+            parsed_query.query_type,
+            parsed_query.target_entity,
+            candidate_pool.value,
+        )
+
+        # 2. Semantic Retrieval via SentenceTransformer + FAISS (mode-specific candidate pool)
+        if self.index_manager.is_ready(pool=candidate_pool):
+            try:
+                # For SIMILARITY queries, if a target game was identified, embed its rich semantic profile
+                if parsed_query.query_type == "SIMILARITY" and parsed_query.target_game:
+                    embed_text = parsed_query.target_game.get("semantic_profile") or parsed_query.target_game.get("title")
+                else:
+                    embed_text = parsed_query.clean_search_query or raw_prompt
+
+                query_vec = self.embedder.embed_query(embed_text)
+                raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(
+                    query_vec, top_k=top_k, pool=candidate_pool
+                )
+
+                for gid, score in raw_sem_matches:
+                    game = self.catalog_manager.get_game(gid)
+                    if game is not None:
+                        semantic_candidates.append((game, score))
+            except Exception as e:
+                logger.warning(f"DiscoveryService: Semantic search failed, falling back to lexical: {e}")
+        else:
+            logger.warning(
+                f"DiscoveryService: FAISS index for pool {candidate_pool.value} is not initialized; using lexical fallback."
+            )
+            if not self.lexical_index:
+                raise RuntimeError("Discovery vector index and lexical catalog are both unavailable.")
+
+        # 3. Lexical Retrieval strictly respecting designated candidate pool policy
+        lexical_candidates: List[Tuple[Dict[str, Any], float, Dict[str, Any]]] = []
+        if self.lexical_index:
+            lexical_candidates = self.lexical_index.search_lexical(
+                query=parsed_query.clean_search_query or raw_prompt,
+                limit=top_k,
+                query_type=parsed_query.query_type,
+                candidate_pool=candidate_pool,
+            )
+
+        # 4. Candidate Fusion & Multi-Signal Hybrid Ranking
+        results: List[DiscoverySearchResult] = Ranker.rank_hybrid(
+            semantic_candidates=semantic_candidates,
+            lexical_candidates=lexical_candidates,
+            parsed_query=parsed_query,
+            filters=filters,
+            limit=limit,
+            min_threshold=MIN_MATCH_SCORE_THRESHOLD,
+            mode=mode,
+            session_context=session_context,
+            user_preferences=user_prefs,
+            user_liked_vector=user_liked_vec,
+            user_disliked_vector=user_disliked_vec,
+            index_manager=self.index_manager,
+            single_channel_damping=single_channel_damping,
+            low_review_confidence_floor=low_review_confidence_floor,
+        )
+
+        # 5. Generate grounded Why These summary
+        why_these = Ranker.generate_why_these_summary(
+            parsed_query=parsed_query,
+            results=results,
+            mode=mode,
+            personalized=personalized,
+        )
+
+        return parsed_query, results, why_these
+
     async def search(
         self,
         request: DiscoverySearchRequest,
@@ -128,49 +223,7 @@ class DiscoveryService:
         if not self._is_warm():
             await asyncio.to_thread(self.warm)
 
-        top_k = max(request.limit * 5, 50)
-        semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
-
-        # 1. Deterministic Query Understanding
-        parsed_query = self.query_parser.parse(raw_prompt)
-        logger.info("Parsed query '%s' as %s (target=%s, pool=%s)", raw_prompt, parsed_query.query_type, parsed_query.target_entity, candidate_pool.value)
-
-        # 2. Semantic Retrieval via SentenceTransformer + FAISS (mode-specific candidate pool)
-        if self.index_manager.is_ready(pool=candidate_pool):
-            try:
-                # For SIMILARITY queries, if a target game was identified, embed its rich semantic profile
-                if parsed_query.query_type == "SIMILARITY" and parsed_query.target_game:
-                    embed_text = parsed_query.target_game.get("semantic_profile") or parsed_query.target_game.get("title")
-                else:
-                    embed_text = parsed_query.clean_search_query or raw_prompt
-
-                query_vec = self.embedder.embed_query(embed_text)
-                raw_sem_matches: List[Tuple[str, float]] = self.index_manager.search(
-                    query_vec, top_k=top_k, pool=candidate_pool
-                )
-
-                for gid, score in raw_sem_matches:
-                    game = self.catalog_manager.get_game(gid)
-                    if game is not None:
-                        semantic_candidates.append((game, score))
-            except Exception as e:
-                logger.warning(f"DiscoveryService: Semantic search failed, falling back to lexical: {e}")
-        else:
-            logger.warning(f"DiscoveryService: FAISS index for pool {candidate_pool.value} is not initialized; using lexical fallback.")
-            if not self.lexical_index:
-                raise RuntimeError("Discovery vector index and lexical catalog are both unavailable.")
-
-        # 3. Lexical Retrieval strictly respecting designated candidate pool policy
-        lexical_candidates: List[Tuple[Dict[str, Any], float, Dict[str, Any]]] = []
-        if self.lexical_index:
-            lexical_candidates = self.lexical_index.search_lexical(
-                query=parsed_query.clean_search_query or raw_prompt,
-                limit=top_k,
-                query_type=parsed_query.query_type,
-                candidate_pool=candidate_pool,
-            )
-
-        # 4. Extract User Profile & Vectors if authenticated
+        # Fast synchronous DB extraction on event loop (SQLAlchemy session is not thread-safe)
         user_prefs = None
         user_liked_vec = None
         user_disliked_vec = None
@@ -196,37 +249,28 @@ class DiscoveryService:
             except Exception as ex:
                 logger.warning(f"Failed to load user preferences in discovery search: {ex}")
 
-        # 5. Candidate Fusion & Multi-Signal Hybrid Ranking
         effective_floor = low_review_confidence_floor
         if effective_floor is None and mode == "DISCOVER":
             effective_floor = 80.0
 
-        results: List[DiscoverySearchResult] = Ranker.rank_hybrid(
-            semantic_candidates=semantic_candidates,
-            lexical_candidates=lexical_candidates,
-            parsed_query=parsed_query,
-            filters=request.filters,
-            limit=request.limit,
-            min_threshold=MIN_MATCH_SCORE_THRESHOLD,
+        # Offload CPU-heavy pipeline (embedding inference, FAISS vector search, ranking) to worker thread (ADV-PERF-001)
+        parsed_query, results, why_these = await asyncio.to_thread(
+            self._execute_search_pipeline,
+            raw_prompt=raw_prompt,
             mode=mode,
+            candidate_pool=candidate_pool,
+            limit=request.limit,
+            filters=request.filters,
             session_context=request.session_context,
-            user_preferences=user_prefs,
-            user_liked_vector=user_liked_vec,
-            user_disliked_vector=user_disliked_vec,
-            index_manager=self.index_manager,
+            user_prefs=user_prefs,
+            user_liked_vec=user_liked_vec,
+            user_disliked_vec=user_disliked_vec,
             single_channel_damping=single_channel_damping,
             low_review_confidence_floor=effective_floor,
-        )
-
-        # 6. Generate grounded Why These summary
-        why_these = Ranker.generate_why_these_summary(
-            parsed_query=parsed_query,
-            results=results,
-            mode=mode,
             personalized=personalized,
         )
 
-        # 7. Enrich Top Results with IGDB Media & Summaries (Non-blocking / cached)
+        # Enrich Top Results with IGDB Media & Summaries (Non-blocking / cached async I/O on event loop)
         await self._attach_enrichment_and_update_display(results)
 
         no_strong_match = len(results) == 0 or (len(results) > 0 and results[0].score < STRONG_MATCH_THRESHOLD)
@@ -244,18 +288,9 @@ class DiscoveryService:
             results=results,
         )
 
-
-    async def get_similar_games(self, steam_app_id: str, limit: int = 12) -> DiscoverySearchResponse:
-        """
-        Find games similar to a given canonical game by Steam App ID using its semantic profile and metadata.
-        """
-        if not self._is_warm():
-            await asyncio.to_thread(self.warm)
-
-        seed_game = self.catalog_manager.get_game(steam_app_id)
-        if not seed_game:
-            raise KeyError(f"Game with Steam App ID '{steam_app_id}' not found in catalog.")
-
+    def _execute_similar_games_pipeline(
+        self, seed_game: Dict[str, Any], limit: int
+    ) -> Tuple[ParsedQuery, List[DiscoverySearchResult]]:
         title = seed_game.get("title", "")
         semantic_profile = seed_game.get("semantic_profile") or title
 
@@ -305,6 +340,23 @@ class DiscoveryService:
             limit=limit,
             min_threshold=MIN_MATCH_SCORE_THRESHOLD,
         )
+        return parsed_query, results
+
+    async def get_similar_games(self, steam_app_id: str, limit: int = 12) -> DiscoverySearchResponse:
+        """
+        Find games similar to a given canonical game by Steam App ID using its semantic profile and metadata.
+        """
+        if not self._is_warm():
+            await asyncio.to_thread(self.warm)
+
+        seed_game = self.catalog_manager.get_game(steam_app_id)
+        if not seed_game:
+            raise KeyError(f"Game with Steam App ID '{steam_app_id}' not found in catalog.")
+
+        title = seed_game.get("title", "")
+        parsed_query, results = await asyncio.to_thread(
+            self._execute_similar_games_pipeline, seed_game, limit
+        )
 
         # Enrich top results with IGDB media & summaries
         await self._attach_enrichment_and_update_display(results)
@@ -318,24 +370,13 @@ class DiscoveryService:
             results=results,
         )
 
-    async def more_like_this(self, request: MoreLikeThisRequest) -> DiscoverySearchResponse:
-        """
-        Find related games given multiple canonical game IDs.
-        """
-        if not self._is_warm():
-            await asyncio.to_thread(self.warm)
-
-        seed_games: List[Dict[str, Any]] = []
-        seed_ids = set()
-        for gid in request.get_ids():
-            g = self.catalog_manager.get_game(gid)
-            if g:
-                seed_games.append(g)
-                seed_ids.add(str(g.get("id")))
-
-        if not seed_games:
-            raise KeyError("None of the requested game IDs were found in the catalog.")
-
+    def _execute_more_like_this_pipeline(
+        self,
+        seed_games: List[Dict[str, Any]],
+        seed_ids: Set[str],
+        limit: int,
+        filters: Optional[Any],
+    ) -> Tuple[ParsedQuery, List[DiscoverySearchResult], str]:
         combined_titles = ", ".join([g.get("title", "") for g in seed_games])
         combined_profiles = " ".join([g.get("semantic_profile", "") for g in seed_games])
 
@@ -348,7 +389,7 @@ class DiscoveryService:
             target_game=seed_games[0],
         )
 
-        top_k = max(request.limit * 5, 50)
+        top_k = max(limit * 5, 50)
         semantic_candidates: List[Tuple[Dict[str, Any], float]] = []
 
         if self.index_manager.is_ready():
@@ -375,9 +416,37 @@ class DiscoveryService:
             semantic_candidates=semantic_candidates,
             lexical_candidates=lexical_candidates,
             parsed_query=parsed_query,
-            filters=request.filters,
-            limit=request.limit,
+            filters=filters,
+            limit=limit,
             min_threshold=MIN_MATCH_SCORE_THRESHOLD,
+        )
+
+        return parsed_query, results, combined_titles
+
+    async def more_like_this(self, request: MoreLikeThisRequest) -> DiscoverySearchResponse:
+        """
+        Find related games given multiple canonical game IDs.
+        """
+        if not self._is_warm():
+            await asyncio.to_thread(self.warm)
+
+        seed_games: List[Dict[str, Any]] = []
+        seed_ids = set()
+        for gid in request.get_ids():
+            g = self.catalog_manager.get_game(gid)
+            if g:
+                seed_games.append(g)
+                seed_ids.add(str(g.get("id")))
+
+        if not seed_games:
+            raise KeyError("None of the requested game IDs were found in the catalog.")
+
+        parsed_query, results, combined_titles = await asyncio.to_thread(
+            self._execute_more_like_this_pipeline,
+            seed_games,
+            seed_ids,
+            request.limit,
+            request.filters,
         )
 
         # Enrich top results with IGDB media & summaries

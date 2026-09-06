@@ -118,3 +118,71 @@ def test_discovery_search_validation_failures():
     )
     assert resp_extra.status_code == 422
     assert resp_extra.json()["error"]["code"] == "DISCOVERY_VALIDATION_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_discovery_search_offloaded_to_thread_unblocks_event_loop(monkeypatch):
+    """
+    ADV-PERF-001: Verify that CPU-bound discovery search pipeline is offloaded
+    to a worker thread via asyncio.to_thread, ensuring concurrent tasks on the
+    asyncio event loop can execute without being blocked.
+    """
+    import asyncio
+    import threading
+    import time
+    from unittest.mock import AsyncMock
+    from app.search.ranker import ParsedQuery
+    from app.search.lexical import normalize_string
+
+    loop_thread_id = threading.get_ident()
+    pipeline_thread_id = None
+
+    svc = DiscoveryService()
+    svc._warm = True  # Avoid full warm() during unit test
+
+    def mock_pipeline(*args, **kwargs):
+        nonlocal pipeline_thread_id
+        pipeline_thread_id = threading.get_ident()
+        # Simulate heavy CPU-bound search work (50ms)
+        time.sleep(0.05)
+        pq = ParsedQuery(
+            raw_query="cyberpunk",
+            normalized_query=normalize_string("cyberpunk"),
+            query_type="GENERAL_DISCOVERY",
+            clean_search_query="cyberpunk",
+        )
+        return pq, [], None
+
+    monkeypatch.setattr(svc, "_execute_search_pipeline", mock_pipeline)
+    monkeypatch.setattr(svc, "_attach_enrichment_and_update_display", AsyncMock())
+
+    ping_count = 0
+    stop_ping = False
+
+    async def event_loop_pinger():
+        nonlocal ping_count
+        while not stop_ping:
+            ping_count += 1
+            await asyncio.sleep(0.005)
+
+    pinger_task = asyncio.create_task(event_loop_pinger())
+
+    req = DiscoverySearchRequest(prompt="cyberpunk", limit=5)
+    resp = await svc.search(req)
+
+    stop_ping = True
+    await pinger_task
+
+    # 1. Pipeline MUST execute in a separate worker thread from event loop
+    assert pipeline_thread_id is not None
+    assert pipeline_thread_id != loop_thread_id, (
+        f"Pipeline executed on event loop thread ({pipeline_thread_id}) instead of worker thread"
+    )
+
+    # 2. Event loop MUST remain responsive while pipeline was running
+    assert ping_count > 0, "Event loop was blocked: 0 pings executed during pipeline run"
+
+    # 3. Response successfully returned
+    assert resp.query == "cyberpunk"
+    assert resp.match_count == 0
+
