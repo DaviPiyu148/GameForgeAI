@@ -42,7 +42,7 @@ Durable architectural decisions that govern system standards:
 
 | ADR | Decision Title | Scope |
 | :--- | :--- | :--- |
-| [`ADR-001`](../decisions/ADR-001-FRONTEND-STACK.md) | Frontend Stack | React 18 + Vite + TypeScript + Tailwind CSS |
+| [`ADR-001`](../decisions/ADR-001-FRONTEND-STACK.md) | Frontend Stack | React 19 + Vite + TypeScript + Tailwind CSS |
 | [`ADR-002`](../decisions/ADR-002-BACKEND-STACK.md) | Backend Stack | FastAPI modular monolith + SQLAlchemy + SQLite + Alembic |
 | [`ADR-003`](../decisions/ADR-003-GAME-DSL.md) | Game DSL Schema | Strict Pydantic schema validation & versioning |
 | [`ADR-004`](../decisions/ADR-004-BUILD-JOBS.md) | Build Jobs & SSE | Async background build pipeline & event streaming |
