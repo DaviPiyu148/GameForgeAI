@@ -9,6 +9,7 @@ Security invariants:
 - password_hash is NEVER returned in any response schema.
 - Plaintext passwords are NEVER logged.
 """
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.password import hash_password, verify_password, validate_password_strength
@@ -56,6 +57,22 @@ class AuthService:
         user_resp = UserResponse.model_validate(user)
         return AuthResponse(user=user_resp, access_token=token, token_type="bearer")
 
+    def _handle_user_integrity_error(self, db: Session, e: IntegrityError) -> None:
+        """
+        Handle unique constraint violations during user persistence or updates (ADV-CORR-002).
+        Rolls back the failed transaction and maps the database error to the correct domain exception:
+        - DuplicateUsernameError (maps to HTTP 409 USERNAME_TAKEN)
+        - DuplicateEmailError (maps to HTTP 409 EMAIL_ALREADY_EXISTS)
+        """
+        db.rollback()
+        err_msg = str(e).lower()
+        if "username" in err_msg:
+            raise DuplicateUsernameError("This username is already taken.") from e
+        elif "email" in err_msg:
+            raise DuplicateEmailError("An account with this email address already exists.") from e
+        else:
+            raise DuplicateEmailError("An account with this email address already exists.") from e
+
     def register(self, db: Session, data: RegisterRequest) -> AuthResponse:
         """
         Create a new user account.
@@ -66,8 +83,8 @@ class AuthService:
           3. Check for duplicate email → DuplicateEmailError.
           4. Check for duplicate username → DuplicateUsernameError.
           5. Hash password with Argon2 via pwdlib.
-          6. Persist User.
-          7. Issue JWT access token.
+          6. Persist User (guarded against TOCTOU race with _handle_user_integrity_error).
+          7. Issue JWT access token with token_version claim.
         """
         email_normalized = data.email.lower().strip()
         username_clean = data.username.strip()
@@ -85,9 +102,14 @@ class AuthService:
             username=username_clean,
             password_hash=hash_password(data.password),
             level=1,
+            token_version=1,
         )
-        saved = self.repo.create(db, user)
-        token = create_access_token(saved.id)
+        try:
+            saved = self.repo.create(db, user)
+        except IntegrityError as e:
+            self._handle_user_integrity_error(db, e)
+
+        token = create_access_token(saved.id, token_version=getattr(saved, "token_version", 1) or 1)
         return self._to_response(saved, token)
 
     def login(self, db: Session, data: LoginRequest) -> AuthResponse:
@@ -96,6 +118,7 @@ class AuthService:
 
         Returns the same generic error for BOTH unknown email AND wrong password
         to prevent user enumeration.
+        Issues access token with user's current token_version.
         """
         email_normalized = data.email.lower().strip()
         user = self.repo.get_by_email(db, email_normalized)
@@ -110,7 +133,7 @@ class AuthService:
         if not verify_password(data.password, user.password_hash):
             raise InvalidCredentialsError(_INVALID_CREDENTIALS_MSG)
 
-        token = create_access_token(user.id)
+        token = create_access_token(user.id, token_version=getattr(user, "token_version", 1) or 1)
         return self._to_response(user, token)
 
     def get_profile(self, user: User) -> UserResponse:
@@ -120,7 +143,7 @@ class AuthService:
     def update_username(self, db: Session, user: User, new_username: str) -> UserResponse:
         """
         Update a user's display username.
-        Checks for uniqueness against other users.
+        Checks for uniqueness against other users and handles TOCTOU constraint races (ADV-CORR-002).
         """
         clean_username = new_username.strip()
         if len(clean_username) < 2:
@@ -134,8 +157,11 @@ class AuthService:
 
         user.username = clean_username
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError as e:
+            self._handle_user_integrity_error(db, e)
         return UserResponse.model_validate(user)
 
     def change_password(self, db: Session, user: User, current_password: str, new_password: str) -> None:
@@ -143,6 +169,7 @@ class AuthService:
         Change an authenticated user's password.
         Requires verifying the current password first.
         Validates new password strength before hashing.
+        Increments token_version to invalidate all active JWT tokens across all sessions (ADV-SEC-003).
         """
         if not verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError("Current password is incorrect.")
@@ -150,6 +177,30 @@ class AuthService:
         validate_password_strength(new_password)
 
         user.password_hash = hash_password(new_password)
+        user.token_version = (getattr(user, "token_version", 1) or 1) + 1
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    def reset_password(self, db: Session, user: User, new_password: str) -> None:
+        """
+        Administrative or recovery password reset.
+        Validates new password strength, updates password hash, and increments
+        token_version to invalidate all active JWT tokens across all sessions (ADV-SEC-003).
+        """
+        validate_password_strength(new_password)
+        user.password_hash = hash_password(new_password)
+        user.token_version = (getattr(user, "token_version", 1) or 1) + 1
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    def revoke_all_sessions(self, db: Session, user: User) -> None:
+        """
+        Explicit session revocation. Increments token_version so any previously
+        issued JWT access tokens will be rejected on subsequent requests (ADV-SEC-003).
+        """
+        user.token_version = (getattr(user, "token_version", 1) or 1) + 1
         db.add(user)
         db.commit()
         db.refresh(user)

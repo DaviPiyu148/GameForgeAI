@@ -35,9 +35,9 @@ from app.config import settings
 _SSE_CREDENTIAL_TTL_SECONDS = 90
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, token_version: int = 1) -> str:
     """
-    Create a signed JWT access token for the given user UUID.
+    Create a signed JWT access token for the given user UUID and token version.
     Token is valid for AUTH_ACCESS_TOKEN_EXPIRE_MINUTES minutes.
     """
     now = datetime.now(timezone.utc)
@@ -45,6 +45,7 @@ def create_access_token(user_id: str) -> str:
         "sub": user_id,
         "exp": now + timedelta(minutes=settings.AUTH_ACCESS_TOKEN_EXPIRE_MINUTES),
         "type": "access",
+        "tv": token_version,
     }
     return jwt.encode(payload, settings.AUTH_JWT_SECRET, algorithm="HS256")
 

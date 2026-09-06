@@ -29,6 +29,9 @@ class User(Base):
     # Gamification level — starts at 1.
     level = Column(Integer, nullable=False, default=1)
 
+    # Token version for session invalidation on credential changes (ADV-SEC-003)
+    token_version = Column(Integer, nullable=False, default=1, server_default="1")
+
     # Optional profile picture URL/path
     avatar_url = Column(String(500), nullable=True)
 

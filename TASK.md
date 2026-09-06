@@ -1,16 +1,16 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Phase A Remediation — Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)
+Phase A Remediation — Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)
 
 ## Status
-COMPLETE
+IN_PROGRESS
 
 ## Objective
-Implement and verify Slice 1 of Phase A from the adversarial audit remediation roadmap:
-1. ADV-ARCH-004: Replace `JSONResponse(status_code=204, content=None)` with empty `Response(status_code=status.HTTP_204_NO_CONTENT)` in `saved_discoveries.py` and `project_inspirations.py` to ensure strictly empty bodies per RFC 9110 §15.3.5.
-2. ADV-CORR-003: Update `find_active_duplicate_build` in `build_repo.py` and callers in `build_service.py` to include `scale` and `world_mode` parameters, preventing false-positive build deduplication when configuration parameters differ.
-3. ADV-SEC-001: Harden `InMemorySlidingWindowRateLimiter` in `rate_limit.py` to prune expired keys/empty deques upon evaluation and cap dictionary growth (e.g. `MAX_KEYS = 10_000`) under lock to prevent unbounded memory retention.
+Implement and verify Slice 2 of Phase A (Authentication & Session Correctness):
+1. ADV-CORR-002: Catch `IntegrityError` in `AuthService.register()` and `update_username()`, inspect the specific constraint failure name (`users.email` vs `users.username`), rollback transaction, and raise appropriate domain error (`DuplicateEmailError` vs `DuplicateUsernameError`) mapping to HTTP 409 Conflict instead of unhandled HTTP 500.
+2. ADV-SEC-003: Invalidate active JWT tokens across all credential-changing paths (password change, password reset, revocation). Add `token_version` (Integer, default 1) to `User`, embed `"tv"` claim in access token payload, validate `"tv"` against `user.token_version` in `get_current_user`, increment `user.token_version` on password changes and resets, and reject tokens lacking `"tv"` or matching outdated versions with HTTP 401.
+3. ADV-CORR-004: Restrict exception swallowing in `get_optional_user` strictly to `jwt.PyJWTError`. Allow database operational errors (`OperationalError`, `SQLAlchemyError`) to propagate up to FastAPI handlers as HTTP 500 rather than silently converting authenticated users to anonymous guests.
 
 ## Started
 2026-09-06
@@ -20,7 +20,8 @@ Implement and verify Slice 1 of Phase A from the adversarial audit remediation r
 ## 1. Pre-Implementation
 
 - [x] Read AGENTS.md Constitution & guidelines
-- [x] Inspect git status and verify uncommitted user work in `GameScene.ts` and `vfxSystem.ts`
+- [x] Baseline test suite status: 635 passed, 4 warnings in 155.39s (EXIT CODE 0)
+- [x] Frontend baseline status: `tsc -b && vite build` built in 5.80s, `oxlint` 0 warnings/errors on 88 files
 - [x] Record cryptographic baseline SHA-256 hashes:
   - `GameScene.ts`: `ae6287f1ce92621baa781e822278abd4cfc8e2c8b706a7a7c8d05b266d966095`
   - `vfxSystem.ts`: `c8a5e0a46c3b0df950d53db13368e008b03d8132ef46457b797afc9af6d243fa`
@@ -30,72 +31,76 @@ Implement and verify Slice 1 of Phase A from the adversarial audit remediation r
 
 ## 2. Implementation
 
-- [x] Subtask 1: Fix `ADV-ARCH-004` (HTTP 204 Empty Body Compliance in `saved_discoveries.py:117` and `project_inspirations.py:152`)
-- [x] Subtask 2: Fix `ADV-CORR-003` (Build Duplicate Filter Parameters `scale` and `world_mode` in `build_repo.py:146` and `build_service.py:125`)
-- [x] Subtask 3: Fix `ADV-SEC-001` (Rate Limiter Memory Retention & LRU Cap in `rate_limit.py:22`)
-
-### Implementation Evidence
-- `ADV-ARCH-004`: Replaced `JSONResponse(status_code=204, content=None)` with `Response(status_code=status.HTTP_204_NO_CONTENT)` in `backend/app/api/saved_discoveries.py` and `backend/app/api/project_inspirations.py`.
-- `ADV-CORR-003`: Extended `BuildRepository.find_active_duplicate_build()` to filter on `scale` and `world_mode`. Updated caller in `BuildService.submit_build()` to pass `data.parameters.scale` and `data.parameters.world_mode or "linear"`.
-- `ADV-SEC-001`: Replaced `defaultdict` with `OrderedDict` in `SlidingWindowRateLimiter`. Added eviction of empty deques/keys upon evaluation, proactive `prune_expired()` sweep, and hard `max_keys = 10_000` upper bound with LRU eviction.
+- [x] Subtask 1: Fix `ADV-CORR-002` (TOCTOU constraint mapping in `backend/app/services/auth_service.py`)
+  - Added `_handle_user_integrity_error` catching `IntegrityError` in `register()` and `update_username()`.
+  - Transaction rolled back (`db.rollback()`) and dialect error string parsed: `"username"` -> `DuplicateUsernameError` (HTTP 409 `USERNAME_TAKEN`), `"email"` -> `DuplicateEmailError` (HTTP 409 `EMAIL_ALREADY_EXISTS`).
+- [x] Subtask 2: Fix `ADV-SEC-003` (JWT `token_version` invalidation across credential-changing paths)
+  - Added `token_version = Column(Integer, nullable=False, default=1, server_default="1")` to `User` model.
+  - Created Alembic migration `c1d2e3f4a5b6_add_token_version_to_users.py` (upgraded cleanly on `gameforge.db`).
+  - Added `"tv"` claim to `create_access_token(user_id, token_version=...)`.
+  - Enforced `"tv"` verification against `user.token_version` in `get_current_user` (HTTP 401 on missing or mismatched `"tv"`).
+  - Incremented `user.token_version` in `change_password()`, `reset_password()`, and `revoke_all_sessions()`.
+- [x] Subtask 3: Fix `ADV-CORR-004` (`get_optional_user` DB error preservation in `backend/app/dependencies.py`)
+  - Swallows strictly `(jwt.InvalidTokenError, jwt.PyJWTError)` for token validation.
+  - Queries `user_repository.get_by_id(db, user_id)` outside try/except so database operational errors (`OperationalError`, `SQLAlchemyError`) propagate up as HTTP 500 rather than silently converting authenticated users to anonymous guests.
 
 ---
 
 ## 3. Verification
 
-- [x] Unit & regression tests for `ADV-ARCH-004` (204 No Content with `b""` body and headers) in `test_saved_discoveries.py` and `test_project_inspirations.py` (25 passed).
-- [x] Unit & regression tests for `ADV-CORR-003` (`test_duplicate_build_submission_distinguishes_scale_and_world_mode`) in `test_build_concurrency.py` (9 passed).
-- [x] Unit & regression tests for `ADV-SEC-001` (basic window, expired deque cleanup, `prune_expired()` 500-key sweep, `max_keys` cap, multi-thread safety) in `test_auth.py` (21 passed).
-- [x] Frontend static analysis (`npx oxlint`: 0 warnings, 0 errors on 88 files) & typecheck (`npx tsc --noEmit`: 0 errors).
+- [x] Concurrent registration race tests (distinguishing email vs username 409s)
+  - `test_register_toctou_email_integrity_error_maps_to_409`: PASSED
+  - `test_register_toctou_username_integrity_error_maps_to_409`: PASSED
+  - `test_handle_user_integrity_error_unit`: PASSED (SQLite + PostgreSQL dialect constraint messages, rollback verification)
+- [x] Concurrent username update race tests (409 Conflict)
+  - `test_update_username_toctou_integrity_error_maps_to_409`: PASSED
+- [x] Token invalidation tests across password change, reset, and revocation
+  - `test_token_version_embedded_and_validated`: PASSED (asserts "tv": 1 in payload, 401 on missing "tv", 401 on mismatched "tv")
+  - `test_password_change_revokes_previous_access_tokens`: PASSED (asserts 401 on old token, fresh token works with 200, "tv": 2)
+  - `test_reset_password_and_revoke_all_sessions_service`: PASSED (asserts token_version increments to 2 on reset and 3 on revoke, rejecting previous tokens)
+- [x] 4-case test matrix for `get_optional_user`:
+  - `test_get_optional_user_four_case_matrix`: PASSED
+    1. No token -> returns None (guest)
+    2. Expired/malformed token -> returns None (guest)
+    3. Valid token + healthy DB -> returns User (authenticated)
+    4. Valid token + DB outage/error (`OperationalError: database is locked`) -> raises `OperationalError` (bubbles to HTTP 500)
+    5. Valid token + outdated/missing token_version -> returns None (guest)
+- [x] Focused auth test suite: 31 passed in 4.03s (`pytest -v tests/test_auth.py`)
+- [x] Profile, discovery, and saved discoveries suites: 16 passed in 24.37s (`pytest -v tests/test_profile_api.py tests/test_discovery_api.py tests/test_saved_discoveries.py`)
+- [x] Full backend test suite (`.venv\Scripts\pytest.exe -q`): **643 passed, 4 warnings in 102.11s (0 failures)**
+- [x] Frontend typecheck and build (`npm run build`): **Built in 2.48s (0 errors)**
 - [x] Workspace protection verification:
-  - `GameScene.ts` SHA-256: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266d966095` (VERIFIED UNCHANGED)
-  - `vfxSystem.ts` SHA-256: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` (VERIFIED UNCHANGED)
-
-### Verification Execution Evidence
-```text
-1. ADV-ARCH-004 Tests:
-   Command: .venv\Scripts\pytest.exe -q tests\test_saved_discoveries.py tests\test_project_inspirations.py
-   Result:  25 passed, 1 warning (EXIT CODE 0)
-   Evidence: del_res.status_code == 204, del_res.content == b"", content-length in (None, "0"), application/json not in content-type.
-
-2. ADV-CORR-003 Tests:
-   Command: .venv\Scripts\pytest.exe -q tests\test_build_concurrency.py
-   Result:  9 passed, 1 warning (EXIT CODE 0)
-   Evidence: Builds with identical prompt but distinct scale ("campaign" vs "standard") or world_mode ("open_world" vs "linear") allocate separate build IDs; identical parameters deduplicate cleanly.
-
-3. ADV-SEC-001 Tests:
-   Command: .venv\Scripts\pytest.exe -q tests\test_auth.py
-   Result:  21 passed, 1 warning (EXIT CODE 0)
-   Evidence: 500 ephemeral keys swept by prune_expired(), deque cleanup verified, max_keys capacity cap enforced at 20 with oldest LRU dropped, concurrent access across 8 threads verified thread-safe.
-
-4. Frontend Integrity:
-   - npx tsc --noEmit: 0 errors
-   - npx oxlint: 0 warnings, 0 errors across 88 files
-
-5. Workspace Protection Baseline Check:
-   - GameScene.ts: AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095 (MATCH)
-   - vfxSystem.ts: C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA (MATCH)
-```
+  - `GameScene.ts`: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095` (UNTOUCHED)
+  - `vfxSystem.ts`: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` (UNTOUCHED)
 
 ---
 
 ## 4. Documentation
 
-- [x] Authoritative findings artifact `adversarial_code_review_findings.md` preserved and referenced.
-- [x] Task execution ledger `TASK.md` updated with full verification evidence.
+- [x] Update `TASK.md` with concrete verification evidence and logs
 
 ---
 
 ## 5. Git Checkpoint
 
-- [x] Review `git diff` and `git status` (clean, only intended files touched)
-- [x] `git diff --check`: 0 errors
-- [x] Slice 1 logical commit created: `8494ee8d9da9d5243cb866d2983c781472271de7` (`backend: implement Phase A Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)`)
-- [x] Working tree verified: clean except protected user work (`GameScene.ts` & `vfxSystem.ts`)
+- [x] Review `git diff` and `git status`
+- [x] Verify working tree: intentionally dirty solely due to protected user work in `GameScene.ts` and `vfxSystem.ts`
+- [x] Create logical commit for Slice 2: `backend: implement Phase A Slice 2 (ADV-CORR-002, ADV-SEC-003, ADV-CORR-004)`
+- **Commit**: `16530b6` (`16530b65103aae639a04f981dc6faef968ef21d6`)
 
 ---
 
 ## Previous Tasks Archive
+
+### Task: Phase A Remediation — Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)
+Status: COMPLETE (2026-09-06)
+- **Commit**: `dd4f0871668b6f34d6727fa64e0d9c1810fea7e2` (`backend: implement Phase A Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)`)
+- **Working Tree State**: Slice 1 implementation is frozen in Git; working tree is intentionally dirty solely due to protected pre-existing user modifications in `GameScene.ts` and `vfxSystem.ts` (0 Slice 1 uncommitted changes).
+- **Verified Deliverables**:
+  1. `ADV-ARCH-004`: Replaced `JSONResponse(status_code=204, content=None)` with `Response(status_code=status.HTTP_204_NO_CONTENT)` in `saved_discoveries.py` and `project_inspirations.py`. Asserted status 204, body `b""`, Content-Length 0/None.
+  2. `ADV-CORR-003`: Extended `find_active_duplicate_build` with defensive `scale` and `world_mode` fallbacks. Added regression test distinguishing distinct scale/world_mode parameters.
+  3. `ADV-SEC-001`: Refactored `SlidingWindowRateLimiter` with `OrderedDict`, automatic expired deque eviction, post-insertion cap guard (`max_keys = 10_000`), LRU access ordering promotion (`move_to_end`), public contract for `prune_expired()`, and 6 unit/regression tests.
+- **Verification Evidence**: 635 backend tests passed (155.39s), frontend `tsc -b && vite build` built in 5.80s, `GameScene.ts` & `vfxSystem.ts` SHA-256 hashes 100% identical.
 
 ### Task: Full-Scope Adversarial Code Review, Security Audit & Architectural Inspection
 Status: COMPLETE (2026-09-06)

@@ -12,15 +12,26 @@ Security invariant verified:
 """
 import time
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import MagicMock, patch
+import jwt
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from app.auth.rate_limit import SlidingWindowRateLimiter
+from app.auth.tokens import decode_access_token, create_access_token
+from app.config import settings
+from app.dependencies import get_optional_user
 from app.main import app
 from app.db.session import Base, get_db
+from app.services.auth_service import (
+    DuplicateEmailError,
+    DuplicateUsernameError,
+    auth_service,
+)
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -412,3 +423,306 @@ def test_prune_expired_contract():
     pruned_keys = limiter.prune_expired()
     assert pruned_keys == 1, f"Expected 1 key removed, got {pruned_keys}"
     assert "multi_ts_key" not in limiter._windows
+
+
+# ─── ADV-CORR-002: TOCTOU INTEGRITY ERROR MAPPING ──────────────────────────────
+
+def test_handle_user_integrity_error_unit():
+    """
+    Direct unit test for AuthService._handle_user_integrity_error:
+    - Verifies db.rollback() is invoked.
+    - Inspects error string matching for username and email uniqueness constraints across SQLite/PostgreSQL dialects.
+    """
+    mock_db = MagicMock()
+
+    # 1. SQLite username uniqueness violation
+    err_sqlite_username = IntegrityError("statement", {}, Exception("UNIQUE constraint failed: users.username"))
+    with pytest.raises(DuplicateUsernameError) as exc_info:
+        auth_service._handle_user_integrity_error(mock_db, err_sqlite_username)
+    assert "This username is already taken." in str(exc_info.value)
+    assert mock_db.rollback.call_count == 1
+
+    # 2. SQLite email uniqueness violation
+    mock_db.reset_mock()
+    err_sqlite_email = IntegrityError("statement", {}, Exception("UNIQUE constraint failed: users.email"))
+    with pytest.raises(DuplicateEmailError) as exc_info:
+        auth_service._handle_user_integrity_error(mock_db, err_sqlite_email)
+    assert "An account with this email address already exists." in str(exc_info.value)
+    assert mock_db.rollback.call_count == 1
+
+    # 3. PostgreSQL / Named constraint username violation
+    mock_db.reset_mock()
+    err_pg_username = IntegrityError("statement", {}, Exception('duplicate key value violates unique constraint "uq_users_username"'))
+    with pytest.raises(DuplicateUsernameError):
+        auth_service._handle_user_integrity_error(mock_db, err_pg_username)
+    assert mock_db.rollback.call_count == 1
+
+    # 4. PostgreSQL / Named constraint email violation
+    mock_db.reset_mock()
+    err_pg_email = IntegrityError("statement", {}, Exception('duplicate key value violates unique constraint "uq_users_email"'))
+    with pytest.raises(DuplicateEmailError):
+        auth_service._handle_user_integrity_error(mock_db, err_pg_email)
+    assert mock_db.rollback.call_count == 1
+
+
+def test_register_toctou_email_integrity_error_maps_to_409(client):
+    """
+    Simulates a TOCTOU race during registration where initial get_by_email / get_by_username
+    pass, but concurrent insertion triggers an IntegrityError on users.email.
+    Endpoint must return HTTP 409 EMAIL_ALREADY_EXISTS, NOT HTTP 500 REGISTRATION_FAILED.
+    """
+    def mock_create(db, user):
+        raise IntegrityError("INSERT INTO users...", {}, Exception("UNIQUE constraint failed: users.email"))
+
+    with patch.object(auth_service.repo, "create", side_effect=mock_create):
+        res = client.post("/api/auth/register", json={
+            "email": "toctou_email@example.com",
+            "username": "UniqueUser1",
+            "password": "Password123!",
+        })
+        assert res.status_code == 409
+        data = res.json()
+        assert data["error"]["code"] == "EMAIL_ALREADY_EXISTS"
+        assert "email address already exists" in data["error"]["message"]
+
+
+def test_register_toctou_username_integrity_error_maps_to_409(client):
+    """
+    Simulates a TOCTOU race during registration where initial get_by_username passes,
+    but concurrent insertion triggers an IntegrityError on users.username.
+    Endpoint must return HTTP 409 USERNAME_TAKEN, NOT HTTP 500 REGISTRATION_FAILED.
+    """
+    def mock_create(db, user):
+        raise IntegrityError("INSERT INTO users...", {}, Exception("UNIQUE constraint failed: users.username"))
+
+    with patch.object(auth_service.repo, "create", side_effect=mock_create):
+        res = client.post("/api/auth/register", json={
+            "email": "toctou_user@example.com",
+            "username": "ConflictUser",
+            "password": "Password123!",
+        })
+        assert res.status_code == 409
+        data = res.json()
+        assert data["error"]["code"] == "USERNAME_TAKEN"
+        assert "username is already taken" in data["error"]["message"]
+
+
+def test_update_username_toctou_integrity_error_maps_to_409(client):
+    """
+    Simulates a TOCTOU race during username update:
+    Initial check passes, but concurrent update raises IntegrityError on commit.
+    Endpoint must return HTTP 409 USERNAME_TAKEN, NOT HTTP 500.
+    """
+    reg_res = register_user(client, email="updater@example.com", username="UpdaterUser")
+    token = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch("sqlalchemy.orm.Session.commit", side_effect=IntegrityError("UPDATE users...", {}, Exception("UNIQUE constraint failed: users.username"))):
+        res = client.patch("/api/auth/profile", json={"username": "NewName"}, headers=headers)
+        assert res.status_code == 409
+        assert res.json()["error"]["code"] == "USERNAME_TAKEN"
+
+
+# ─── ADV-SEC-003: JWT TOKEN REVOCATION VIA TOKEN_VERSION ───────────────────────
+
+def test_token_version_embedded_and_validated(client):
+    """
+    Verify access tokens embed the 'tv' claim matching user.token_version,
+    and missing or outdated 'tv' tokens are rejected with 401.
+    """
+    reg_res = register_user(client, email="tv_user@example.com", username="TVUser")
+    token = reg_res.json()["access_token"]
+
+    # 1. Inspect decoded payload
+    payload = decode_access_token(token)
+    assert "tv" in payload
+    assert payload["tv"] == 1
+
+    # 2. Valid token authenticates successfully
+    me_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["username"] == "TVUser"
+
+    # 3. Token lacking 'tv' claim (legacy / pre-migration / forged) is rejected
+    payload_no_tv = {
+        "sub": payload["sub"],
+        "exp": payload["exp"],
+        "type": "access",
+    }
+    token_no_tv = jwt.encode(payload_no_tv, settings.AUTH_JWT_SECRET, algorithm="HS256")
+    res_no_tv = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_no_tv}"})
+    assert res_no_tv.status_code == 401
+    assert res_no_tv.json()["error"]["code"] == "UNAUTHORIZED"
+
+    # 4. Token with mismatched 'tv' claim is rejected
+    payload_wrong_tv = {
+        "sub": payload["sub"],
+        "exp": payload["exp"],
+        "type": "access",
+        "tv": 999,
+    }
+    token_wrong_tv = jwt.encode(payload_wrong_tv, settings.AUTH_JWT_SECRET, algorithm="HS256")
+    res_wrong_tv = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_wrong_tv}"})
+    assert res_wrong_tv.status_code == 401
+    assert res_wrong_tv.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+def test_password_change_revokes_previous_access_tokens(client):
+    """
+    Changing password increments token_version:
+    - Previous access token becomes invalid (401).
+    - New login yields a fresh token that works (200).
+    """
+    email = "passchange@example.com"
+    old_pass = "securepass123"
+    new_pass = "brandNewPass789!"
+
+    reg_res = register_user(client, email=email, username="PassChanger", password=old_pass)
+    old_token = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {old_token}"}
+
+    # Verify old token works initially
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+
+    # Change password
+    change_res = client.post(
+        "/api/auth/change-password",
+        json={"current_password": old_pass, "new_password": new_pass},
+        headers=headers,
+    )
+    assert change_res.status_code == 200
+    assert change_res.json()["success"] is True
+
+    # Old token MUST NOW BE REJECTED with 401
+    revoked_res = client.get("/api/auth/me", headers=headers)
+    assert revoked_res.status_code == 401
+    assert revoked_res.json()["error"]["code"] == "UNAUTHORIZED"
+
+    # Login with new password gives a new working token
+    login_res = client.post("/api/auth/login", json={"email": email, "password": new_pass})
+    assert login_res.status_code == 200
+    new_token = login_res.json()["access_token"]
+    assert new_token != old_token
+
+    new_payload = decode_access_token(new_token)
+    assert new_payload["tv"] == 2
+
+    # New token works
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"}).status_code == 200
+
+
+def test_reset_password_and_revoke_all_sessions_service():
+    """
+    Verify AuthService.reset_password and AuthService.revoke_all_sessions increment token_version.
+    """
+    from app.models.user import User
+    from app.dependencies import get_current_user
+    from fastapi import HTTPException
+
+    db = TestingSessionLocal()
+    try:
+        user = User(
+            email="reset_test@example.com",
+            username="ResetUser",
+            password_hash="dummy_hash",
+            level=1,
+            token_version=1,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        # Issue token for version 1
+        t1 = create_access_token(user.id, token_version=user.token_version)
+        assert get_current_user(token=t1, db=db).id == user.id
+
+        # 1. Reset password -> increments token_version to 2
+        auth_service.reset_password(db, user, "new_reset_password_123")
+        assert user.token_version == 2
+
+        # Old token t1 must fail with HTTPException 401
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(token=t1, db=db)
+        assert exc_info.value.status_code == 401
+
+        # Fresh token for version 2 succeeds
+        t2 = create_access_token(user.id, token_version=user.token_version)
+        assert get_current_user(token=t2, db=db).id == user.id
+
+        # 2. Revoke all sessions -> increments token_version to 3
+        auth_service.revoke_all_sessions(db, user)
+        assert user.token_version == 3
+
+        # Token t2 must now fail
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(token=t2, db=db)
+        assert exc_info.value.status_code == 401
+
+        # Fresh token for version 3 succeeds
+        t3 = create_access_token(user.id, token_version=user.token_version)
+        assert get_current_user(token=t3, db=db).id == user.id
+    finally:
+        db.close()
+
+
+# ─── ADV-CORR-004: GET_OPTIONAL_USER ERROR PRESERVATION MATRIX ─────────────────
+
+def test_get_optional_user_four_case_matrix():
+    """
+    Test 4-case matrix for get_optional_user dependency:
+    1. No token -> None (guest)
+    2. Malformed / expired token -> None (guest)
+    3. Valid token + healthy DB -> User (authenticated)
+    4. Valid token + DB operational outage -> raises OperationalError (bubbles to 500)
+    5. Valid token + outdated/missing token_version -> None (guest)
+    """
+    from app.models.user import User
+
+    db = TestingSessionLocal()
+    try:
+        user = User(
+            email="optional_user@example.com",
+            username="OptUser",
+            password_hash="dummy_hash",
+            level=1,
+            token_version=1,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        valid_token = create_access_token(user.id, token_version=1)
+
+        # Case 1: No token
+        assert get_optional_user(token=None, db=db) is None
+        assert get_optional_user(token="", db=db) is None
+
+        # Case 2: Malformed or expired token
+        assert get_optional_user(token="not-a-valid-jwt-string", db=db) is None
+        expired_payload = {
+            "sub": user.id,
+            "exp": time.time() - 3600,
+            "type": "access",
+            "tv": 1,
+        }
+        expired_token = jwt.encode(expired_payload, settings.AUTH_JWT_SECRET, algorithm="HS256")
+        assert get_optional_user(token=expired_token, db=db) is None
+
+        # Case 3: Valid token + healthy DB
+        resolved = get_optional_user(token=valid_token, db=db)
+        assert resolved is not None
+        assert resolved.id == user.id
+        assert resolved.username == "OptUser"
+
+        # Case 4: Valid token + DB operational error (must NOT swallow as guest)
+        mock_broken_db = MagicMock()
+        with patch("app.repositories.user_repo.user_repository.get_by_id", side_effect=OperationalError("SELECT...", {}, Exception("database is locked"))):
+            with pytest.raises(OperationalError) as exc_info:
+                get_optional_user(token=valid_token, db=mock_broken_db)
+            assert "database is locked" in str(exc_info.value)
+
+        # Case 5: Valid token structure but outdated or missing token_version -> guest (None)
+        mismatched_token = create_access_token(user.id, token_version=99)
+        assert get_optional_user(token=mismatched_token, db=db) is None
+    finally:
+        db.close()

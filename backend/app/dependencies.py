@@ -58,6 +58,11 @@ def get_current_user(
     if not user:
         raise _make_401()
 
+    token_version = payload.get("tv")
+    current_version = getattr(user, "token_version", 1) or 1
+    if token_version is None or token_version != current_version:
+        raise _make_401()
+
     return user
 
 
@@ -68,6 +73,8 @@ def get_optional_user(
     """
     FastAPI dependency: resolve User if a valid Bearer token is provided, otherwise return None.
     Does NOT throw 401 if unauthenticated.
+    Swallows ONLY jwt.InvalidTokenError / jwt.PyJWTError for invalid/expired tokens.
+    Allows database operational errors (OperationalError, etc.) to bubble up as HTTP 500 (ADV-CORR-004).
     """
     from app.repositories.user_repo import user_repository
 
@@ -76,12 +83,23 @@ def get_optional_user(
 
     try:
         payload = decode_access_token(token)
-        user_id: str = payload.get("sub", "")
-        if not user_id:
-            return None
-        return user_repository.get_by_id(db, user_id)
-    except Exception:
+    except (jwt.InvalidTokenError, jwt.PyJWTError):
         return None
+
+    user_id: str = payload.get("sub", "")
+    if not user_id:
+        return None
+
+    user = user_repository.get_by_id(db, user_id)
+    if not user:
+        return None
+
+    token_version = payload.get("tv")
+    current_version = getattr(user, "token_version", 1) or 1
+    if token_version is None or token_version != current_version:
+        return None
+
+    return user
 
 
 __all__ = ["get_db", "get_current_user", "get_optional_user"]
