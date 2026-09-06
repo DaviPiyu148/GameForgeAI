@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, DateTime, Index
+from sqlalchemy import Column, String, Integer, Text, DateTime, Index, ForeignKey
 from app.db.session import Base
 
 
@@ -14,7 +14,12 @@ class BuildLog(Base):
     __tablename__ = "build_logs"
 
     id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
-    build_id = Column(String(36), nullable=False, index=True)
+    build_id = Column(
+        String(36),
+        ForeignKey("build_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     sequence_number = Column(Integer, nullable=False)
     level = Column(String(20), nullable=False, default="INFO")  # INFO, WARNING, ERROR, SUCCESS
     message = Column(Text, nullable=False)

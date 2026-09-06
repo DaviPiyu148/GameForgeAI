@@ -1,7 +1,7 @@
 # 15 — Current Status
 
 ## Date
-2026-09-04
+2026-09-06
 
 ## System Freeze Status
 ```text
@@ -70,6 +70,7 @@ All components across Discovery, Game Details, Saved Discoveries, Studio Tabs, D
 | Feature Card Interactive Micro-Animations Refinement (All 3 icons stationary at rest and strictly hover-animated: authentic Material Symbol skull with rotating cogwheel on hover, arrow moving towards target goal on hover, and outline bonfire with dancing flames/rising sparks on hover, zero square box artifacts) | COMPLETE |
 | Discovery Prompt Chips & Quick Mood Vibe Selectors (Harmonized outline pill row for prompt chips + Build Game DNA; 6 neon arcade vibe cards with dedicated Material icons and non-truncated labels) | COMPLETE |
 | MEGA Final Browser QA, UI/UX Remediation, Route Audit & Existing-Prototype Validation (All 12 routes visited; 46 known issues audited and PASS in live Chrome; WASD/arrow keyboard movement and R restart focus verified in existing prototype; Use as Inspiration existing-project selection and fresh project creation verified without project cloning; duplicate Remix actions removed; canonical 4-module Builder synchronization enforced; Navbar equal tabs w-28 with bottom light glow; Profile popover on-page scroll & 2s cyan ring highlight; 0 new prototypes generated) | COMPLETE |
+| **Adversarial Code Review, Security Audit & Phase A+B Remediation** (9 Phase A + 5 Phase B findings remediated across TOCTOU, JWT revocation, rate limiting, SSE stability, DB foreign keys, proxy security, and index cleanup) | COMPLETE |
 
 ---
 
@@ -104,7 +105,7 @@ React 19 + TypeScript + Vite + Tailwind CSS v4 frontend (HashRouter, single `App
 - Tracked files: 283 (after the repository hygiene cleanup removed 12 confirmed-dead frontend files and this documentation pass added/updated the files described below).
 - No known HIGH-confidence dead source files remain (see `REPOSITORY_HYGIENE_AUDIT.md`).
 - No unused dependencies, frontend or backend.
-- Single Alembic migration head: `bc9ae398f146`.
+- Single Alembic migration head: `f2a3b4c5d6e7` (Phase B remediation complete — ADV-DB-002, ADV-DB-001 earlier).
 - A handful of LOW/MEDIUM-confidence items remain intentionally deferred (not dead, not urgent): a few historical Discovery R&D scripts in `backend/scripts/`, one undocumented manual smoke-test script (`test_generation_live.py`), one unread `AI_PROVIDER` config field, and `gameforge-ai/public/icons.svg`'s uncertain future-use status. None of these affect current functionality.
 
 ---

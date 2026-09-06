@@ -158,3 +158,19 @@ def check_register_rate(ip: str) -> bool:
 def check_save_rate(user_id: str) -> bool:
     """50 save-discovery requests per user per 1 hour."""
     return rate_limiter.is_allowed(f"save:{user_id}", limit=50, window_seconds=3600)
+
+
+def check_preference_mutate_rate(user_id: str) -> bool:
+    """
+    20 Game DNA preference mutation operations (reset and onboard) per user per 1 hour.
+
+    Shares the cache key 'preference_mutate:{user_id}' across both
+    POST /api/profile/preferences/reset and POST /api/profile/preferences/onboard.
+
+    IMPORTANT SCOPE LIMITATION:
+    This rate limiter operates in-memory and is local to the current application worker process.
+    Under single-worker operation (ADR-004), in-memory window tracking is consistent.
+    Distributed rate limiting (e.g. via Redis) is deferred until horizontal scaling.
+    """
+    return rate_limiter.is_allowed(f"preference_mutate:{user_id}", limit=20, window_seconds=3600)
+

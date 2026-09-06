@@ -16,12 +16,12 @@ class User(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
 
     # Email is normalized to lowercase before storage.
-    # Must be unique across all accounts.
-    email = Column(String(254), nullable=False, unique=True, index=True)
+    # Must be unique across all accounts (enforced via uq_users_email).
+    email = Column(String(254), nullable=False)
 
     # Display username — unique across all accounts.
-    # Normalized to stripped form; case-sensitive comparison.
-    username = Column(String(50), nullable=False, unique=True, index=True)
+    # Normalized to stripped form; case-sensitive comparison (enforced via uq_users_username).
+    username = Column(String(50), nullable=False)
 
     # Argon2-hashed password via pwdlib. NEVER serialized in responses.
     password_hash = Column(String(255), nullable=False)

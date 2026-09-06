@@ -3,7 +3,7 @@ Data access repository for BuildJob and BuildLog entities.
 Provides atomic conditional state transitions, monotonic sequence-safe logging,
 orphan reconciliation, and duplicate build submission queries.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -200,6 +200,46 @@ class BuildRepository:
         )
         db.commit()
         return count
+
+    def prune_build_logs(self, db: Session, max_age_days: int = 30) -> int:
+        """
+        Prune BuildLog rows belonging to terminal builds older than max_age_days.
+
+        Retention & Eligibility Invariants:
+        - Parent BuildJob MUST be in a terminal state ('SUCCESS', 'ERROR', 'CANCELLED').
+        - Age is measured from BuildJob.completed_at; if completed_at is NULL,
+          it falls back to BuildJob.created_at.
+        - The effective timestamp must be <= (now - max_age_days).
+        - Non-terminal builds ('QUEUED', 'RUNNING', 'VALIDATING') are NEVER pruned,
+          regardless of age.
+
+        Returns:
+            int: The total count of BuildLog rows deleted.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        terminal_statuses = ["SUCCESS", "ERROR", "CANCELLED"]
+
+        # Find all qualifying terminal build job IDs whose effective timestamp is older than cutoff
+        qualifying_build_ids = [
+            row[0]
+            for row in db.query(BuildJob.id)
+            .filter(
+                BuildJob.status.in_(terminal_statuses),
+                func.coalesce(BuildJob.completed_at, BuildJob.created_at) <= cutoff,
+            )
+            .all()
+        ]
+
+        if not qualifying_build_ids:
+            return 0
+
+        deleted_count = (
+            db.query(BuildLog)
+            .filter(BuildLog.build_id.in_(qualifying_build_ids))
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        return deleted_count
 
 
 build_repository = BuildRepository()

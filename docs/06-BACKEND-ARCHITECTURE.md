@@ -65,4 +65,34 @@ Alembic migrations (verified against `backend/alembic/versions/` and `alembic he
 - `f6a7b8c9d0e1`: Phase 4 — Blueprint/Remix (`remix_intent` column on `project_versions`)
 - `a2b3c4d5e6f7`: Phase 5 — `scale` column on `build_jobs`
 - `b3c4d5e6f7a8`: Phase 6 — `world_mode` column on `build_jobs`
-- `bc9ae398f146` (head): `scale` and `world_mode` columns on `projects`
+- `bc9ae398f146`: `scale` and `world_mode` columns on `projects`
+- `c1d2e3f4a5b6`: Add `token_version` column to `users` table for session revocation (ADV-SEC-003)
+- `e1f2a3b4c5d6`: Add `ForeignKey("build_jobs.id", ondelete="CASCADE")` to `build_logs` table (ADV-DB-001)
+- `f2a3b4c5d6e7` (head): Drop redundant explicit unique indexes `ix_users_email` and `ix_users_username` from `users` table; uniqueness enforced via named table-level `UniqueConstraint` only (ADV-DB-002)
+
+## Concurrency, Streaming & Worker Topology (ADV-ARCH-001)
+
+### Single Application Worker Constraint
+The backend utilizes an in-process, in-memory event broadcaster ([`BuildEventBroadcaster`](file:///C:/Users/Piyush148/Documents/AI%20Game/backend/app/services/build_service.py#L38-L79)) to route live Server-Sent Events (SSE) during async game generation. The broadcaster maintains subscriber queues in an in-memory dictionary (`self._subscribers: Dict[str, Set[asyncio.Queue]]`).
+
+Consequently, the deployment topology is strictly constrained to **one application worker per server instance**:
+- The launcher (`start.bat:338`) starts Uvicorn with `--reload` and no `--workers` flag, running exactly one application worker (supervised by the reloader process).
+- The in-process broadcaster and the sliding-window rate limiter ([`SlidingWindowRateLimiter`](file:///C:/Users/Piyush148/Documents/AI%20Game/backend/app/auth/rate_limit.py#L22)) are process-local.
+- If multiple application workers were deployed (`uvicorn --workers > 1`), an SSE client connection served by Worker B would not receive events published by the background compilation worker running on Worker A.
+
+### Horizontal Scaling & Distributed Message Broker Roadmap
+Per **ADR-004** (*"FastAPI-compatible async/background execution. Do not add Celery/Redis initially"*) and project constitutional rules (*"Avoid premature complexity"*), external message brokers (Redis, RabbitMQ, Celery) are omitted from current phases.
+
+When horizontal multi-worker scaling is approved under a future ADR:
+1. **Pub/Sub Broadcaster**: The in-memory `BuildEventBroadcaster` will be swapped for a distributed message broker (Redis Pub/Sub). The `stream_events()` SSE generator interface and client-side SSE protocol will remain 100% unchanged.
+2. **Distributed Rate Limiting**: The process-local `SlidingWindowRateLimiter` will be backed by a shared Redis sorted-set window.
+3. **Database Concurrency**: The SQLite database will transition to PostgreSQL to support concurrent multi-process writes.
+
+### Rate Limiting (ADV-SEC-001, ADV-SEC-005)
+The in-memory [`SlidingWindowRateLimiter`](file:///C:/Users/Piyush148/Documents/AI%20Game/backend/app/auth/rate_limit.py#L22) protects all sensitive write endpoints:
+- `login:{ip}` — 10 attempts/IP/15 min
+- `register:{ip}` — 5 attempts/IP/hour
+- `save:{user_id}` — 50 saves/user/hour
+- `preference_mutate:{user_id}` — 20 Game DNA preference operations/user/hour (combined `POST /preferences/reset` + `POST /preferences/onboard`) (ADV-SEC-005)
+
+All rate limit buckets are process-local. Under ADR-004 single-worker deployment, this is consistent. Distributed rate limiting is deferred to the horizontal scaling ADR.

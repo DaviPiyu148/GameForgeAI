@@ -1,85 +1,93 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Phase A Remediation — Slice 3 (ADV-PERF-001, ADV-REL-001, ADV-SEC-006) & Phase A Completion
+Phase B Remediation — Investigation, Policy Decisions & Technical Hardening (ADV-DB-001, ADV-SEC-002, ADV-SEC-005, ADV-ARCH-001, ADV-DB-002)
 
 ## Status
-COMPLETE
+IN_PROGRESS
 
 ## Objective
-Implement and verify Slice 3 of Phase A (Performance, Stream Reliability, and Exception Hardening) and finalize Phase A:
-1. ADV-PERF-001: Discovery Event-Loop Blocking Remediation (CRITICAL / GUARDED). Offload CPU-bound SentenceTransformer embedding, dense FAISS similarity search, and candidate fusion/ranking to worker threads (`asyncio.to_thread`) without blocking the FastAPI event loop. Satisfy all guardrail criteria: before/after benchmark, 1 vs 10 concurrent queries, `/health` endpoint responsiveness (<10ms during heavy query), SSE stream ping responsiveness, thread-safety assessment, and mathematical ranking equivalence.
-2. ADV-REL-001: Dead SSE Keep-Alive Loop / Stream Lifecycle Remediation (MEDIUM). Prevent infinite keep-alive comment loops (`: keep-alive\n\n`) when build workers stall, crash, or fail silently. Implement active build state inspection, worker heartbeat, delayed-registration grace window (15s), and execution budget (300s SLA upper bound), cleanly terminating the SSE stream with appropriate terminal status (`SUCCESS`, `ERROR`, or `CANCELLED`) instead of looping indefinitely.
-3. ADV-SEC-006: Internal Exception-String Leakage Remediation (MEDIUM). Eliminate raw exception string (`str(e)`) leakage in error responses across API endpoints (`projects.py`, `build_service.py`). Preserve intentional domain 4xx errors (`ProjectNotFoundError`, `ValueError`, `PlaytestNotFoundError`) and `HTTPException` (403), while ensuring unexpected internal server errors return generic safe messages (e.g., "Failed to compile project prototype. Please try again.") and log full diagnostic tracebacks exclusively in server logs (`logger.exception`).
-4. Scope Discipline & Phase Boundaries:
-   - `ADV-SEC-002` (reverse-proxy topology / trusted forwarded headers) remains strictly in Phase B.
-   - `ADV-ARCH-003` (dead `TaskType.DIRECTOR` / Phase-7 residue) remains strictly in Phase C.
+Execute Phase B remediation across all 5 assigned findings adhering strictly to the investigation-first and scope discipline principles:
+1. ADV-DB-001: BuildLog Lifecycle & Retention Policy Decision (HIGH). Formulate and establish the authoritative lifecycle policy for `BuildLog` records, evaluating foreign key cascade deletion against scheduled log retention pruning to balance referential integrity and diagnostic auditability.
+2. ADV-SEC-002: Reverse-Proxy Deployment Topology & Trusted Forwarded Headers (MEDIUM). Audit client IP resolution for rate limiting, evaluate reverse-proxy trust configurations (`--proxy-headers`, `FORWARDED_ALLOW_IPS`), and document or configure safe IP resolution preventing both IP spoofing and shared proxy IP rate-limit exhaustion.
+3. ADV-SEC-005: Game DNA Preference Reset Abuse Threshold & Rate Limiting (MEDIUM). Define acceptable rate-limiting abuse threshold for Game DNA preference reset (`POST /api/profile/preferences/reset`) and onboarding (`POST /api/profile/preferences/onboard`) to protect SQLite persistence from write thrashing.
+4. ADV-ARCH-001: Single-Process SSE Broadcaster Architecture Constraint Documentation (HIGH / COND.). Formally document the in-process `BuildEventBroadcaster` concurrency and process-boundary constraint in backend architecture and deployment documentation per ADR-004, establishing the future Redis Pub/Sub horizontal scaling roadmap without premature complexity.
+5. ADV-DB-002: Redundant User Unique Indexes Cleanup (LOW). Design and execute an Alembic migration removing duplicate SQLite unique indexes on `email` and `username` while preserving named table-level unique constraints and model integrity.
 
 ## Started
 2026-09-06
 
 ---
 
-## 1. Pre-Implementation
+## 1. Pre-Implementation & Investigation
 
 - [x] Read AGENTS.md Constitution & guidelines
-- [x] Baseline test suite status: 643 passed, 4 warnings in 102.11s (EXIT CODE 0)
-- [x] Frontend baseline status: `npm run build` built in 2.48s (0 errors)
-- [x] Record cryptographic baseline SHA-256 hashes:
+- [x] Workspace Protection Rule: Verify `GameScene.ts` and `vfxSystem.ts` SHA-256 hashes match baseline
   - `GameScene.ts`: `ae6287f1ce92621baa781e822278abd4cfc8e2c8b706a7a7c8d05b266d966095`
   - `vfxSystem.ts`: `c8a5e0a46c3b0df950d53db13368e008b03d8132ef46457b797afc9af6d243fa`
-- [x] Workspace Protection Rule: Verify `git diff -- GameScene.ts vfxSystem.ts` unchanged before/after every slice.
+- [x] Verify current test suite baseline: 653 backend tests passed (102.13s), frontend builds cleanly (0 errors)
+- [x] Confirm Phase A closure & freeze (9/9 findings complete, canonical commit `8764c98f6a876db92fcbe36da728eda667287723`)
+- [x] Complete Pre-Implementation Investigation & Preflight Checks across all 5 Phase B findings:
+  - `ADV-DB-001`: Evaluated Audit Record vs Transient Diagnostics vs Hybrid Model. Preflight orphan count: `0` orphan `build_logs` in `backend/gameforge.db` (106 jobs, 1,289 logs, 0 orphans). Adopted Hybrid Model: FK with `ON DELETE CASCADE` + explicit 30-day retention pruning utility. Recorded that 30-day retention is an explicit product/operations policy decision. Migration rule: Fail migration with explicit error if orphan rows are detected (no silent destruction). Retention rule: Eligible when `BuildJob.status IN ('SUCCESS', 'ERROR', 'CANCELLED')` AND `BuildJob.completed_at` (or `created_at` if completed_at is null) <= now - 30 days. Non-terminal jobs are never pruned.
+  - `ADV-SEC-002`: Documented actual current deployment topology: Current deployment has NO reverse proxy and does NOT enable Uvicorn proxy-header processing. `127.0.0.1` is not currently acting as a proxy. For production behind reverse proxy, document Uvicorn `--proxy-headers` and `--forwarded-allow-ips`. Application routes will NOT build a custom XFF parser. Security test will verify both: untrusted peer + XFF ignored (peer IP used) AND trusted proxy peer + XFF honored.
+  - `ADV-SEC-005`: Evaluated preference reset and onboard write patterns. Explicitly recorded that 20 operations/user/hour is a chosen conservative policy threshold (not telemetry-derived) and documented its single-worker in-memory scope. Policy is COMBINED across both endpoints (reset + onboard share a single key `preference_mutate:{user_id}` for 20 total ops/hour).
+  - `ADV-ARCH-001`: Verified actual startup (`start.bat:338`) runs exactly one application worker per server instance. Traced `BuildEventBroadcaster` in-memory `asyncio.Queue` process-local scope. Prepared architecture documentation update for `docs/06-BACKEND-ARCHITECTURE.md` and `docs/14-DEPLOYMENT.md` referencing ADR-004. Zero application code changes.
+  - `ADV-DB-002`: Inspected SQLite schema via `PRAGMA index_list('users')` and `index_info`. Confirmed 4 unique indexes on 2 columns. Prepared Alembic migration dropping `ix_users_email` and `ix_users_username` with explicit post-condition verification (exactly 2 unique constraint indexes with `origin='u'`, zero redundant copies with `origin='c' + unique=1`, email/username uniqueness preserved, auth signup/update TOCTOU race tests pass 100%).
 
 ---
 
-## 2. Implementation
+## 2. Implementation Slices
 
-- [x] Subtask 1: Fix `ADV-PERF-001` (Discovery Event-Loop Blocking - CRITICAL / GUARDED)
-  - Profile & benchmark synchronous discovery search on event loop
-  - Wrap CPU-bound `embed_query`, FAISS vector search, and ranking in worker thread execution via `asyncio.to_thread`
-  - Verify thread safety: SentenceTransformer (`encode` with `torch.no_grad()`), FAISS (`IndexFlatIP` C++ OpenMP inner-product search), and LexicalIndex (immutable dictionaries) confirmed thread-safe and reentrant under concurrent read access.
-  - Verify health endpoint responsiveness during concurrent queries (<10ms max latency; measured 2.12ms avg, 4.90ms max)
-  - Verify 5 mathematical ranking invariants across 5 benchmark queries: candidate IDs, semantic similarity scores, lexical outputs, hybrid fusion scores, and final ranking order matched 100% with 0 discrepancies against baseline.
-- [x] Subtask 2: Fix `ADV-REL-001` (Dead SSE Keep-Alive Loop / Stream Lifecycle - MEDIUM)
-  - Update `build_service.stream_events` generator to query job state on `asyncio.TimeoutError`
-  - Terminate stream cleanly when build reaches terminal state (`SUCCESS`, `ERROR`, `CANCELLED`) or is deleted (`BUILD_NOT_FOUND`)
-  - Handle worker heartbeat / dead worker timeout: if build is stuck in non-terminal state without an active worker task, transition DB to ERROR (`WORKER_TERMINATED`), emit terminal event, and break.
-  - Add 15s grace window for freshly QUEUED builds to allow worker registration without false termination.
-  - Enforce dual timer lifecycle: (1) a 30-second SSE keep-alive/state-inspection interval that inspects DB and worker task state on every 30s of queue inactivity, emitting `: keep-alive\n\n` or cleanly terminating dead/finished streams; and (2) a 300-second absolute build execution ceiling that terminates hung jobs with `BUILD_TIMEOUT`. Based on the multi-stage generative architecture (`AI_OVERALL_DEADLINE_SECONDS=60.0` for generation failover + 25.0s to 50.0s for the bounded repair loop + ~11.0s AST validation, DB transactions, and network overhead, bounding complete legitimate generation at ~121s–180s), the 300s ceiling provides a substantial 120-second safety margin (1.67x) against expected queue scheduling, transport, and DB delays.
-- [x] Subtask 3: Fix `ADV-SEC-006` (Internal Exception-String Leakage Remediation - MEDIUM)
-  - Audit all `make_error_response` / `_error` calls in API endpoints (`projects.py`, `build_service.py`)
-  - Replace raw `str(e)` in 500 error envelopes with generic safe messages
-  - Ensure full diagnostic exception tracebacks are logged exclusively on the server (`logger.exception`)
-  - Preserve explicit domain 4xx (`ProjectNotFoundError` -> 404, `ValueError` -> 400/409) and `HTTPException` (403) from being swallowed into 500.
+- [x] Slice 1: `ADV-ARCH-001` (Single Application Worker SSE Broadcaster Constraint Documentation - HIGH / COND.)
+  - Verified current startup command runs single application worker per instance (`start.bat:338`: `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`).
+  - Formally documented single application worker in-process SSE broadcaster architecture constraint in `docs/06-BACKEND-ARCHITECTURE.md` and `docs/14-DEPLOYMENT.md`.
+  - Referenced ADR-004; documented Redis Pub/Sub scaling roadmap for horizontal deployment.
+  - Strictly documentation only: zero application code changes, no Redis, no Celery, no broadcaster rewrite.
+- [x] Slice 2: `ADV-DB-001` (BuildLog Lifecycle & Foreign Key Retention - HIGH)
+  - Adopted Hybrid Lifecycle Policy: FK `ForeignKey("build_jobs.id", ondelete="CASCADE")` on `build_logs.build_id` + 30-day product retention pruning helper.
+  - Migration preflight: Checks orphan count; fails migration with explicit `RuntimeError` if orphan rows are detected (no silent destruction). Verified live database has 0 orphans; applied migration `e1f2a3b4c5d6`.
+  - Updated `BuildLog` model in `app/models/build_log.py`.
+  - Implemented repository pruning helper `prune_build_logs(db: Session, max_age_days: int = 30) -> int` in `build_repo.py`: eligible only when `BuildJob.status` is terminal (`SUCCESS`, `ERROR`, `CANCELLED`) and `BuildJob.completed_at` (or `created_at` if null) is older than 30 days. Non-terminal jobs (`QUEUED`, `RUNNING`, `VALIDATING`) are never pruned.
+  - Verification Evidence: All 1,289 existing `build_logs` IDs in `gameforge.db` preserved 100% after migration. Upgrade/downgrade/re-upgrade lifecycle cycle verified. ON DELETE CASCADE deletion of target logs and retention of unrelated logs verified. 8-case retention matrix verified (terminal+old pruned, terminal+recent retained, running+old retained, queued+old retained, cancelled+old pruned, completed_at=NULL old pruned, completed_at=NULL recent retained, running completed_at=NULL old retained). All 4 tests in `test_build_log_retention.py` passed in 4.43s. All 27 existing build and concurrency tests in `test_builds.py` and `test_build_concurrency.py` passed in 7.48s.
+- [x] Slice 3: `ADV-DB-002` (User Table Redundant Unique Indexes Cleanup - LOW)
+  - Removed `unique=True` and `index=True` from `email` and `username` columns in `app/models/user.py` (table-level `UniqueConstraint` preserved).
+  - Created migration `f2a3b4c5d6e7_drop_redundant_users_unique_indexes.py` (down_revision: `e1f2a3b4c5d6`) dropping `ix_users_email` and `ix_users_username`.
+  - Applied migration `f2a3b4c5d6e7` to live `backend/gameforge.db`: all 80 users preserved; PRAGMA shows 2 unique constraint indexes (`origin='u'`) and 0 redundant explicit unique indexes (`origin='c' + unique=1`); `ix_users_id` preserved.
+  - Verification Evidence: 3 tests in `test_user_index_cleanup.py` passed (3.10s): model metadata, in-memory SQLite census + uniqueness enforcement, and upgrade→downgrade→re-upgrade lifecycle. Auth tests `test_auth.py` 31/31 passed (3.35s).
+- [x] Slice 4: `ADV-SEC-005` (Game DNA Preference Reset & Onboard Rate Limiting - MEDIUM)
+  - Added `check_preference_mutate_rate(user_id: str) -> bool` in `app/auth/rate_limit.py` (shared key `preference_mutate:{user_id}`, 20 ops/user/hour, process-local scope documented).
+  - Applied rate check in `app/api/profile.py` for `POST /preferences/onboard` and `POST /preferences/reset`; added `_error(code, message, status_code)` helper and necessary imports.
+  - Verification Evidence: 2 tests in `test_preference_rate_limit.py` passed (0.73s): unit test for check_preference_mutate_rate (exactly 20 allowed, 21st rejected), API integration test asserting 10 resets + 10 onboards = 20 combined allowed, 21st and 22nd both rejected with 429 RATE_LIMITED, user 2 unaffected.
+- [x] Slice 5: `ADV-SEC-002` (Reverse-Proxy Deployment Topology & Trusted Headers - MEDIUM)
+  - Expanded `docs/14-DEPLOYMENT.md`: documented threat model (IP spoofing, shared-proxy exhaustion, architectural separation invariant), verified dev topology (direct Uvicorn, no proxy, XFF ignored), and production requirements (`--proxy-headers --forwarded-allow-ips=<CIDR>`).
+  - Verified with live ProxyHeadersMiddleware probe: untrusted peer (`198.51.100.1`) + spoofed XFF → peer IP used; trusted proxy (`10.0.0.1`) + XFF → client IP honored.
+  - Verification Evidence: 4 tests in `test_proxy_headers_security.py` passed (1.91s): direct connection ignores spoofed XFF; untrusted peer rejected by middleware; trusted proxy honors XFF without shared-IP exhaustion; auth.py AST audit confirms zero raw XFF header parsing.
 
 ---
 
 ## 3. Verification
 
-- [x] `ADV-PERF-001` Benchmark: 1 query latency vs 10 concurrent queries (4.41 QPS throughput, 2.27s for 10 concurrent queries)
-- [x] `ADV-PERF-001` Responsiveness: `/health` latency during heavy query: average 2.12ms, max 4.90ms (<10ms guardrail met; 13-24 health pings executed where 0 executed before)
-- [x] `ADV-PERF-001` Invariants: All 5 invariants (candidate IDs, semantic similarity scores, lexical outputs, fusion scores, and final ranking order) matched 100% across all 5 benchmark queries (0 discrepancies vs baseline)
-- [x] `ADV-PERF-001` Thread Safety: Concurrent read access to SentenceTransformer, FAISS index, and lexical index verified under 10-query workload with no race/error observed
-- [x] `ADV-REL-001` Regression: SSE stream terminates cleanly on worker death, external terminal status, deleted build, or max build timeout; delayed registration grace window verified (5/5 tests passed in `test_build_concurrency.py`)
-- [x] `ADV-SEC-006` Regression: 500 responses return generic safe messages without internal `str(e)` across project routes, and domain 4xx / HTTPException are preserved (4/4 tests passed in `test_projects.py`)
-- [x] Focused Slice 3 tests: 35 passed in 34.34s (`test_discovery_api.py`, `test_build_concurrency.py`, `test_projects.py`)
-- [x] Full backend test suite: 653 passed, 4 warnings in 102.13s (`.venv\Scripts\pytest.exe -q`)
-- [x] Frontend typecheck and build: `tsc -b && vite build` built cleanly in 1.07s (0 errors)
-- [x] Workspace protection verification: `GameScene.ts` (`ae62...095`) and `vfxSystem.ts` (`c8a5...3fa`) SHA-256 hashes 100% identical
+- [ ] Unit & integration tests for each remediated item
+- [ ] Full backend test suite pass (>= 653 tests)
+- [ ] Frontend build succeeds (`npm run build`)
+- [ ] Workspace protection check (`GameScene.ts` and `vfxSystem.ts` untouched)
 
 ---
 
 ## 4. Documentation
 
-- [x] Update `TASK.md` with concrete verification evidence, frozen severities, thread safety audit, and SLA rationale
+- [ ] Update `docs/06-BACKEND-ARCHITECTURE.md`
+- [ ] Update `docs/14-DEPLOYMENT.md`
+- [ ] Update `docs/15-CURRENT-STATUS.md`
 
 ---
 
 ## 5. Git Checkpoint
 
-- [x] Review `git diff` and `git status`
-- [x] Working tree status: Working tree intentionally dirty only due to protected pre-existing user modifications; all Phase A changes across Slices 1, 2, and 3 are committed.
-- [x] Commit hash: `ec37c07f74feebcc2a726ecc2a7295eaeb2cfc09` (canonical Slice 3 commit incorporating grace window, HTTPException preservation, and ledger update)
+- [ ] Review `git diff` and `git status`
+- [ ] Verify zero secrets or unintended files staged
+- [ ] Create Phase B Git commit
+- [ ] Verify clean working tree (dirty solely due to protected files)
 
 ---
 
@@ -87,6 +95,8 @@ Implement and verify Slice 3 of Phase A (Performance, Stream Reliability, and Ex
 
 ### Task: Phase A Remediation — Slice 3 (ADV-PERF-001, ADV-REL-001, ADV-SEC-006)
 Status: COMPLETE (2026-09-06)
+- **Commit**: `8764c98f6a876db92fcbe36da728eda667287723` (`backend: implement Phase A Slice 3 (ADV-PERF-001, ADV-REL-001, ADV-SEC-006)`)
+- **Working Tree State**: Phase A implementation is frozen in Git; working tree is intentionally dirty solely due to protected pre-existing user modifications in `GameScene.ts` and `vfxSystem.ts` (0 uncommitted changes for Phase A).
 - **Verified Deliverables**:
   1. `ADV-PERF-001` (CRITICAL / GUARDED): Offloaded CPU-bound SentenceTransformer embedding inference, dense FAISS similarity search, and candidate fusion/ranking (`_execute_search_pipeline`, `_execute_similar_games_pipeline`, `_execute_more_like_this_pipeline`) to worker threads via `asyncio.to_thread`. Preserved fast DB operations and async IGDB enrichment on event loop.
      - Event loop unblocking proof: During 731-789ms heavy search query, 13 to 24 health pings executed concurrently (0 executed before remediation). Max health ping latency was 4.90ms (guardrail target <10ms).
@@ -94,7 +104,7 @@ Status: COMPLETE (2026-09-06)
      - Invariants: Candidate IDs, semantic similarity scores, lexical outputs, hybrid fusion scores, and final ranking order matched 100% across all 5 benchmark queries (0 discrepancies vs baseline).
      - Thread Safety: Concurrent read access to SentenceTransformer, FAISS index, and lexical index verified under 10-query workload with no race/error observed.
      - Test: `test_discovery_search_offloaded_to_thread_unblocks_event_loop` in `test_discovery_api.py` passed.
-  2. `ADV-REL-001` (MEDIUM): Added active state validation to `stream_events()` in `build_service.py` on the 30-second SSE keep-alive/state-inspection interval. Evaluates terminal DB states (`SUCCESS`, `ERROR`, `CANCELLED`), task cancellation / missing worker (`WORKER_TERMINATED`), delayed registration grace window (15s), and the 300-second absolute build execution ceiling (`BUILD_TIMEOUT`), terminating streams cleanly instead of looping indefinitely.
+  2. `ADV-REL-001` (MEDIUM): Added active state validation to `stream_events()` in `build_service.py` on the 30-second SSE inactivity / state-check interval. Evaluates terminal DB states (`SUCCESS`, `ERROR`, `CANCELLED`), task cancellation / missing worker (`WORKER_TERMINATED`), delayed registration grace window (15s), and the 300-second absolute build lifetime ceiling measured from `created_at` (`BUILD_TIMEOUT`), cleanly terminating streams instead of looping indefinitely. The active execution path is modeled at ~121s normal duration (`AI_OVERALL_DEADLINE_SECONDS=60.0` for generation failover + 25.0s to 50.0s for the bounded repair loop + ~11.0s AST validation, DB transactions, and network overhead), with up to 180s reserved for documented provider retry and failover edge paths; the remaining ~120 seconds of the 300s ceiling absorb expected queue scheduling, worker startup, transport, and DB delays.
      - 5 regression tests in `test_build_concurrency.py`: `test_sse_stream_terminates_when_worker_dies`, `test_sse_stream_terminates_on_external_terminal_status`, `test_sse_stream_terminates_on_deleted_build`, `test_sse_stream_terminates_on_max_build_timeout`, `test_sse_stream_does_not_kill_freshly_queued_build_during_registration_delay` passed.
   3. `ADV-SEC-006` (MEDIUM): Replaced raw `str(e)` leakage with safe generic error envelopes in `projects.py` (`apply_improvements`, `apply_remix`, `compile_project`) and `build_service.py` (`_run_build_worker`). Structured 4xx responses preserved for domain errors (`ProjectNotFoundError` -> 404, `ValueError` -> 400/409) and `HTTPException` (403); unexpected internal errors emit safe generic messages with full tracebacks logged via `logger.exception`.
      - 4 regression tests in `test_projects.py`: `test_improve_project_unexpected_error_does_not_leak_exception_string`, `test_remix_project_unexpected_error_does_not_leak_exception_string`, `test_compile_project_unexpected_error_does_not_leak_exception_string`, `test_project_endpoints_preserve_domain_exceptions_and_http_exceptions` passed.

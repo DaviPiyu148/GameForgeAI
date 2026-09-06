@@ -12,11 +12,12 @@ Keep these distinct:
 ## Implemented Database Entities (B1–B7)
 
 ### User (SQLAlchemy Model: `users`, B7, extended Product Expansion V1)
-- `id`: String(36) (Primary Key, server-generated UUID)
-- `email`: String(254), unique, non-null, indexed (stored lowercase)
-- `username`: String(50), unique, non-null, indexed
+- `id`: String(36) (Primary Key, server-generated UUID, non-unique index `ix_users_id`)
+- `email`: String(254), non-null (stored lowercase). Uniqueness enforced by table-level `UniqueConstraint("email", name="uq_users_email")`. Redundant explicit `ix_users_email` index removed per ADV-DB-002 (migration `f2a3b4c5d6e7`).
+- `username`: String(50), non-null. Uniqueness enforced by table-level `UniqueConstraint("username", name="uq_users_username")`. Redundant explicit `ix_users_username` index removed per ADV-DB-002 (migration `f2a3b4c5d6e7`).
 - `password_hash`: String(255), non-null (Argon2 hash via `pwdlib`; NEVER returned in API responses)
 - `level`: Integer, non-null, default: `1`
+- `token_version`: Integer, non-null, default: `1` (ADV-SEC-003 session revocation; incremented on password change, reset, or explicit revocation)
 - `avatar_url`: String(500), nullable (uploaded profile picture path, added in Product Expansion V1)
 - `created_at`: DateTime(timezone=True), non-null, auto timestamp
 - `updated_at`: DateTime(timezone=True), non-null, auto timestamp
@@ -95,7 +96,7 @@ Keep these distinct:
 
 ### BuildLog (SQLAlchemy Model: `build_logs`, B2)
 - `id`: String(36) (Primary Key, server-generated UUID)
-- `build_id`: String(36), non-null, indexed
+- `build_id`: String(36), non-null, indexed (FK to `build_jobs.id` with `ondelete="CASCADE"`, ADV-DB-001)
 - `sequence_number`: Integer, non-null (1-indexed per build)
 - `level`: String(20), non-null (`INFO`, `WARNING`, `ERROR`, `SUCCESS`)
 - `message`: Text, non-null
