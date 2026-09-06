@@ -66,7 +66,7 @@ npm run lint         # lint
 **One-click launch (Windows)**: run `start.bat` from the repo root — it verifies prerequisites, applies migrations, starts both servers, and opens the browser.
 
 ## Documentation
-Read `AGENTS.md` first (the AI development constitution), then `docs/DOCUMENTATION-MAP.md` for what each document covers. Accepted architectural decisions live in `decisions/`. `docs/15-CURRENT-STATUS.md` is the living status document — read it for what's actually shipped as of today.
+Read `AGENTS.md` first (the AI development constitution), then `docs/README.md` for the full documentation index. Accepted architectural decisions live in `decisions/`. `docs/15-CURRENT-STATUS.md` is the living status document — read it for what's actually shipped as of today.
 
 ## Security Boundary
 LLM output must become structured Game DSL, be validated, and only then be rendered by a controlled runtime. Never execute arbitrary model-generated JavaScript. See `docs/13-SECURITY.md`.

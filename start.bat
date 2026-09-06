@@ -199,7 +199,7 @@ if not exist "%VENV_PYTHON%" (
 
 REM Dependency consistency check via bootstrap_env.py
 set "NEEDS_PIP=0"
-"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap_env.py" --check-deps >nul 2>&1
+"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap\bootstrap_env.py" --check-deps >nul 2>&1
 if !ERRORLEVEL! NEQ 0 set "NEEDS_PIP=1"
 
 if "!NEEDS_PIP!"=="1" (
@@ -223,7 +223,7 @@ echo [6/10] Preparing frontend dependencies...
 set "FRONTEND_LOCK=%FRONTEND_DIR%\package-lock.json"
 set "NEEDS_NPM=0"
 
-"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap_env.py" --check-frontend-deps >nul 2>&1
+"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap\bootstrap_env.py" --check-frontend-deps >nul 2>&1
 if !ERRORLEVEL! NEQ 0 set "NEEDS_NPM=1"
 
 if "!NEEDS_NPM!"=="1" (
@@ -252,7 +252,7 @@ if "!NEEDS_NPM!"=="1" (
             exit /b 1
         )
     )
-    "%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap_env.py" --stamp-frontend-deps >nul 2>&1
+    "%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap\bootstrap_env.py" --stamp-frontend-deps >nul 2>&1
     cd /d "%PROJECT_ROOT%"
     echo        Frontend dependencies installed successfully -- OK
 ) else (
@@ -322,7 +322,7 @@ if exist "%USERPROFILE%\.cache\huggingface\hub\models--sentence-transformers--al
     set "HF_HUB_OFFLINE=1"
 )
 
-"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap_env.py" --bootstrap-discovery
+"%VENV_PYTHON%" "%BACKEND_DIR%\scripts\bootstrap\bootstrap_env.py" --bootstrap-discovery
 echo        Discovery engine verified -- OK
 
 REM ============================================================================

@@ -5,7 +5,7 @@ from app.schemas.discovery import GameDiscoveryItem, GameEnrichment, DiscoverySe
 from app.search.catalog import CatalogManager
 from app.search.ranker import Ranker
 from app.search.query_parser import QueryParser
-from scripts.ingest_catalog import detect_description_language, build_display_description
+from scripts.bootstrap.ingest_catalog import detect_description_language, build_display_description
 
 
 def test_detect_description_language_accuracy():

@@ -4050,6 +4050,65 @@ DECISION:             1. Keep 25% (Controlled real-world exposure test; accumula
 ### 5. Git Checkpoint
 - Commit hash: 6df1da1
 
+---
+
+## Monorepo Structure Reorganization & Clean-up (2026-09-06)
+
+### Status
+COMPLETE
+
+### Objective
+Reorganize the repository into a clean, production-grade monorepo structure while preserving 100% of existing functionality, all local working-tree changes, and protected user changes:
+1. Consolidate 30+ root Markdown documents into `docs/` subdirectories (`architecture/`, `archive/`, `engineering/`, `product/`).
+2. Organize 57 unorganized scripts in `backend/scripts/` into functional subdirectories (`bootstrap/`, `maintenance/`, `evaluation/`, `research/`).
+3. Move `stitch_gameforge_ai/` to `references/stitch/` and remove empty source folder.
+4. Fix relative import paths, `sys.path` parent levels, and dataset paths across moved scripts.
+5. Create `docs/README.md` as unified documentation index and update cross-references (`start.bat`, `SETUP.md`, `backend/README.md`, root `README.md`).
+6. Enforce strict safety: zero commit/push, preserve uncommitted user changes, verify protected file hashes.
+
+### Scope & Exact Moved File Count
+Total staged moved files: **105 files**
+- **Documentation (33 files)**:
+  - `docs/architecture/` (2 files: `AI_PROVIDER_ARCHITECTURE.md`, `UI_MOTION_SYSTEM.md`)
+  - `docs/archive/` (20 files: 19 audit/QA reports from root + `SMALL_PRODUCT_FIXES_V2.md`)
+  - `docs/engineering/` (3 files: `GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md`, `MODERN_WEB_POLISH_V1_PLAN.md`, `TOAST_RENDER_PHASE_FIX_V1.md`)
+  - `docs/product/` (8 files: `DISCOVERY_EXPERIENCE_V2.md`, `DISCOVERY_INTELLIGENCE_V1.md`, `GAMEPLAY_EXPERIENCE_V1.md`, `GAME_GENERATION_V2.md`, `GAME_RUNTIME_EXPERIENCE_V1.md`, `GENERATION_OUTPUT_QUALITY_V3.md`, `GENERATION_RESILIENCE.md`, `GENERATION_RUNTIME_INTEGRATION.md`)
+- **Backend Scripts (57 files)**:
+  - `backend/scripts/bootstrap/` (3 files: `bootstrap_env.py`, `build_index.py`, `ingest_catalog.py`)
+  - `backend/scripts/maintenance/` (1 file: `seed_dev.py`)
+  - `backend/scripts/evaluation/` (9 files: canonical and quality evaluation runners)
+  - `backend/scripts/research/audits/` (10 files: ranker, corpus, landmarks, and profile audits)
+  - `backend/scripts/research/benchmarks/` (4 files: production and mode benchmarks)
+  - `backend/scripts/research/diagnostics/` (8 files: inspection and diagnostic utilities)
+  - `backend/scripts/research/experiments/` (4 files: candidate pool, review floor, RRF damping, ranker tuning)
+  - `backend/scripts/research/tests/` (5 files: baseline and verification scripts)
+  - `backend/scripts/research/validations/` (13 files: statistical, shadow, and longitudinal validations)
+- **Stitch Design References (15 files)**:
+  - `references/stitch/` (7 prototype screen captures/HTML pairs + `obsidian_forge/DESIGN.md`)
+
+### Protected Files Verification
+SHA-256 integrity verified against baseline:
+- `gameforge-ai/src/runtime/GameScene.ts`: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095` (EXACT MATCH)
+- `gameforge-ai/src/runtime/vfxSystem.ts`: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` (EXACT MATCH)
+
+### Automated Test & Build Evidence
+1. **Backend Regression Test Suite**: `pytest tests/ -q --tb=short` in `backend/` -> **666 passed, 0 failed** in 147.97s.
+2. **Frontend TypeScript Check**: `npx tsc --noEmit` in `gameforge-ai/` -> **0 errors** (exit code 0).
+3. **Frontend Production Build**: `npm run build` in `gameforge-ai/` -> **0 errors**, production bundle generated in 798ms (`dist/index.html`, `dist/assets/*`).
+4. **Script Path & Execution Validation**:
+   - `bootstrap_env.py --help`: OK (exit code 0)
+   - `build_index.py --help`: OK (exit code 0)
+   - `ingest_catalog.py`: OK (executed complete steam catalog scan in 24.31s, verified output path)
+   - `seed_dev.py`: Syntax & bytecode verified via `py_compile` (exit code 0); CLI execution with real data mutation classified as NOT VERIFIED / BLOCKED by design (requires `DEV_SEED_PASSWORD`, withheld to avoid mutating local DB).
+   - `app.main:app`: OK (imported clean from repo root, exit code 0)
+
+### Working Tree State
+- Staged renames: 105 files (all pure `R100`, 0 additions, 0 deletions)
+- Unstaged modifications: 81 files (25 pre-existing user changes preserved + script/test/doc path updates)
+- Untracked files: 1 file (`docs/README.md`)
+- Commits created: 0 (retained in working tree per instructions)
+
+
 
 
 

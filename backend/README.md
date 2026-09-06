@@ -44,8 +44,7 @@ backend/
 │   │                           # Auth/Avatar/Preference/Progression/SavedDiscovery services)
 │   └── db/                      # SQLAlchemy engine & session management
 ├── data/                      # Discovery dataset & processed artifacts (raw/processed git-ignored)
-├── scripts/                   # Offline setup scripts (ingest_catalog.py, build_index.py, seed_dev.py)
-│                              # plus historical R&D evaluation scripts from Discovery tuning
+├── scripts/                   # Offline setup & research scripts (bootstrap/, maintenance/, evaluation/, research/)
 ├── tests/                     # pytest regression suite (scoped via pytest.ini's `testpaths = tests`)
 ├── .env.example
 ├── alembic.ini
@@ -97,8 +96,8 @@ alembic upgrade head
 ### 5. Ingest Catalog & Build Discovery Index
 
 ```bash
-python scripts/ingest_catalog.py
-python scripts/build_index.py --max-records 20000
+python scripts/bootstrap/ingest_catalog.py
+python scripts/bootstrap/build_index.py --max-records 20000
 ```
 
 See the repo-root `SETUP.md` for the full first-time dataset download instructions.

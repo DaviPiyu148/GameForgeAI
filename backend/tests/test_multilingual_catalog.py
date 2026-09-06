@@ -2,7 +2,7 @@ import os
 import pytest
 from typing import Any, Dict, List
 
-from scripts.ingest_catalog import normalize_genres_list, build_semantic_profile, EXPANDED_GENRE_MAP
+from scripts.bootstrap.ingest_catalog import normalize_genres_list, build_semantic_profile, EXPANDED_GENRE_MAP
 from app.search.catalog import CatalogManager
 
 

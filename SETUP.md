@@ -127,7 +127,7 @@ print('Dataset ready in data/raw/')
 ### 3b. Ingest the catalog
 
 ```powershell
-python scripts/ingest_catalog.py
+python scripts/bootstrap/ingest_catalog.py
 ```
 
 Produces `data/processed/games_catalog.json` (~448 MB).
@@ -135,7 +135,7 @@ Produces `data/processed/games_catalog.json` (~448 MB).
 ### 3c. Build the FAISS vector index
 
 ```powershell
-python scripts/build_index.py --max-records 20000
+python scripts/bootstrap/build_index.py --max-records 20000
 ```
 
 Produces `data/processed/games_index.faiss` and `data/processed/index_meta.json`.

@@ -3,7 +3,7 @@ import tempfile
 import json
 import pytest
 
-from scripts.ingest_catalog import (
+from scripts.bootstrap.ingest_catalog import (
     clean_text,
     extract_year,
     build_semantic_profile,
