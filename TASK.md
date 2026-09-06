@@ -1,10 +1,70 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-Phase B Remediation — Investigation, Policy Decisions & Technical Hardening (ADV-DB-001, ADV-SEC-002, ADV-SEC-005, ADV-ARCH-001, ADV-DB-002)
+Phase 1 — Documentation Architecture Consolidation
 
 ## Status
 COMPLETE
+
+## Objective
+Establish a clean, mature, single-source-of-truth documentation architecture:
+1. Preserve all 25 pre-existing local user modifications and protected runtime files (`GameScene.ts`, `vfxSystem.ts`).
+2. Migrate numbered files `docs/01-PROJECT.md` .. `docs/15-CURRENT-STATUS.md` to semantic paths in `docs/product/`, `docs/architecture/`, `docs/engineering/`, `docs/operations/`, `docs/status/` using `git mv`.
+3. Create `decisions/ADR-008-GEMINI-INTERACTIONS-AND-FAILOVER.md`.
+4. Create canonical architecture documents: `docs/architecture/ai-provider.md`, `docs/architecture/runtime-and-gameplay.md`, `docs/engineering/accessibility.md`.
+5. Merge motion system into `DESIGN.md` and consolidate generation quality/resilience into `docs/architecture/ai-game-generation.md`.
+6. Consolidate historical reports and closed plans into `docs/archive/` subdirectories (`audits/`, `browser-qa/`, `discovery/`, `generation/`, `gameplay/`, `remediation/`, `plans/`).
+7. Consolidate `docs/DOCUMENTATION-MAP.md` into `docs/README.md` and delete `DOCUMENTATION-MAP.md`.
+8. Audit all repository links and references for stale paths.
+9. Verify zero changes to application logic, dependencies, database, or runtime.
+
+## Started
+2026-09-06
+
+---
+
+## Phase 1 Subtasks & Verification Ledger
+
+- [x] Pre-Execution Workspace Verification:
+  - Commit boundary `99e5acd` preserved.
+  - 25 pre-existing user modifications identified and preserved.
+  - Protected runtime SHA-256 hashes verified (`GameScene.ts`, `vfxSystem.ts`).
+- [x] Create documentation directory structure (`operations/`, `status/`, `archive/{audits,browser-qa,discovery,generation,gameplay,remediation,plans,research,handoffs}`).
+- [x] Move 15 numbered documents to semantic locations using `git mv`:
+  - `docs/01-PROJECT.md` $\rightarrow$ `docs/product/project.md`
+  - `docs/02-PRODUCT-SPEC.md` $\rightarrow$ `docs/product/product-spec.md`
+  - `docs/03-TECH-STACK.md` $\rightarrow$ `docs/architecture/tech-stack.md`
+  - `docs/04-SYSTEM-ARCHITECTURE.md` $\rightarrow$ `docs/architecture/system.md`
+  - `docs/05-FRONTEND-ARCHITECTURE.md` $\rightarrow$ `docs/architecture/frontend.md`
+  - `docs/06-BACKEND-ARCHITECTURE.md` $\rightarrow$ `docs/architecture/backend.md`
+  - `docs/07-DATA-MODEL.md` $\rightarrow$ `docs/architecture/data-model.md`
+  - `docs/08-API-CONTRACT.md` $\rightarrow$ `docs/architecture/api-contract.md`
+  - `docs/09-AI-GAME-GENERATION.md` $\rightarrow$ `docs/architecture/ai-game-generation.md`
+  - `docs/10-DISCOVERY-ENGINE.md` $\rightarrow$ `docs/architecture/discovery-engine.md`
+  - `docs/11-IMPLEMENTATION-PHASES.md` $\rightarrow$ `docs/engineering/roadmap.md`
+  - `docs/12-TESTING-QA.md` $\rightarrow$ `docs/engineering/testing-qa.md`
+  - `docs/13-SECURITY.md` $\rightarrow$ `docs/engineering/security.md`
+  - `docs/14-DEPLOYMENT.md` $\rightarrow$ `docs/operations/deployment.md`
+  - `docs/15-CURRENT-STATUS.md` $\rightarrow$ `docs/status/current-status.md`
+- [x] Move 33 historical/audit/QA files to structured `docs/archive/` subdirectories via `git mv`.
+- [x] Author `decisions/ADR-008-GEMINI-INTERACTIONS-AND-FAILOVER.md`.
+- [x] Author `docs/architecture/ai-provider.md`.
+- [x] Author `docs/architecture/runtime-and-gameplay.md`.
+- [x] Author `docs/engineering/accessibility.md`.
+- [x] Merge motion system into `DESIGN.md`.
+- [x] Merge quality, composition, and resilience details into `docs/architecture/ai-game-generation.md`.
+- [x] Consolidate `docs/DOCUMENTATION-MAP.md` into `docs/README.md` and remove `DOCUMENTATION-MAP.md` via `git rm`.
+- [x] Update root `README.md`, `PRODUCT.md`, `gameforge-ai/README.md`, `backend/README.md`, `docs/product/project.md`, `docs/status/current-status.md`, `docs/architecture/discovery-engine.md`, `docs/architecture/backend.md`.
+- [x] Repository-wide stale link audit completed.
+- [x] Verify `git diff --check` clean.
+- [x] Verify protected file SHA-256 hashes match baseline.
+
+---
+
+## Historical Tasks
+
+### Phase B Remediation — Investigation, Policy Decisions & Technical Hardening
+
 
 ## Objective
 Execute Phase B remediation across all 5 assigned findings adhering strictly to the investigation-first and scope discipline principles:

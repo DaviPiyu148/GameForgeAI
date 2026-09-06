@@ -4,7 +4,7 @@ React + TypeScript + Vite + Tailwind CSS frontend for GameForge AI. Talks to the
 
 ## Role
 
-Renders the 7 primary routes (`#/`, `#/discover/no-matches`, `#/build`, `#/status/success`, `#/status/error`, `#/dashboard`, `#/profile`) via `react-router-dom`'s `HashRouter`, holds transient UI state in a single `AppContext` (React Context), and embeds a Phaser 3.88.2 canvas for playable prototype runs. Backend/database remain authoritative for persistent business state — see `AGENTS.md` and `docs/05-FRONTEND-ARCHITECTURE.md`.
+Renders the 7 primary routes (`#/`, `#/discover/no-matches`, `#/build`, `#/status/success`, `#/status/error`, `#/dashboard`, `#/profile`) via `react-router-dom`'s `HashRouter`, holds transient UI state in a single `AppContext` (React Context), and embeds a Phaser 3.88.2 canvas for playable prototype runs. Backend/database remain authoritative for persistent business state — see `AGENTS.md` and `docs/architecture/frontend.md`.
 
 ## Stack
 

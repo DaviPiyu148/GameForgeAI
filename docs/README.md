@@ -1,198 +1,165 @@
-# GameForge AI — Documentation Index
+# GameForge AI — Documentation Architecture & Index
 
-This directory is the primary documentation home for GameForge AI. Use this file as
-your navigation entry point for all project, product, architecture, engineering,
-and historical documentation.
+This directory is the primary documentation home for GameForge AI. Use this index as the navigation entry point for all product, architecture, engineering, operational, and archived documentation.
 
 ---
 
-## Documentation Hierarchy
+## 1. Documentation Authority Model
 
-```
-Repository root             — canonical controls, constitution, ledger
-decisions/                  — durable architectural decision records
-docs/01–15                  — canonical product and engineering documentation
-docs/architecture/          — deep-dive architecture references
-docs/product/               — product experience definitions and quality targets
-docs/engineering/           — implementation plans and technical notes
-docs/archive/               — historical audits, QA reports, and obsolete plans
-references/stitch/          — reference UI prototype exports from Stitch
-```
+When evaluating requirements, architecture, or system state, consult sources in this priority order:
+
+| Source | Role & Authority |
+| :--- | :--- |
+| **`AGENTS.md`** (root) | **Engineering & AI Agent Constitution** — Mandatory engineering rules and invariants. |
+| **`TASK.md`** (root) | **Task Execution Ledger** — Current active task, subtask tracking, and verification records. |
+| **`decisions/`** | **Architectural Decision Records (ADRs)** — Durable, accepted architectural standards. |
+| **`docs/`** | **Canonical System & Product Truth** — Current specifications, architecture, and engineering standards. |
+| **Source Code** | **Actual Implementation** — Verified against active contracts and schemas. |
+| **Test Suites** | **Executable Verification** — Automated proof of system behavior. |
+| **`docs/archive/`** | **Historical Evidence** — Completed audits, past QA reports, and closed migration plans. |
+| **`references/`** | **Reference Artifacts** — Upstream Stitch UI exports and design captures (non-runtime). |
 
 ---
 
-## 1. Canonical Authority (Repository Root)
+## 2. Canonical Authority (Repository Root)
 
-These files at the repository root are the **source of truth** for their topics.
+These control documents at the repository root define the project's vision, design, rules, and setup:
 
 | File | Purpose |
-|------|---------|
-| [`AGENTS.md`](../AGENTS.md) | Engineering and AI-agent constitution — rules for all agents working in this repo |
-| [`README.md`](../README.md) | Repository entry point and orientation |
-| [`PRODUCT.md`](../PRODUCT.md) | Product definition and vision |
-| [`DESIGN.md`](../DESIGN.md) | Design system reference |
-| [`SETUP.md`](../SETUP.md) | Developer setup guide |
-| [`TASK.md`](../TASK.md) | Current active task execution ledger |
+| :--- | :--- |
+| [`AGENTS.md`](../AGENTS.md) | AI development constitution and engineering rules for all agents |
+| [`README.md`](../README.md) | Repository onboarding, orientation, and development quickstart |
+| [`PRODUCT.md`](../PRODUCT.md) | High-level product vision and user journey definition |
+| [`DESIGN.md`](../DESIGN.md) | Visual design system source of truth (colors, typography, effects, motion, toasts) |
+| [`SETUP.md`](../SETUP.md) | Comprehensive local development, virtualenv, database, and launcher setup |
+| [`TASK.md`](../TASK.md) | Active task execution ledger and milestone evidence |
 
 ---
 
-## 2. Architecture Decision Records (`decisions/`)
+## 3. Architecture Decision Records (`decisions/`)
 
-Durable decisions that are not subject to revision without a new ADR.
+Durable architectural decisions that govern system standards:
 
-| ADR | Decision |
-|-----|---------|
-| [`ADR-001`](../decisions/ADR-001-FRONTEND-STACK.md) | Frontend stack (React + Vite + TypeScript) |
-| [`ADR-002`](../decisions/ADR-002-BACKEND-STACK.md) | Backend stack (FastAPI + SQLAlchemy + SQLite) |
-| [`ADR-003`](../decisions/ADR-003-GAME-DSL.md) | Game DSL schema and validation pipeline |
-| [`ADR-004`](../decisions/ADR-004-BUILD-JOBS.md) | Build job system and SSE broadcaster architecture |
-| [`ADR-005`](../decisions/ADR-005-DISCOVERY-ARCHITECTURE.md) | Discovery engine architecture |
-| [`ADR-006`](../decisions/ADR-006-HOSTED-LLM-PROVIDER.md) | Hosted LLM provider integration |
-| [`ADR-007`](../decisions/ADR-007-AUTHENTICATION-AND-OWNERSHIP.md) | Authentication and ownership model |
-
----
-
-## 3. Canonical Documentation (`docs/01–15`)
-
-Numbered documents are the **current source of truth** for their topics.
-They are maintained as the project evolves.
-
-| Doc | Topic |
-|-----|-------|
-| [`01-PROJECT.md`](01-PROJECT.md) | Project overview and goals |
-| [`02-PRODUCT-SPEC.md`](02-PRODUCT-SPEC.md) | Product specification |
-| [`03-TECH-STACK.md`](03-TECH-STACK.md) | Technology stack choices |
-| [`04-SYSTEM-ARCHITECTURE.md`](04-SYSTEM-ARCHITECTURE.md) | Overall system architecture |
-| [`05-FRONTEND-ARCHITECTURE.md`](05-FRONTEND-ARCHITECTURE.md) | Frontend architecture |
-| [`06-BACKEND-ARCHITECTURE.md`](06-BACKEND-ARCHITECTURE.md) | Backend architecture, SSE broadcaster constraints |
-| [`07-DATA-MODEL.md`](07-DATA-MODEL.md) | Data model and schema |
-| [`08-API-CONTRACT.md`](08-API-CONTRACT.md) | API contract reference |
-| [`09-AI-GAME-GENERATION.md`](09-AI-GAME-GENERATION.md) | AI game generation pipeline |
-| [`10-DISCOVERY-ENGINE.md`](10-DISCOVERY-ENGINE.md) | Discovery and search engine |
-| [`11-IMPLEMENTATION-PHASES.md`](11-IMPLEMENTATION-PHASES.md) | Implementation phase roadmap |
-| [`12-TESTING-QA.md`](12-TESTING-QA.md) | Testing strategy and QA |
-| [`13-SECURITY.md`](13-SECURITY.md) | Security model and controls |
-| [`14-DEPLOYMENT.md`](14-DEPLOYMENT.md) | Deployment guide and operational procedures |
-| [`15-CURRENT-STATUS.md`](15-CURRENT-STATUS.md) | Current system status |
+| ADR | Decision Title | Scope |
+| :--- | :--- | :--- |
+| [`ADR-001`](../decisions/ADR-001-FRONTEND-STACK.md) | Frontend Stack | React 18 + Vite + TypeScript + Tailwind CSS |
+| [`ADR-002`](../decisions/ADR-002-BACKEND-STACK.md) | Backend Stack | FastAPI modular monolith + SQLAlchemy + SQLite + Alembic |
+| [`ADR-003`](../decisions/ADR-003-GAME-DSL.md) | Game DSL Schema | Strict Pydantic schema validation & versioning |
+| [`ADR-004`](../decisions/ADR-004-BUILD-JOBS.md) | Build Jobs & SSE | Async background build pipeline & event streaming |
+| [`ADR-005`](../decisions/ADR-005-DISCOVERY-ARCHITECTURE.md) | Discovery Architecture | Hybrid dense semantic (FAISS) + lexical retrieval |
+| [`ADR-006`](../decisions/ADR-006-HOSTED-LLM-PROVIDER.md) | Hosted LLM Provider | Provider abstraction & zero client-side credentials |
+| [`ADR-007`](../decisions/ADR-007-AUTHENTICATION-AND-OWNERSHIP.md) | Auth & Ownership | JWT + Argon2, per-user project isolation & IDOR defense |
+| [`ADR-008`](../decisions/ADR-008-GEMINI-INTERACTIONS-AND-FAILOVER.md) | Gemini Interactions & Failover | Sequential credential failover, model chains & deadline budgeting |
 
 ---
 
-## 4. Architecture References (`docs/architecture/`)
+## 4. Canonical Product Documentation (`docs/product/`)
 
-Deep-dive architecture documents for specific subsystems.
+Defines product requirements, capabilities, and functional specifications:
 
-| File | Topic |
-|------|-------|
-| [`AI_PROVIDER_ARCHITECTURE.md`](architecture/AI_PROVIDER_ARCHITECTURE.md) | AI provider abstraction, failover, and key rotation |
-| [`UI_MOTION_SYSTEM.md`](architecture/UI_MOTION_SYSTEM.md) | Frontend motion design system |
-
----
-
-## 5. Product Experience Documentation (`docs/product/`)
-
-Product experience definitions, quality targets, and experience benchmarks.
-These inform development and QA; the numbered docs (`02`, `09`, `10`) remain
-the canonical specifications.
-
-| File | Topic |
-|------|-------|
-| [`DISCOVERY_EXPERIENCE_V2.md`](product/DISCOVERY_EXPERIENCE_V2.md) | Discovery experience v2 definition |
-| [`DISCOVERY_INTELLIGENCE_V1.md`](product/DISCOVERY_INTELLIGENCE_V1.md) | Discovery intelligence behavior |
-| [`GAMEPLAY_EXPERIENCE_V1.md`](product/GAMEPLAY_EXPERIENCE_V1.md) | Gameplay experience v1 targets |
-| [`GAME_GENERATION_V2.md`](product/GAME_GENERATION_V2.md) | Game generation v2 quality goals |
-| [`GAME_RUNTIME_EXPERIENCE_V1.md`](product/GAME_RUNTIME_EXPERIENCE_V1.md) | Runtime experience definition |
-| [`GENERATION_OUTPUT_QUALITY_V3.md`](product/GENERATION_OUTPUT_QUALITY_V3.md) | Generation output quality targets v3 |
-| [`GENERATION_RESILIENCE.md`](product/GENERATION_RESILIENCE.md) | Generation resilience and fallback behavior |
-| [`GENERATION_RUNTIME_INTEGRATION.md`](product/GENERATION_RUNTIME_INTEGRATION.md) | Generation-to-runtime integration contract |
+| Document | Topic & Scope |
+| :--- | :--- |
+| [`project.md`](product/project.md) | Project mission, target audience, core loop, and architectural boundaries |
+| [`product-spec.md`](product/product-spec.md) | Detailed user stories, primary routes, builder controls, and studio experience |
 
 ---
 
-## 6. Engineering Plans and Notes (`docs/engineering/`)
+## 5. Canonical Architecture Documentation (`docs/architecture/`)
 
-Implementation plans, technical notes, and engineering change records.
+Detailed architectural specifications for all backend, frontend, runtime, and AI subsystems:
 
-| File | Topic |
-|------|-------|
-| [`GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md`](engineering/GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md) | Migration plan for Gemini Interactions API |
-| [`MODERN_WEB_POLISH_V1_PLAN.md`](engineering/MODERN_WEB_POLISH_V1_PLAN.md) | Modern web polish implementation plan |
-| [`TOAST_RENDER_PHASE_FIX_V1.md`](engineering/TOAST_RENDER_PHASE_FIX_V1.md) | Toast render-phase fix technical note |
-
----
-
-## 7. Archive (`docs/archive/`)
-
-Historical evidence — QA reports, browser audits, accessibility audits, remediation
-plans, and operational investigations. These are preserved for forensic and
-historical reference. **They do not represent current system state.**
-
-When a historical report conflicts with a numbered canonical document (`01–15`),
-the numbered document is authoritative.
-
-| File | Classification |
-|------|---------------|
-| [`ACCESSIBILITY_AUDIT_V1.md`](archive/ACCESSIBILITY_AUDIT_V1.md) | Audit — accessibility |
-| [`ACCESSIBILITY_REMEDIATION_PLAN_V1.md`](archive/ACCESSIBILITY_REMEDIATION_PLAN_V1.md) | Plan — accessibility remediation |
-| [`BROWSER_COMPREHENSIVE_QA_V4.md`](archive/BROWSER_COMPREHENSIVE_QA_V4.md) | QA report — browser comprehensive |
-| [`BROWSER_E2E_TEST_REPORT.md`](archive/BROWSER_E2E_TEST_REPORT.md) | QA report — browser end-to-end |
-| [`BROWSER_PRODUCT_AUDIT_V2.md`](archive/BROWSER_PRODUCT_AUDIT_V2.md) | Audit — browser product v2 |
-| [`BROWSER_PRODUCT_REMEDIATION_V1.md`](archive/BROWSER_PRODUCT_REMEDIATION_V1.md) | Plan — browser product remediation |
-| [`DIRECT_API_BROWSER_SMOKE_V1.md`](archive/DIRECT_API_BROWSER_SMOKE_V1.md) | QA report — direct API smoke test |
-| [`DISCOVERY_EXPERIENCE_AUDIT.md`](archive/DISCOVERY_EXPERIENCE_AUDIT.md) | Audit — discovery experience |
-| [`DOCUMENTATION_REFRESH_REPORT.md`](archive/DOCUMENTATION_REFRESH_REPORT.md) | Report — documentation refresh |
-| [`DYNAMIC_SOURCE_OF_TRUTH_AUDIT.md`](archive/DYNAMIC_SOURCE_OF_TRUTH_AUDIT.md) | Audit — dynamic source of truth |
-| [`FORENSIC_REVIEW_REPORT.md`](archive/FORENSIC_REVIEW_REPORT.md) | Report — forensic review |
-| [`FULL_STACK_OPERATIONAL_AUDIT.md`](archive/FULL_STACK_OPERATIONAL_AUDIT.md) | Audit — full stack operational |
-| [`GAMEPLAY_EXPERIENCE_AUDIT.md`](archive/GAMEPLAY_EXPERIENCE_AUDIT.md) | Audit — gameplay experience |
-| [`GENERATION_OUTPUT_AUDIT.md`](archive/GENERATION_OUTPUT_AUDIT.md) | Audit — generation output |
-| [`GENERATION_RUNTIME_AUDIT.md`](archive/GENERATION_RUNTIME_AUDIT.md) | Audit — generation runtime |
-| [`HARDCODED_LITERAL_AUDIT.md`](archive/HARDCODED_LITERAL_AUDIT.md) | Audit — hardcoded literals |
-| [`REPOSITORY_HYGIENE_AUDIT.md`](archive/REPOSITORY_HYGIENE_AUDIT.md) | Audit — repository hygiene |
-| [`RUNTIME_VISUAL_AUDIT.md`](archive/RUNTIME_VISUAL_AUDIT.md) | Audit — runtime visual |
-| [`SMALL_PRODUCT_FIXES_V2.md`](archive/SMALL_PRODUCT_FIXES_V2.md) | Plan — small product fixes v2 |
-| [`UI_COPY_AUDIT.md`](archive/UI_COPY_AUDIT.md) | Audit — UI copy |
+| Document | Subsystem & Scope |
+| :--- | :--- |
+| [`tech-stack.md`](architecture/tech-stack.md) | Full-stack technology choices, runtime dependencies, and toolchain |
+| [`system.md`](architecture/system.md) | High-level system architecture, data flow, and trust boundaries |
+| [`frontend.md`](architecture/frontend.md) | React component hierarchy, routing, state management, and HUD layout |
+| [`backend.md`](architecture/backend.md) | FastAPI service layer, repositories, SSE broadcaster, and single-worker boundary |
+| [`data-model.md`](architecture/data-model.md) | Database entities, relationships, indexes, and Alembic migration policies |
+| [`api-contract.md`](architecture/api-contract.md) | REST API endpoints, request/response schemas, error formats, and SSE events |
+| [`ai-game-generation.md`](architecture/ai-game-generation.md) | 10-stage compiler pipeline, 7-axis quality gates, design patterns & resilience |
+| [`discovery-engine.md`](architecture/discovery-engine.md) | Hybrid FAISS+lexical search, ranking, 3-layer catalog metadata, and Game DNA |
+| [`ai-provider.md`](architecture/ai-provider.md) | Sequential credential failover, task model chains, error classification & deadlines |
+| [`runtime-and-gameplay.md`](architecture/runtime-and-gameplay.md) | Phaser 3.88 runtime, visual profiles, procedural textures, VFX & gameplay beats |
 
 ---
 
-## 8. Backend Scripts (`backend/scripts/`)
+## 6. Canonical Engineering & QA Documentation (`docs/engineering/`)
 
-Operational and research scripts are organized under `backend/scripts/`:
+Engineering processes, quality assurance strategies, security posture, and accessibility:
 
-```
-backend/scripts/
-├── bootstrap/      — environment setup, index building, catalog ingestion
-├── maintenance/    — dev seeding and maintenance utilities
-├── evaluation/     — formal evaluation scripts (part of engineering workflow)
-└── research/
-    ├── audits/         — discovery/ranking audits
-    ├── benchmarks/     — production and mode benchmarks
-    ├── experiments/    — RRF, candidate pool, ranker experiments
-    ├── diagnostics/    — inspection and diagnostic utilities
-    ├── validations/    — statistical and shadow validation runs
-    └── tests/          — quick ad-hoc query verification scripts
-```
-
-See [`backend/README.md`](../backend/README.md) for usage instructions.
+| Document | Topic & Scope |
+| :--- | :--- |
+| [`roadmap.md`](engineering/roadmap.md) | Implementation roadmap, completed milestones, current phase, and gate criteria |
+| [`testing-qa.md`](engineering/testing-qa.md) | Multi-tier testing strategy (unit, integration, regression, benchmarks) |
+| [`security.md`](engineering/security.md) | Threat modeling, LLM safety boundaries, auth hardening, and secret handling |
+| [`accessibility.md`](engineering/accessibility.md) | WCAG 2.1 AA compliance, modal focus trapping, reduced motion, and landmarks |
 
 ---
 
-## 9. Design References (`references/stitch/`)
+## 7. Canonical Operational Documentation (`docs/operations/`)
 
-Original UI prototypes and visual design references exported from Stitch are preserved under `references/stitch/`:
-- Screen captures (`screen.png`) and prototype HTML (`code.html`) for home, builder, dashboard, profile, and discovery states.
-- Original `obsidian_forge/DESIGN.md` design spec (the consolidated root [`DESIGN.md`](../DESIGN.md) document details the shipped deviations and current design system).
+Deployment topologies, environment configuration, and operational procedures:
+
+| Document | Topic & Scope |
+| :--- | :--- |
+| [`deployment.md`](operations/deployment.md) | Single-worker topology, environment variables, migration execution, and health checks |
 
 ---
 
-## Classification Guide
+## 8. Living Status (`docs/status/`)
 
-When contributing documentation, use this classification:
+| Document | Topic & Scope |
+| :--- | :--- |
+| [`current-status.md`](status/current-status.md) | Living snapshot of implementation completion, frozen subsystems, and current limits |
 
-| Type | Location |
-|------|---------|
-| Engineering constitution / rules | `AGENTS.md` (root) |
-| Durable architectural decision | `decisions/ADR-NNN-*.md` |
-| Current product / engineering spec | `docs/01–15-*.md` |
-| Deep-dive architecture reference | `docs/architecture/` |
-| Product experience / quality targets | `docs/product/` |
-| Implementation plan or technical note | `docs/engineering/` |
-| Historical audit, QA report, or closed plan | `docs/archive/` |
+---
+
+## 9. Historical Archive (`docs/archive/`)
+
+Preserved forensic records, completed audits, past QA reports, and closed implementation plans. **These represent historical snapshots, not current system truth.**
+
+### 9.1 Audits (`docs/archive/audits/`)
+- [`ACCESSIBILITY_AUDIT_V1.md`](archive/audits/ACCESSIBILITY_AUDIT_V1.md) — Static AST accessibility audit
+- [`DISCOVERY_EXPERIENCE_AUDIT.md`](archive/audits/DISCOVERY_EXPERIENCE_AUDIT.md) — Discovery UI & search audit
+- [`DOCUMENTATION_REFRESH_REPORT.md`](archive/audits/DOCUMENTATION_REFRESH_REPORT.md) — Documentation structure review
+- [`DYNAMIC_SOURCE_OF_TRUTH_AUDIT.md`](archive/audits/DYNAMIC_SOURCE_OF_TRUTH_AUDIT.md) — Dynamic vs static source audit
+- [`FORENSIC_REVIEW_REPORT.md`](archive/audits/FORENSIC_REVIEW_REPORT.md) — Comprehensive forensic review
+- [`FULL_STACK_OPERATIONAL_AUDIT.md`](archive/audits/FULL_STACK_OPERATIONAL_AUDIT.md) — Operational readiness audit
+- [`GAMEPLAY_EXPERIENCE_AUDIT.md`](archive/audits/GAMEPLAY_EXPERIENCE_AUDIT.md) — Gameplay pacing and feel audit
+- [`GENERATION_OUTPUT_AUDIT.md`](archive/audits/GENERATION_OUTPUT_AUDIT.md) — Generated game database audit
+- [`GENERATION_RUNTIME_AUDIT.md`](archive/audits/GENERATION_RUNTIME_AUDIT.md) — Runtime compilation audit
+- [`HARDCODED_LITERAL_AUDIT.md`](archive/audits/HARDCODED_LITERAL_AUDIT.md) — Hardcoded values scan
+- [`REPOSITORY_HYGIENE_AUDIT.md`](archive/audits/REPOSITORY_HYGIENE_AUDIT.md) — Repository structure & cleanliness audit
+- [`RUNTIME_VISUAL_AUDIT.md`](archive/audits/RUNTIME_VISUAL_AUDIT.md) — Phaser graphical presentation audit
+- [`UI_COPY_AUDIT.md`](archive/audits/UI_COPY_AUDIT.md) — UI copy and terminology audit
+
+### 9.2 Browser QA Reports (`docs/archive/browser-qa/`)
+- [`BROWSER_COMPREHENSIVE_QA_V4.md`](archive/browser-qa/BROWSER_COMPREHENSIVE_QA_V4.md) — Full browser QA walkthrough
+- [`BROWSER_E2E_TEST_REPORT.md`](archive/browser-qa/BROWSER_E2E_TEST_REPORT.md) — End-to-end browser test report
+- [`BROWSER_PRODUCT_AUDIT_V2.md`](archive/browser-qa/BROWSER_PRODUCT_AUDIT_V2.md) — Product flow QA audit
+- [`DIRECT_API_BROWSER_SMOKE_V1.md`](archive/browser-qa/DIRECT_API_BROWSER_SMOKE_V1.md) — Direct API browser smoke test
+
+### 9.3 Completed Remediations (`docs/archive/remediation/`)
+- [`ACCESSIBILITY_REMEDIATION_PLAN_V1.md`](archive/remediation/ACCESSIBILITY_REMEDIATION_PLAN_V1.md) — Accessibility remediation plan
+- [`BROWSER_PRODUCT_REMEDIATION_V1.md`](archive/remediation/BROWSER_PRODUCT_REMEDIATION_V1.md) — Product UI fixes
+- [`SMALL_PRODUCT_FIXES_V2.md`](archive/remediation/SMALL_PRODUCT_FIXES_V2.md) — Small polish remediations
+- [`TOAST_RENDER_PHASE_FIX_V1.md`](archive/remediation/TOAST_RENDER_PHASE_FIX_V1.md) — Toast lifecycle fix
+
+### 9.4 Closed Plans & Historical Architecture (`docs/archive/plans/`)
+- [`GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md`](archive/plans/GEMINI_INTERACTIONS_MIGRATION_PLAN_V1.md) — Original Interactions migration plan
+- [`MODERN_WEB_POLISH_V1_PLAN.md`](archive/plans/MODERN_WEB_POLISH_V1_PLAN.md) — Frontend polish plan
+- [`AI_PROVIDER_ARCHITECTURE.md`](archive/plans/AI_PROVIDER_ARCHITECTURE.md) — Superseded V2 provider plan
+- [`UI_MOTION_SYSTEM.md`](archive/plans/UI_MOTION_SYSTEM.md) — Motion system specification (absorbed into `DESIGN.md`)
+
+### 9.5 Historical Subsystem Milestones
+- **Discovery**: [`DISCOVERY_EXPERIENCE_V2.md`](archive/discovery/DISCOVERY_EXPERIENCE_V2.md), [`DISCOVERY_INTELLIGENCE_V1.md`](archive/discovery/DISCOVERY_INTELLIGENCE_V1.md)
+- **Generation**: [`GAME_GENERATION_V2.md`](archive/generation/GAME_GENERATION_V2.md), [`GENERATION_OUTPUT_QUALITY_V3.md`](archive/generation/GENERATION_OUTPUT_QUALITY_V3.md), [`GENERATION_RESILIENCE.md`](archive/generation/GENERATION_RESILIENCE.md), [`GENERATION_RUNTIME_INTEGRATION.md`](archive/generation/GENERATION_RUNTIME_INTEGRATION.md)
+- **Gameplay**: [`GAME_RUNTIME_EXPERIENCE_V1.md`](archive/gameplay/GAME_RUNTIME_EXPERIENCE_V1.md), [`GAMEPLAY_EXPERIENCE_V1.md`](archive/gameplay/GAMEPLAY_EXPERIENCE_V1.md)
+
+---
+
+## 10. Non-Runtime Reference Material (`references/`)
+
+Original visual prototypes, mockups, and screen exports from Stitch are preserved under `references/stitch/`:
+- `references/stitch/obsidian_forge/DESIGN.md` — Initial Stitch design concept (historical)
+- Screen captures (`screen.png`) and prototype HTML (`code.html`) for home, builder, dashboard, profile, and discovery views.

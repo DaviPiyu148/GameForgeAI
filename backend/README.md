@@ -116,7 +116,7 @@ uvicorn app.main:app --reload --port 8000
 
 ## API Endpoints
 
-Full contract with request/response shapes: `docs/08-API-CONTRACT.md`. Router-level summary:
+Full contract with request/response shapes: `docs/architecture/api-contract.md`. Router-level summary:
 
 - `api/auth.py` — registration, login, profile (`/me`), avatar upload/delete/serve.
 - `api/projects.py` — project CRUD, playtests, AI playtest analysis, improvements, blueprint, remix, version history.
@@ -140,6 +140,6 @@ pytest -v
 
 ## Explicitly Not Yet Implemented
 
-- Production deployment hardening, observability, and rate-limit tuning beyond the current in-process sliding-window limiter (single-worker assumption — see `docs/06-BACKEND-ARCHITECTURE.md`).
+- Production deployment hardening, observability, and rate-limit tuning beyond the current in-process sliding-window limiter (single-worker assumption — see `docs/architecture/backend.md`).
 - An "AI Game Director" adaptive-difficulty/narrative layer (future phase — not started).
 - Monetization / bring-your-own-key (BYOK) provider selection (future phase — not started).

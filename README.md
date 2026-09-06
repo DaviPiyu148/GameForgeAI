@@ -66,7 +66,11 @@ npm run lint         # lint
 **One-click launch (Windows)**: run `start.bat` from the repo root — it verifies prerequisites, applies migrations, starts both servers, and opens the browser.
 
 ## Documentation
-Read `AGENTS.md` first (the AI development constitution), then `docs/README.md` for the full documentation index. Accepted architectural decisions live in `decisions/`. `docs/15-CURRENT-STATUS.md` is the living status document — read it for what's actually shipped as of today.
+- **Engineering Constitution**: [`AGENTS.md`](./AGENTS.md) — Durable rules, safety invariants, and constraints.
+- **Documentation Index**: [`docs/README.md`](./docs/README.md) — Complete documentation map and authority model.
+- **Architectural Decisions**: [`decisions/`](./decisions/) — Accepted ADRs (ADR-001 through ADR-008).
+- **Living Status**: [`docs/status/current-status.md`](./docs/status/current-status.md) — Current state, frozen systems, and test baseline.
+- **Engineering Roadmap**: [`docs/engineering/roadmap.md`](./docs/engineering/roadmap.md) — Phase history and future milestones.
 
 ## Security Boundary
-LLM output must become structured Game DSL, be validated, and only then be rendered by a controlled runtime. Never execute arbitrary model-generated JavaScript. See `docs/13-SECURITY.md`.
+LLM output is translated into structured Game DSL, validated against closed schemas, and interpreted by a deterministic Phaser 2D Arcade runtime. Never execute arbitrary model-generated JavaScript. See [`docs/engineering/security.md`](./docs/engineering/security.md).

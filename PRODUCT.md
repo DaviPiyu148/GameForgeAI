@@ -52,7 +52,7 @@ Key workflows include:
 
 - **Frontend:** Finished React + TypeScript + Vite + Tailwind CSS application (`gameforge-ai/`) with 7 primary routes, custom UI components, and Phaser game canvas integration.
 - **Backend:** Fully implemented FastAPI backend (`backend/app/`) with SQLAlchemy models, Alembic migrations, SSE build streaming, discovery engine, and Game DSL validators.
-- **Design & Architecture:** Documented design system (`DESIGN.md`), 15 architectural specification documents (`docs/01-PROJECT.md` through `15-CURRENT-STATUS.md`), and comprehensive test suites.
+- **Design & Architecture:** Documented design system ([`DESIGN.md`](./DESIGN.md)), canonical documentation hierarchy ([`docs/README.md`](./docs/README.md)), accepted ADRs ([`decisions/`](./decisions/)), and comprehensive test suites.
 - **Absences & Non-Goals:** No arbitrary 3D game engines (MVP is strictly Phaser 2D), no unvalidated LLM code execution, no multi-tenant social network in MVP.
 
 ## Product Principles

@@ -75,3 +75,26 @@ Follows a strict baseline grid:
 ## 8. Layout & Reusable Patterns
 *   **Bento Grids:** Used on the homepage for feature highlights, wrapping content in glowing, bordered boxes.
 *   **IDE Layout:** The builder utilizes a classic IDE layout with a fixed sidebar, top nav, main editor pane, and a bottom compiler output terminal, separated by rigid 1px borders.
+
+## 9. Motion & Micro-Interaction System
+The UI motion system delivers a crisp "cyber-terminal" feel with snappy easing and reusable CSS animation classes defined in `gameforge-ai/src/styles/index.css`:
+
+### 9.1 Motion Tokens
+*   `--motion-fast`: `100ms` (Micro-interactions, icon hover, active press)
+*   `--motion-normal`: `180ms` (Button states, form focus transitions)
+*   `--motion-medium`: `260ms` (Modal and page entrances, drawer transitions)
+*   `--motion-slow`: `400ms` (Emphasis sweeps, energy borders)
+*   `--ease-cyber`: `cubic-bezier(0.1, 0.9, 0.2, 1)` (Signature snap-and-settle easing curve)
+
+### 9.2 Reusable Effect Classes
+*   **Entrances:** `.page-enter`, `.stagger-enter` (`.stagger-1`..`.stagger-5`), `.modal-enter` / `.modal-exit`, `.modal-backdrop-enter` / `.modal-backdrop-exit`.
+*   **Interactions:** `.btn-interactive` (hover lift + active scale-down), `.icon-interactive`, `.energy-sweep` (diagonal light sweep on hover).
+*   **Ambient / Terminal:** `.scanline-effect` (CRT scanline overlay), `.crt-flicker`, `.terminal-cursor` (blinking caret), `.ai-pulse`, `.scan-sweep` (live wireframe preview band).
+*   **Milestones & Fullscreen:** `.milestone-unlock-flash` (one-shot brightness pulse on recent unlocks), `.fullscreen-transition` (scale/opacity settle on canvas fullscreen toggle).
+
+## 10. Toast & Transient Feedback System
+Transient state feedback (game saves, build completions, XP gains, level ups, milestone unlocks) is handled through a decoupled pub/sub bus and portal container:
+
+*   **Pub/Sub Bus (`toastBus.ts`):** `pushToast({ type, title, message, duration })` allows non-React side effects to emit notifications without threading state through `AppState`.
+*   **Portal Container (`ToastContainer.tsx`):** Mounted in `App.tsx`, renders stacked top-right notifications with distinct per-variant glow styling (`info`, `success`, `xp`, `levelup`, `milestone`, `error`).
+*   **Staggered Durations:** 3s for info/success, 4s for XP gains, 5s for Level Up and Milestone unlocks (with `.toast-enter-emphasis` entrance).
