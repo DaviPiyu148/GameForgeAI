@@ -407,3 +407,58 @@ def test_cross_genre_blueprints():
         assert val_res.is_valid is True, f"Failed for genre {title}: {val_res.errors}"
         compat = RuntimeCompatibilityValidator.validate(val_res.dsl)
         assert compat.compatible is True, f"Incompatible for genre {title}: {compat.errors}"
+
+
+def test_open_world_canonical_fields_normalization_preservation():
+    """P1-009 Regression: Proves normalization does NOT discard supported open-world fields."""
+    raw = make_valid_open_world_dsl()
+
+    # Enrich with canonical fields previously dropped
+    raw["open_world"]["pois"][0]["activity_ids"] = ["act_1", "act_2"]
+    raw["open_world"]["pois"][0]["interaction_text"] = "Access Mainframe"
+
+    raw["open_world"]["connections"][0]["required_state_key"] = "district_access_token"
+
+    raw["open_world"]["activities"][0]["start_poi_id"] = "poi_station_1"
+    raw["open_world"]["activities"][0]["target_count"] = 5
+    raw["open_world"]["activities"][0]["time_limit_seconds"] = 120
+    raw["open_world"]["activities"][0]["prerequisites"] = {
+        "min_reputation": {"fac_allied": 10},
+        "required_state": {"hacked_terminals": 1},
+        "completed_activities": ["act_intro"],
+    }
+    raw["open_world"]["activities"][0]["success_consequences"] = {
+        "reputation_changes": {"fac_allied": 15},
+        "threat_change": -1,
+        "state_mutations": {"sector_unlocked": True},
+    }
+
+    raw["open_world"]["actors"][0]["schedules"] = [
+        {"start_hour": 9, "end_hour": 17, "region_id": "reg_1", "activity_name": "patrol_shift"}
+    ]
+    raw["open_world"]["actors"][0]["gives_activity_id"] = "act_delivery_1"
+
+    val_res = validate_game_dsl(raw)
+    assert val_res.is_valid is True
+    ow = val_res.dsl.open_world
+
+    # Assert POI fields survived
+    assert ow.pois[0].activity_ids == ["act_1", "act_2"]
+    assert ow.pois[0].interaction_text == "Access Mainframe"
+
+    # Assert Connection required_state_key survived
+    assert ow.connections[0].required_state_key == "district_access_token"
+
+    # Assert Activity fields survived
+    assert ow.activities[0].start_poi_id == "poi_station_1"
+    assert ow.activities[0].target_count == 5
+    assert ow.activities[0].time_limit_seconds == 120
+    assert ow.activities[0].prerequisites.min_reputation == {"fac_allied": 10}
+    assert ow.activities[0].prerequisites.completed_activities == ["act_intro"]
+    assert ow.activities[0].success_consequences.threat_change == -1
+    assert ow.activities[0].success_consequences.state_mutations == {"sector_unlocked": True}
+
+    # Assert Actor fields survived
+    assert len(ow.actors[0].schedules) == 1
+    assert ow.actors[0].schedules[0].activity_name == "patrol_shift"
+    assert ow.actors[0].gives_activity_id == "act_delivery_1"

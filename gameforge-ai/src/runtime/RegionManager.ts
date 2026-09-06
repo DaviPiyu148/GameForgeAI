@@ -1,4 +1,5 @@
 import type { RegionDef, WorldConnectionDef } from './types';
+import type { WorldManager } from './WorldManager';
 
 export class RegionManager {
   private regions: Map<string, RegionDef> = new Map();
@@ -7,7 +8,7 @@ export class RegionManager {
   private onRegionChange?: (newRegion: RegionDef, prevRegion: RegionDef) => void;
 
   constructor(
-    regions: RegionDef[],
+    regions: RegionDef[] = [],
     connections: WorldConnectionDef[] = [],
     initialRegionId?: string,
     onRegionChange?: (newRegion: RegionDef, prevRegion: RegionDef) => void
@@ -41,6 +42,10 @@ export class RegionManager {
     return Array.from(this.regions.values());
   }
 
+  public getConnections(): WorldConnectionDef[] {
+    return [...this.connections];
+  }
+
   public getConnectedRegionIds(regionId: string = this.currentRegion.id): string[] {
     const connected = new Set<string>();
 
@@ -64,18 +69,69 @@ export class RegionManager {
     return Array.from(connected);
   }
 
-  public transitionToRegion(regionId: string): boolean {
-    const nextRegion = this.regions.get(regionId);
-    if (!nextRegion || nextRegion.id === this.currentRegion.id) {
-      return false;
+  public canTransition(
+    targetRegionId: string,
+    worldManager?: WorldManager,
+    traversalType: 'on_foot' | 'vehicle' | 'fast_travel' = 'on_foot'
+  ): { allowed: boolean; reason?: string } {
+    const targetRegion = this.regions.get(targetRegionId);
+    if (!targetRegion) {
+      return { allowed: false, reason: 'Destination region not found.' };
+    }
+    if (targetRegion.id === this.currentRegion.id) {
+      return { allowed: false, reason: 'Already in target region.' };
     }
 
+    // Find connection definition
+    const conn = this.connections.find(
+      (c) =>
+        (c.from_region === this.currentRegion.id && c.to_region === targetRegionId) ||
+        (c.bidirectional !== false && c.from_region === targetRegionId && c.to_region === this.currentRegion.id)
+    );
+
+    if (conn) {
+      // Check required state key (e.g. security badge, unlocked gate)
+      if (conn.required_state_key && worldManager) {
+        const stateVal = worldManager.getState(conn.required_state_key);
+        if (!stateVal) {
+          return {
+            allowed: false,
+            reason: `Locked: requires state key '${conn.required_state_key}'.`,
+          };
+        }
+      }
+
+      // Check traversal type
+      if (conn.traversal_types && conn.traversal_types.length > 0) {
+        if (!conn.traversal_types.includes(traversalType)) {
+          return {
+            allowed: false,
+            reason: `Traversal method '${traversalType}' not supported (requires: ${conn.traversal_types.join(', ')}).`,
+          };
+        }
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  public transitionToRegion(
+    regionId: string,
+    worldManager?: WorldManager,
+    traversalType: 'on_foot' | 'vehicle' | 'fast_travel' = 'on_foot'
+  ): { success: boolean; reason?: string } {
+    const check = this.canTransition(regionId, worldManager, traversalType);
+    if (!check.allowed) {
+      return { success: false, reason: check.reason };
+    }
+
+    const nextRegion = this.regions.get(regionId)!;
     const prevRegion = this.currentRegion;
     this.currentRegion = nextRegion;
 
     if (this.onRegionChange) {
       this.onRegionChange(nextRegion, prevRegion);
     }
-    return true;
+    return { success: true };
   }
 }

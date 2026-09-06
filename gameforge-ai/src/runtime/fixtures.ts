@@ -357,7 +357,7 @@ export const PLATFORMER_FIXTURE: GameDSL = {
     // Goal Beacon
     {
       id: 'goal_exit',
-      type: 'obstacle',
+      type: 'collectible',
       x: 820,
       y: 220,
       width: 36,
@@ -366,7 +366,7 @@ export const PLATFORMER_FIXTURE: GameDSL = {
       health: 1,
       behavior: 'stationary',
       color: '#00ffaa',
-      points: 0,
+      points: 100,
     },
   ],
   rules: [
@@ -493,5 +493,276 @@ export const COLLECTOR_FIXTURE: GameDSL = {
     show_health: true,
     show_score: true,
     status_text: 'COLLECT ALL 3 ENCRYPTED SHARDS',
+  },
+};
+
+export const ARENA_FIXTURE: GameDSL = {
+  schema_version: '1.0',
+  metadata: {
+    title: 'Neon Gladiator Arena',
+    genre: 'Top-Down Arena Combat',
+    description: 'Survive combatant waves in the high-stakes gladiator ring.',
+    archetype: 'arena',
+  },
+  world: {
+    width: 800,
+    height: 600,
+    gravity: 0,
+    background_color: '#080812',
+    theme: 'neon',
+    wave_count: 3,
+  },
+  player: {
+    spawn_x: 400,
+    spawn_y: 300,
+    speed: 250,
+    jump_power: 0,
+    max_health: 100,
+    width: 32,
+    height: 32,
+    color: '#00f0ff',
+    attack_type: 'ranged',
+    attack_damage: 30,
+    dash_speed: 600,
+  },
+  entities: [
+    {
+      id: 'arena_foe_1',
+      type: 'enemy',
+      x: 200,
+      y: 150,
+      width: 28,
+      height: 28,
+      speed: 100,
+      health: 30,
+      behavior: 'chase',
+      color: '#ff0055',
+      points: 100,
+    },
+    {
+      id: 'arena_foe_2',
+      type: 'enemy',
+      x: 600,
+      y: 450,
+      width: 28,
+      height: 28,
+      speed: 110,
+      health: 30,
+      behavior: 'patrol',
+      color: '#ff0055',
+      points: 100,
+    },
+  ],
+  rules: [
+    {
+      id: 'rule_arena_defeat',
+      trigger: 'on_enemy_defeat',
+      action: 'add_score',
+      params: { amount: 100 },
+    },
+    {
+      id: 'rule_arena_damage',
+      trigger: 'on_collide_enemy',
+      action: 'damage_player',
+      params: { amount: 20 },
+    },
+  ],
+  ui: {
+    show_health: true,
+    show_score: true,
+    show_wave: true,
+    status_text: 'ELIMINATE ARENA WAVES | CLICK TO FIRE | SPACE/SHIFT TO DASH',
+  },
+};
+
+export const RUNNER_FIXTURE: GameDSL = {
+  schema_version: '1.0',
+  metadata: {
+    title: 'Cyber Skyline Dash',
+    genre: 'Endless / Side Runner',
+    description: 'Sprint across floating highway lanes, jump over laser fences, and reach the extraction pad.',
+    archetype: 'runner',
+  },
+  world: {
+    width: 2400,
+    height: 600,
+    gravity: 700,
+    background_color: '#050711',
+    theme: 'cyberpunk',
+  },
+  player: {
+    spawn_x: 100,
+    spawn_y: 450,
+    speed: 260,
+    jump_power: 520,
+    max_health: 100,
+    width: 32,
+    height: 32,
+    color: '#00ffcc',
+    attack_type: 'none',
+  },
+  entities: [
+    // Highway floor
+    { id: 'floor_1', type: 'platform', x: 400, y: 560, width: 800, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#16192b', points: 0 },
+    { id: 'floor_2', type: 'platform', x: 1400, y: 560, width: 800, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#16192b', points: 0 },
+    { id: 'floor_3', type: 'platform', x: 2200, y: 560, width: 400, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#16192b', points: 0 },
+    // Obstacle hazards
+    { id: 'fence_1', type: 'hazard', x: 600, y: 520, width: 24, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#ff0033', points: 0 },
+    { id: 'fence_2', type: 'hazard', x: 1200, y: 520, width: 24, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#ff0033', points: 0 },
+    { id: 'fence_3', type: 'hazard', x: 1700, y: 520, width: 24, height: 40, speed: 0, health: 1, behavior: 'stationary', color: '#ff0033', points: 0 },
+    // Collectible power cells
+    { id: 'cell_1', type: 'collectible', x: 450, y: 480, width: 20, height: 20, speed: 0, health: 1, behavior: 'stationary', color: '#ffe600', points: 50 },
+    { id: 'cell_2', type: 'collectible', x: 950, y: 480, width: 20, height: 20, speed: 0, health: 1, behavior: 'stationary', color: '#ffe600', points: 50 },
+    { id: 'cell_3', type: 'collectible', x: 1500, y: 480, width: 20, height: 20, speed: 0, health: 1, behavior: 'stationary', color: '#ffe600', points: 50 },
+    // Extraction goal
+    { id: 'extraction_pad', type: 'collectible', x: 2300, y: 500, width: 48, height: 48, speed: 0, health: 1, behavior: 'stationary', color: '#00ff66', points: 200 },
+  ],
+  rules: [
+    {
+      id: 'rule_runner_collect',
+      trigger: 'on_collect',
+      action: 'add_score',
+      params: { amount: 50 },
+    },
+    {
+      id: 'rule_runner_goal',
+      trigger: 'on_reach_goal',
+      action: 'win_game',
+      params: { message: 'RUN COMPLETED!' },
+    },
+    {
+      id: 'rule_runner_hazard',
+      trigger: 'on_hazard_touch',
+      action: 'damage_player',
+      params: { amount: 35 },
+    },
+  ],
+  ui: {
+    show_health: true,
+    show_score: true,
+    status_text: 'DASH & LEAP OVER OBSTACLES TO REACH EXTRACTION | D: SPRINT | SPACE: JUMP',
+  },
+};
+
+export const OPEN_WORLD_FIXTURE: GameDSL = {
+  schema_version: '1.0',
+  metadata: {
+    title: 'Neon District Free Roam',
+    genre: 'Open World Exploration',
+    description: 'Explore connected districts, complete courier missions, and commandeer vehicles.',
+    archetype: 'survival',
+  },
+  world: {
+    width: 2400,
+    height: 1800,
+    gravity: 0,
+    background_color: '#080a14',
+    theme: 'neon',
+    world_mode: 'open_world',
+  },
+  player: {
+    spawn_x: 400,
+    spawn_y: 300,
+    speed: 240,
+    jump_power: 0,
+    max_health: 100,
+    width: 32,
+    height: 32,
+    color: '#00f0ff',
+  },
+  entities: [],
+  rules: [],
+  ui: {
+    show_health: true,
+    show_score: true,
+    status_text: 'EXPLORE DISTRICTS | COMMANDEER VEHICLES WITH E',
+  },
+  open_world: {
+    regions: [
+      {
+        id: 'reg_central',
+        name: 'Central Plaza',
+        bounds_x: 0,
+        bounds_y: 0,
+        width: 1200,
+        height: 900,
+        danger_level: 1,
+        theme: 'neon',
+      },
+      {
+        id: 'reg_industrial',
+        name: 'Industrial Sector',
+        bounds_x: 1200,
+        bounds_y: 0,
+        width: 1200,
+        height: 900,
+        danger_level: 3,
+        theme: 'cyberpunk',
+      },
+    ],
+    connections: [
+      {
+        from_region: 'reg_central',
+        to_region: 'reg_industrial',
+        traversal_types: ['on_foot', 'vehicle'],
+        bidirectional: true,
+      },
+    ],
+    pois: [
+      {
+        id: 'poi_terminal_1',
+        region_id: 'reg_central',
+        name: 'Plaza Terminal',
+        type: 'terminal',
+        x: 600,
+        y: 400,
+      },
+    ],
+    activities: [
+      {
+        id: 'act_courier',
+        title: 'Courier Run',
+        description: 'Deliver data package to Plaza Terminal',
+        status: 'available',
+        type: 'delivery',
+        target_poi_id: 'poi_terminal_1',
+        target_count: 1,
+        rewards: { score: 200 },
+      },
+    ],
+    factions: [
+      {
+        id: 'fac_enforcers',
+        name: 'District Enforcers',
+        initial_reputation: 0,
+        hostility_threshold: -30,
+        color: '#0088ff',
+      },
+    ],
+    actors: [
+      {
+        id: 'patrol_enforcer_1',
+        region_id: 'reg_central',
+        name: 'Enforcer Unit',
+        archetype: 'patrol',
+        faction_id: 'fac_enforcers',
+        x: 700,
+        y: 450,
+        speed: 90,
+        behavior: 'patrol',
+      },
+    ],
+    vehicles: [
+      {
+        id: 'speeder_1',
+        name: 'Neon Speeder',
+        type: 'speedster',
+        region_id: 'reg_central',
+        x: 450,
+        y: 350,
+        max_speed: 400,
+        handling: 1.2,
+      },
+    ],
   },
 };

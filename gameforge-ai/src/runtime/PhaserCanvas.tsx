@@ -53,7 +53,7 @@ export const PhaserCanvas: React.FC<PhaserCanvasProps> = ({
       gameRef.current.scene.stop('GameScene');
       gameRef.current.scene.start('GameScene', {
         dsl: gameDsl,
-        seed: (seed ?? 18492031) + Math.floor(Math.random() * 1000),
+        seed: seed ?? 18492031,
         onStateChange: (state: GameState) => {
           setGameState(state);
         },

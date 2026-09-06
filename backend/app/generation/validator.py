@@ -456,6 +456,7 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
                         "to_region": str(to_r),
                         "bidirectional": bool(c.get("bidirectional", True)),
                         "traversal_types": c.get("traversal_types") or ["on_foot", "vehicle"],
+                        "required_state_key": c.get("required_state_key"),
                     })
         if len(norm_conns) > 15:
             norm_conns = norm_conns[:15]
@@ -463,7 +464,7 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         ow["connections"] = repaired_conns
 
         # 3. Factions (1 - 5)
-        VALID_FACTION_FIELDS = {"id", "name", "initial_reputation", "color", "hostile_threshold", "allied_threshold"}
+        VALID_FACTION_FIELDS = {"id", "name", "description", "initial_reputation", "hostility_threshold", "controlled_regions", "color", "alert_unit_archetype"}
         factions = list(ow.get("factions") or [])
         if not factions:
             factions = [
@@ -495,7 +496,7 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         fac_ids = {f["id"] for f in norm_factions}
 
         # 4. POIs (3 - 25)
-        VALID_POI_FIELDS = {"id", "name", "type", "region_id", "x", "y", "description", "icon", "interaction_radius", "discovered"}
+        VALID_POI_FIELDS = {"id", "name", "type", "region_id", "x", "y", "description", "icon", "interaction_radius", "discovered", "activity_ids", "interaction_text"}
         VALID_POI_TYPES = {"safehouse", "shop", "garage", "outpost", "terminal", "landmark", "hospital", "mission_giver", "dungeon", "station", "hideout", "arena", "resource_node"}
         pois = list(ow.get("pois") or [])
         if len(pois) < 3:
@@ -592,7 +593,12 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         ow["vehicles"] = norm_vehs
 
         # 6. Activities (2 - 15)
-        VALID_ACTIVITY_FIELDS = {"id", "title", "description", "type", "region_id", "status", "target_poi_id", "rewards", "consequences"}
+        VALID_ACTIVITY_FIELDS = {
+            "id", "title", "description", "type", "region_id", "status",
+            "start_poi_id", "target_poi_id", "target_actor_id", "target_count",
+            "time_limit_seconds", "prerequisites", "rewards", "success_consequences",
+            "failure_consequences", "consequences"
+        }
         VALID_ACT_TYPES = {"mission", "delivery", "race", "combat", "collection", "investigation", "escort", "patrol", "exploration", "minigame"}
         activities = list(ow.get("activities") or [])
         if len(activities) < 2:
@@ -654,7 +660,11 @@ def validate_game_dsl(data: Union[str, Dict[str, Any]]) -> ValidationResult:
         ow["activities"] = norm_acts
 
         # 7. Actors (<= 50)
-        VALID_ACTOR_FIELDS = {"id", "name", "archetype", "faction_id", "region_id", "x", "y", "behavior", "dialogue", "health", "color", "gives_activity_id"}
+        VALID_ACTOR_FIELDS = {
+            "id", "name", "archetype", "faction_id", "region_id", "x", "y",
+            "width", "height", "speed", "health", "behavior", "color",
+            "dialogue", "schedules", "gives_activity_id"
+        }
         VALID_ARCHETYPES = {"civilian", "guard", "security", "merchant", "quest_giver", "hostile", "companion", "patrol", "courier"}
         actors = list(ow.get("actors") or [])
         if len(actors) > 50:

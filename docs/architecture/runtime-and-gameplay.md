@@ -194,3 +194,54 @@ Validates that every rule in `GameDSL.rules` uses allowlisted triggers and execu
 
 - **In-Game Telemetry Capture**: Records player deaths, accuracy, time-to-objective, and collectible rates to pass structured context to the post-game AI critique engine.
 - **Descriptive Failure Messaging**: Displays exact defeat causes on the game-over screen (e.g. `✖ HEALTH DEPLETED — OVERWHELMED BY ENEMY FIRE ✖` or `✖ TIME EXPIRED — SECTOR CONTAINMENT FAILED ✖`) instead of generic placeholder text.
+
+---
+
+## 11. Authoritative Runtime Architecture & Preset Execution (ADR-009)
+
+The GameForge AI Phaser runtime executes validated `GameDSL` configurations through a contract-driven multi-stage engine:
+
+### 11.1 Runtime Configuration Compiler (`RuntimeConfigCompiler.ts`)
+- **Stage Compilation**: Compiles global DSL and level-specific definitions into isolated `RuntimeStageConfig` stages.
+- **Hierarchical Fallback**: Level-local parameters (`world`, `spawn_x`, `spawn_y`, `rules`, `objective`) override global defaults with stage isolation.
+- **Atomic Multi-Level Progression**: Level transitions atomically reconfigure world bounds, camera bounds, physics gravity, stage rules, and objective evaluators.
+- **Scale Profiles**: Maps scale tiers (`prototype`, `standard`, `campaign`) to stage budgets and maximum wave caps.
+
+### 11.2 Objective Evaluation Engine (`ObjectiveEvaluator.ts`)
+- **Canonical Objective Types**: Evaluates `collect_all`, `defeat_all`, `reach_exit`, `survive_time`, and `score_target`.
+- **Terminal State Latch**: Once a terminal outcome (`WON` or `LOST`) is reached, state is locked, preventing spurious flips.
+
+### 11.3 Synchronous Execution-Path Rule Engine (`rules.ts`)
+- **Active Call-Path Cycle Detection**: Tracks the synchronous execution stack (`activeRuleIds`, `activeExecutionStack`) across the causality chain `Rule -> Action -> Emitted Trigger -> Rule`.
+- **Selective Termination**: Detects and terminates cyclic re-entry immediately while allowing multiple independent rules subscribed to the same trigger to execute cleanly.
+- **Causal Chains & Re-arming**: Supports valid linear chains (`A -> B -> C -> D`). Threshold crossings re-arm if score drops below and re-crosses threshold. Static rule graphs are validated via `RuleEngine.validateRuleGraph`.
+- **Defensive Ceiling**: Enforces `MAX_EXECUTION_DEPTH = 6` as an auxiliary ceiling.
+
+### 11.4 Wave Controller State Machine (`WaveController.ts`)
+- **FSM Transitions**: `IDLE` $\rightarrow$ `SPAWNING` $\rightarrow$ `ACTIVE` $\rightarrow$ `COMPLETED`.
+- **Separation of Request and Notification**: `requestNextWave()` is decoupled from `on_wave_start` notifications.
+- **Notification Re-entrancy Lock**: `isNotifying` lock prevents synchronous rule actions from triggering secondary wave spawns during startup.
+- **Terminal Progression Lock**: Irrevocably halts wave progression in terminal states (`WON`, `LOST`, `DESTROYED`).
+
+### 11.5 Terminal State Gameplay Mutation Safety (`GameScene.ts`)
+- Every gameplay mutation (`addScore`, `damagePlayer`, `healPlayer`, `spawnBonusEntity`, `spawnWave`, `applySpeedBoost`, attacks, pickups, objective progressions, and region transitions) is guarded by `canMutateGameplay()`, which checks `RuntimeStateMachine.isTerminal()`.
+- Scene restarts properly reset all GameObject references and verify `active && scene` before calling methods on Phaser text/HUD components.
+
+### 11.6 Archetype Policy Matrix (`ArchetypePolicy.ts`)
+- Maps 6 archetypes (`platformer`, `arena`, `shooter`, `collector`, `survival`, `runner`) to physics movement models, attack modes (`melee`, `ranged`, `none`), dash mechanics, and wave legality. Prohibits open world for `platformer` and `runner`.
+
+### 11.7 Open-World Subsystems & Memory Isolation (`RegionManager.ts`, `ActivityManager.ts`)
+- **Authoritative World Mode**: Mode resolution strictly uses `world.world_mode`.
+- **Region State Locks**: Validates `required_state_key` and traversal modes (`on_foot`, `vehicle`) on region transitions.
+- **Targeted Progression**: Tracks designated POI targets (`target_poi_id`), actors (`target_actor_id`), timers, and rewards.
+- **UI Memory Hygiene**: Dynamically generated floating labels and text objects are tracked in `openWorldLabelsGroup` and cleanly cleared on region changes.
+
+### 11.8 Seeded Determinism (`PhaserCanvas.tsx`, `prng.ts`)
+- Preserves the exact compiled procedural seed across scene restarts (`'R'` key and header restart), eliminating drift and guaranteeing bit-exact telemetry and replay reproducibility. Visual randomness (particle flares) is strictly separated from simulation PRNG.
+
+### 11.9 54-Cell Capability Matrix & Scale Tier Budgets
+- Evaluates 6 Archetypes × 3 World Modes × 3 Scale Tiers = 54 Cells.
+- **Capability Coverage:** 48 supported cells compile into valid `RuntimeGameConfig` instances; 6 canonically incompatible cells (`platformer` and `runner` in `open_world` across 3 scale tiers) are strictly rejected with compile errors before scene instantiation.
+- **Verification Levels:** The 54 cells evaluate compiler configuration and capability mapping. End-to-end integration verifies 8 canonical/synthetic fixture suites, and live browser gameplay verification exercises all 6 primary archetypes and supported open-world variants on the canvas.
+- **Open-World Field Status:** Core mechanics (regions, connections, traversal gating, POIs, activities, timers, prerequisites, consequences, rewards, vehicles, actors, threat, time of day, factions) are executed. However, not all canonical Open World semantics are fully implemented: actor schedules (`schedules`) are unsupported/rejected with controlled validation errors, and dynamic global event modifiers (`event_modifiers` affecting player physics or enemy base stats) are partial/unsupported as currently implemented (threat/danger modifiers execute via `ThreatManager`, while dynamic stat/physics modifiers are rejected before runtime execution).
+- Scale profiles mirror `scale_tiers.py` generation target budgets (`prototype`, `standard`, `campaign`), deriving runtime `maxLevels` and `maxWaves`.

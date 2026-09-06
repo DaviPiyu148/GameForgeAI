@@ -1,4 +1,7 @@
 export type Archetype = 'survival' | 'shooter' | 'platformer' | 'collector' | 'arena' | 'runner';
+export type GameArchetype = Archetype;
+export type WorldMode = 'linear' | 'campaign' | 'open_world';
+export type PlayerAttackType = 'melee' | 'ranged' | 'aoe' | 'none';
 
 export type EntityType = 'enemy' | 'collectible' | 'obstacle' | 'platform' | 'hazard';
 
@@ -173,9 +176,11 @@ export interface ObjectiveDef {
   type: 'collect_all' | 'defeat_all' | 'reach_exit' | 'survive_time' | 'score_target';
   target_count?: number;
   target_score?: number;
+  target_entity_id?: string;
   time_limit_seconds?: number;
   exit_x?: number;
   exit_y?: number;
+  exit_radius?: number;
   description?: string;
 }
 

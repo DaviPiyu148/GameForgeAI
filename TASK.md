@@ -1,6 +1,120 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
+Runtime Architecture Hardening & Contract Fidelity (Audit Remediation)
+
+## Status
+COMPLETE
+
+## Objective
+Remediate the full runtime audit findings to make the Phaser runtime faithfully execute validated GameDSL configurations across:
+1. Gameplay Archetype / Preset (`platformer`, `arena`, `shooter`, `collector`, `survival`, `runner`)
+2. World Architecture Mode (`linear`, `campaign`, `open_world`)
+3. Game Scale Tier (`prototype`, `standard`, `campaign`)
+4. Level-local stage configuration and multi-level campaign progression
+5. Authoritative objective semantics (`collect_all`, `defeat_all`, `reach_exit`, `survive_time`, `score_target`)
+6. Runtime capability matrix and melee combat support
+7. Deterministic seeded PRNG across scene restarts
+8. Backend normalization preservation for open-world properties
+
+## Started
+2026-09-06
+
+---
+
+## Runtime Hardening Subtasks & Verification Ledger (20-Phase Audit Matrix)
+
+- [x] **Phase 1: Core Architecture & Authoritative Pipeline**:
+  - Direct execution pipeline: `GameDSL -> RuntimeConfig -> ArchetypePolicy -> StageConfig -> ObjectiveEvaluator -> RuleEngine / WaveController -> GameScene`.
+  - Level-local stage bounds, gravity, player spawn, rules, and objectives resolved upfront.
+  - Zero downstream symptom patching.
+- [x] **Phase 2 & P0-001: Synchronous Execution-Path Rule Cycle Protection**:
+  - Tracks active execution path: `activeRuleIds: Set<string>` and `activeExecutionStack: RuleExecutionFrame[]`.
+  - Re-entrancy detection terminates direct cycles (`A -> A`) and indirect cycles (`A -> B -> A`, `A -> B -> C -> A`).
+  - Allows independent multiple rules on the same trigger to execute cleanly.
+  - Supports valid linear causal chains (`A -> B -> C -> D`).
+  - Score thresholds re-arm when score drops below threshold and crosses it again.
+  - Static cycle detection via `RuleEngine.validateRuleGraph`.
+  - Defensive recursion ceiling `MAX_EXECUTION_DEPTH = 6`.
+  - Verification: `ruleCyclesAndChains.test.ts` (6/6 passed), `ruleEngine.test.ts` (2/2 passed).
+- [x] **Phase 3 & P0-002: Wave Progression & Event Re-entrancy Separation**:
+  - Separates `requestNextWave()` from `on_wave_start` notifications.
+  - Notification re-entrancy lock (`isNotifying`) prevents recursive wave creation on startup/wave-start rules.
+  - WaveController state machine authoritative: `IDLE -> SPAWNING -> ACTIVE -> COMPLETED`.
+  - Terminal state irrevocably locks out future wave creation.
+  - Verification: `waveController.test.ts` (5/5 passed), `waveProgression.test.ts` (3/3 passed).
+- [x] **Phase 4: Terminal State Gameplay Mutation Safety**:
+  - `canMutateGameplay()` checks `RuntimeStateMachine.isTerminal()` across all mutation entry points: `addScore`, `damagePlayer`, `healPlayer`, `spawnBonusEntity`, `spawnWave`, `applySpeedBoost`, attacks, pickups, objectives, region transitions.
+  - Verification: `terminalSafety.test.ts` (4/4 passed).
+- [x] **Phase 5: Runtime Configuration Layer**:
+  - Stage-local configuration compilation resolving archetype policy, world mode, scale, world bounds, gravity, spawn point, camera bounds, objective, entities, and rules.
+  - Verification: `runtimeConfig.test.ts` (2/2 passed).
+- [x] **Phase 6: 54-Cell Capability Matrix (6 Archetypes × 3 World Modes × 3 Scale Tiers)**:
+  - Canonical matrix evaluated: 48 supported combinations compile and execute canonically; 6 unsupported combinations (`platformer` and `runner` in `open_world`) are rejected at compile time.
+  - Verification: `matrixCapabilities.test.ts` (2/2 passed, 54 cells evaluated).
+- [x] **Phase 7: Archetype Policy Coverage**:
+  - All 6 canonical archetypes (`platformer`, `arena`, `shooter`, `collector`, `survival`, `runner`) have explicit typed policies governing movement, gravity, jump, dash, attack models, and wave legality.
+  - Verification: `archetypePolicy.test.ts` (4/4 passed).
+- [x] **Phase 8: Platformer Contract**:
+  - Horizontal movement, discrete jump power, gravity physics, platform collision, reach-exit objective, collect-all objective, hazards, melee combat. Zero magic string goal parsing.
+- [x] **Phase 9: Arena Contract**:
+  - Bounded arena, enemy waves, wave lifecycle, escalating pressure, melee attack model, defeat/score objectives, terminal shutdown, valid entity spawning.
+- [x] **Phase 10: Shooter Contract**:
+  - 8-directional movement, diagonal normalization, ranged projectile attacks, aiming, projectile lifecycles, collisions, defeat/survival/score objectives.
+- [x] **Phase 11: Collector Contract**:
+  - Collectible spawning, pickup overlap, target count, duplicate pickup prevention, collection objectives, non-combat interaction, no accidental wave triggers.
+- [x] **Phase 12: Survival Contract**:
+  - Countdown timer, wave lifecycle, escalating pressure, survival/defeat objectives, terminal shutdown.
+- [x] **Phase 13: Runner Contract**:
+  - Continuous forward movement, jump physics if gravity enabled, obstacle handling, camera following, distance/scoring objectives.
+- [x] **Phase 14: Campaign Stage Isolation**:
+  - Atomic stage transition updating world bounds, camera bounds, world gravity, player gravity, spawn position, entities, rules, and objectives.
+  - Verified: gravity > 0 to gravity = 0, small to large bounds, objective A to B, rule A to B. Zero previous-stage listener/entity leakage.
+  - Verification: `campaignIsolation.test.ts` (2/2 passed).
+- [x] **Phase 15 & 16: World Modes & Open-World Lifecycle**:
+  - Authoritative `world.world_mode` (`linear`, `campaign`, `open_world`).
+  - Open-world traversal gating (`required_state_key`), POI/actor activity targeting, timers, prerequisites, consequences.
+  - Repeated transitions (A -> B -> C -> A) × 10 verify zero unbounded growth of sprites, labels, tweens, timers, or listeners.
+  - Verification: `openWorldLifecycle.test.ts` (3/3 passed), `openWorld.test.ts` (3/3 passed).
+- [x] **Phase 17 & 18: Scale Tiers & Normalization Traceability**:
+  - Scale profiles trace directly to canonical `scale_tiers.py` budgets (`prototype`, `standard`, `campaign`).
+  - Backend normalizer (`validator.py`) preserves all open-world and stage fields without silent pruning.
+  - Verification: `backend/tests/test_open_world.py` (8/8 passed).
+- [x] **Phase 19: Deterministic Simulation**:
+  - Seeded Mulberry32 PRNG (`prng.ts`) preserved across scene restarts.
+  - Same seed + same inputs produces 100% bit-exact simulation traces. Different seeds diverge deterministically.
+  - Simulation randomness strictly decoupled from visual flares and telemetry timestamps.
+  - Verification: `deterministicReplay.test.ts` (2/2 passed), `determinism.test.ts` (3/3 passed).
+- [x] **Phase 20: Physics & Input Verification**:
+  - Velocity clamping, body states, static/dynamic body separation, diagonal normalization, scaleY idle animation preserved.
+  - Key bindings (WASD, Arrows, Space, Shift, E, F) and keyboard capture prevention of browser scrolling.
+- [x] **Phase 21: Error Boundary & Malformed DSL**:
+  - Controlled runtime compilation error rendering without uncaught Phaser crashes.
+- [x] **Phase 22: Comprehensive Test Verification**:
+  - Runtime test suite: 55/55 passed (`src/runtime/__tests__/*.test.ts`).
+  - Frontend services/utils test suite: 131/131 passed (`src/services/__tests__/*.test.ts src/utils/__tests__/*.test.ts`).
+  - Total frontend tests: 186/186 passed.
+  - TypeScript project check: 0 errors (`npx tsc -b`).
+  - Linter: 0 errors, 0 warnings (`npm run lint`).
+  - Production build: success (`npm run build`).
+  - Backend tests: 667/667 passed (`pytest -q`).
+- [x] **Phase 23: Real Browser Execution QA**:
+  - Multi-archetype interactive playtest route (`/playtest`) verified via browser subagent.
+  - Gameplay verification: Platformer, Arena, Shooter, Collector, Survival, Runner, Open World at 1440×900 desktop viewport.
+  - Responsive layout verification: Canvas scaling and UI adaptation verified at 768×900 (tablet) and 375×812 (mobile).
+  - Verified controls: WASD movement, Space jump, Click-to-fire, KeyE interaction, KeyR restart.
+  - Browser recording: `runtime_qa_playtest_1788698449683.webp`.
+  - Zero uncaught console errors.
+- [x] **Phase 24: Documentation & ADR Updates**:
+  - Updated `decisions/ADR-009-RUNTIME-CONFIGURATION-AND-PRESET-EXECUTION.md`.
+  - Updated `docs/architecture/runtime-and-gameplay.md` (explicitly documenting that schedules are rejected, dynamic event modifiers are partial/unsupported as implemented, and not all canonical open-world semantics are fully implemented).
+  - Updated `docs/status/current-status.md` (explicit open-world contract limitations and precise browser QA claims).
+
+---
+
+## Historical Tasks
+
+### Task
 Phase 1 — Documentation Architecture Consolidation
 
 ## Status

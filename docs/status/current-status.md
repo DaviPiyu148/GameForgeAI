@@ -41,7 +41,7 @@ The following product areas are documented as feature-complete:
 - Personalization V1
 - Game Generation V2
 - Generated Game Quality V3
-- Runtime Experience V1
+- Runtime Experience V2 (Stage Compilation, Archetype Matrix, Objective Engine, Rule Re-entrancy Guards, ADR-009)
 - Generation/Runtime Integration V1
 - Gameplay Experience V1
 - Creator Progression
@@ -65,25 +65,19 @@ Do not describe these as partially implemented unless new code and evidence exis
 
 ## Verification Snapshot
 
-The most recent documented exhaustive-browser QA snapshot recorded:
+The most recent documented exhaustive runtime-hardening QA snapshot recorded:
 
-- Backend tests: `627/627` passing at that documented checkpoint
-- TypeScript no-emit check: PASS
-- Production frontend build: PASS
-- Frontend lint: PASS
-- Frontend unit suites: 10/10, 131 tests
-- Extensive route/control/browser verification
-- Responsive checks through 375×812
-- Existing prototype runtime testing
-- No new prototypes generated during the runtime-focused QA pass
+- Runtime unit/integration tests: `55/55` passed (`npx tsx --test src/runtime/__tests__/*.test.ts`)
+- Frontend services/utils unit tests: `131/131` passed (`npx tsx --test src/services/__tests__/*.test.ts src/utils/__tests__/*.test.ts`)
+- TypeScript check: `npx tsc -b` PASS (0 errors)
+- Frontend lint: `npm run lint` PASS (0 errors, 0 warnings across 109 files)
+- Production frontend build: `npm run build` PASS (built in 1.08s)
+- Backend tests: `667/667` passing (`.\.venv\Scripts\pytest.exe -q`)
+- Real browser QA: Gameplay verified for all 6 archetypes (`platformer`, `arena`, `shooter`, `collector`, `survival`, `runner`) + `open_world` at 1440×900 desktop viewport (`runtime_qa_playtest_1788698449683.webp`), with responsive layout and canvas scaling verified at 768×900 and 375×812 viewports with zero console errors.
 
 ### Verification freshness warning
 
-The recorded `627/627` figure is a dated verification snapshot, not automatically the current regression count after every later remediation.
-
-Before a new phase is declared complete, run a fresh full regression and update this section with the actual command and result.
-
-Do not replace a real test run with a copied historical number.
+Before any future phase is declared complete, run a fresh full regression and update this section with the actual command and result. Do not replace a real test run with a copied historical number.
 
 ## Current Architecture
 
@@ -124,7 +118,7 @@ The latest documented browser QA covered:
 
 - All currently documented routes
 - Meaningful controls
-- Responsive viewports
+- Responsive viewports (1440×900 gameplay, 768×900 and 375×812 layout/canvas verification)
 - Existing prototype runtime
 - Inspiration flows
 - Builder synchronization
@@ -141,6 +135,9 @@ Future browser claims still require fresh live evidence.
 - Production deployment hardening is not complete.
 - Single-worker architecture is a deliberate scaling boundary.
 - `/api/health` is liveness-only.
+- Open-World actor schedules (`schedules`) are unsupported/rejected by the runtime compiler.
+- Dynamic global event modifiers (`event_modifiers` affecting player physics or enemy base stats) are partial/unsupported as currently implemented (threat/danger modifiers execute via `ThreatManager`, while dynamic stat/physics modifiers are rejected with controlled validation errors).
+- Not all canonical Open World semantics are fully implemented.
 - Some low/medium-confidence repository cleanup items may remain intentionally deferred.
 - Historical benchmark results do not replace organic production evaluation.
 

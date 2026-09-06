@@ -11,6 +11,7 @@ import ApiAccessPage from './pages/ApiAccessPage';
 import CommunityPage from './pages/CommunityPage';
 import SupportPage from './pages/SupportPage';
 import PrivacyPage from './pages/PrivacyPage';
+import PlaytestPage from './pages/PlaytestPage';
 import { PageContainer } from './components/Shared/PageContainer';
 import { AuthModal } from './components/Shared/AuthModal';
 import { ToastContainer } from './components/Shared/ToastContainer';
@@ -33,6 +34,9 @@ function App() {
     );
   }
 
+  const isPlaytestHarnessEnabled =
+    Boolean(import.meta.env.DEV || import.meta.env.VITE_ENABLE_PLAYTEST_HARNESS === 'true');
+
   return (
     <PageContainer>
       <div key={location.pathname} className="page-enter flex-1 flex flex-col">
@@ -48,6 +52,10 @@ function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route
+            path="/playtest"
+            element={isPlaytestHarnessEnabled ? <PlaytestPage /> : <Navigate to="/" replace />}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <AuthModal />

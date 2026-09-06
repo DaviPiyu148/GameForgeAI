@@ -170,10 +170,10 @@ export class VFXSystem {
   public addIdleAnimation(target: Phaser.GameObjects.Sprite, intensity: number = 1.0): Phaser.Tweens.Tween | null {
     if (this.profile.reducedMotion) return null;
 
-    const origY = target.y;
+    const origScaleY = target.scaleY;
     const tween = this.scene.tweens.add({
       targets: target,
-      y: origY - 3 * intensity,
+      scaleY: origScaleY * (1 + 0.05 * intensity),
       duration: 1200 + Math.random() * 300,
       yoyo: true,
       repeat: -1,
