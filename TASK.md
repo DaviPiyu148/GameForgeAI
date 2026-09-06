@@ -4,7 +4,7 @@
 Phase B Remediation — Investigation, Policy Decisions & Technical Hardening (ADV-DB-001, ADV-SEC-002, ADV-SEC-005, ADV-ARCH-001, ADV-DB-002)
 
 ## Status
-IN_PROGRESS
+COMPLETE
 
 ## Objective
 Execute Phase B remediation across all 5 assigned findings adhering strictly to the investigation-first and scope discipline principles:
@@ -67,27 +67,42 @@ Execute Phase B remediation across all 5 assigned findings adhering strictly to 
 
 ## 3. Verification
 
-- [ ] Unit & integration tests for each remediated item
-- [ ] Full backend test suite pass (>= 653 tests)
-- [ ] Frontend build succeeds (`npm run build`)
-- [ ] Workspace protection check (`GameScene.ts` and `vfxSystem.ts` untouched)
+- [x] Unit & integration tests for each remediated item
+  - Slice 2 (`ADV-DB-001`): 4/4 `test_build_log_retention.py` passed (12.01s after migration fix)
+  - Slice 3 (`ADV-DB-002`): 3/3 `test_user_index_cleanup.py` + 31/31 `test_auth.py` passed
+  - Slice 4 (`ADV-SEC-005`): 2/2 `test_preference_rate_limit.py` passed
+  - Slice 5 (`ADV-SEC-002`): 4/4 `test_proxy_headers_security.py` passed
+- [x] Full backend test suite pass — **666/666 passed** in 153.51s (0 failures)
+- [x] Frontend build succeeds — `npm run build` PASS (105 modules, 0 errors, 1.37s)
+- [x] Workspace protection check — both hashes confirmed
+  - `GameScene.ts`: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095` ✅
+  - `vfxSystem.ts`: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` ✅
+
+### Additional Fix During Verification
+- `f2a3b4c5d6e7` migration made **defensively idempotent** (upgrade and downgrade both check for `users` table and index existence before operating). Required because `test_migration_upgrade_downgrade_cycle_preserves_exact_ids` starts from a minimal schema (no `users` table) and now runs through HEAD which includes `f2a3b4c5d6e7`.
+- `test_migration_upgrade_downgrade_cycle_preserves_exact_ids` updated: downgrade step now targets explicit revision `c1d2e3f4a5b6` instead of relative `-1`, since `f2a3b4c5d6e7` is now HEAD and `-1` would not step past the FK migration.
 
 ---
 
 ## 4. Documentation
 
-- [ ] Update `docs/06-BACKEND-ARCHITECTURE.md`
-- [ ] Update `docs/14-DEPLOYMENT.md`
-- [ ] Update `docs/15-CURRENT-STATUS.md`
+- [x] Update `docs/06-BACKEND-ARCHITECTURE.md` — migration chain updated to include `f2a3b4c5d6e7` as HEAD; rate limiting section added documenting all 4 limiter keys including `preference_mutate:{user_id}`
+- [x] Update `docs/07-DATA-MODEL.md` — User entity updated: email/username no longer carry column-level `unique=True, index=True`; table-level `UniqueConstraint` policy documented; `token_version` field added
+- [x] Update `docs/14-DEPLOYMENT.md` — reverse-proxy section expanded with threat model, dev/prod topology, and Uvicorn production startup command
+- [x] Update `docs/15-CURRENT-STATUS.md` — date updated; Phase A+B remediation row added; migration head updated to `f2a3b4c5d6e7`
 
 ---
 
 ## 5. Git Checkpoint
 
-- [ ] Review `git diff` and `git status`
-- [ ] Verify zero secrets or unintended files staged
-- [ ] Create Phase B Git commit
-- [ ] Verify clean working tree (dirty solely due to protected files)
+- [x] Review `git diff` and `git status` — 16 files, 1271 insertions, 67 deletions. Protected files excluded.
+- [x] Verify zero secrets or unintended files staged — confirmed: no secrets, no DB files, no venvs, no build artifacts
+- [x] Create Phase B Git commit
+
+**Commit: `44fc381`**
+Message: `backend: implement Phase B remediation (ADV-ARCH-001, ADV-DB-001, ADV-DB-002, ADV-SEC-005, ADV-SEC-002)`
+
+- [x] Verify clean working tree — only `gameforge-ai/src/runtime/GameScene.ts` and `gameforge-ai/src/runtime/vfxSystem.ts` remain as unstaged user modifications (protected files, never to be committed by AI)
 
 ---
 
