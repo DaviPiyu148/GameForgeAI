@@ -1,18 +1,115 @@
 # GameForge AI — Task Execution Ledger
 
 ## Task
-MEGA Final Browser QA, UI/UX Remediation, Route Audit & Existing-Prototype Validation
+Phase A Remediation — Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)
 
 ## Status
 COMPLETE
 
 ## Objective
-Execute the definitive master browser QA, interaction, visual remediation, route audit, and existing-prototype validation across all 12 routes, authentication, Discovery modes & cold start, "Use as Inspiration" flows (existing project selection + fresh project creation without cloning), Studio, Builder (single Game DNA badge, single seam separator, canonical 4-module synchronization), Profile popover on-page scroll & 2s highlight, existing `testbrowser1` prototype runtime (W/A/S/D & arrows player movement, R restart focus preservation, canvas fullscreen, Remix panel pause & layout), responsive viewports, and reconciled 152/144 control census. Zero new games generated.
+Implement and verify Slice 1 of Phase A from the adversarial audit remediation roadmap:
+1. ADV-ARCH-004: Replace `JSONResponse(status_code=204, content=None)` with empty `Response(status_code=status.HTTP_204_NO_CONTENT)` in `saved_discoveries.py` and `project_inspirations.py` to ensure strictly empty bodies per RFC 9110 §15.3.5.
+2. ADV-CORR-003: Update `find_active_duplicate_build` in `build_repo.py` and callers in `build_service.py` to include `scale` and `world_mode` parameters, preventing false-positive build deduplication when configuration parameters differ.
+3. ADV-SEC-001: Harden `InMemorySlidingWindowRateLimiter` in `rate_limit.py` to prune expired keys/empty deques upon evaluation and cap dictionary growth (e.g. `MAX_KEYS = 10_000`) under lock to prevent unbounded memory retention.
 
 ## Started
-2026-09-05
+2026-09-06
 
 ---
+
+## 1. Pre-Implementation
+
+- [x] Read AGENTS.md Constitution & guidelines
+- [x] Inspect git status and verify uncommitted user work in `GameScene.ts` and `vfxSystem.ts`
+- [x] Record cryptographic baseline SHA-256 hashes:
+  - `GameScene.ts`: `ae6287f1ce92621baa781e822278abd4cfc8e2c8b706a7a7c8d05b266d966095`
+  - `vfxSystem.ts`: `c8a5e0a46c3b0df950d53db13368e008b03d8132ef46457b797afc9af6d243fa`
+- [x] Workspace Protection Rule: Verify `git diff -- GameScene.ts vfxSystem.ts` unchanged before/after every slice.
+
+---
+
+## 2. Implementation
+
+- [x] Subtask 1: Fix `ADV-ARCH-004` (HTTP 204 Empty Body Compliance in `saved_discoveries.py:117` and `project_inspirations.py:152`)
+- [x] Subtask 2: Fix `ADV-CORR-003` (Build Duplicate Filter Parameters `scale` and `world_mode` in `build_repo.py:146` and `build_service.py:125`)
+- [x] Subtask 3: Fix `ADV-SEC-001` (Rate Limiter Memory Retention & LRU Cap in `rate_limit.py:22`)
+
+### Implementation Evidence
+- `ADV-ARCH-004`: Replaced `JSONResponse(status_code=204, content=None)` with `Response(status_code=status.HTTP_204_NO_CONTENT)` in `backend/app/api/saved_discoveries.py` and `backend/app/api/project_inspirations.py`.
+- `ADV-CORR-003`: Extended `BuildRepository.find_active_duplicate_build()` to filter on `scale` and `world_mode`. Updated caller in `BuildService.submit_build()` to pass `data.parameters.scale` and `data.parameters.world_mode or "linear"`.
+- `ADV-SEC-001`: Replaced `defaultdict` with `OrderedDict` in `SlidingWindowRateLimiter`. Added eviction of empty deques/keys upon evaluation, proactive `prune_expired()` sweep, and hard `max_keys = 10_000` upper bound with LRU eviction.
+
+---
+
+## 3. Verification
+
+- [x] Unit & regression tests for `ADV-ARCH-004` (204 No Content with `b""` body and headers) in `test_saved_discoveries.py` and `test_project_inspirations.py` (25 passed).
+- [x] Unit & regression tests for `ADV-CORR-003` (`test_duplicate_build_submission_distinguishes_scale_and_world_mode`) in `test_build_concurrency.py` (9 passed).
+- [x] Unit & regression tests for `ADV-SEC-001` (basic window, expired deque cleanup, `prune_expired()` 500-key sweep, `max_keys` cap, multi-thread safety) in `test_auth.py` (21 passed).
+- [x] Frontend static analysis (`npx oxlint`: 0 warnings, 0 errors on 88 files) & typecheck (`npx tsc --noEmit`: 0 errors).
+- [x] Workspace protection verification:
+  - `GameScene.ts` SHA-256: `AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266d966095` (VERIFIED UNCHANGED)
+  - `vfxSystem.ts` SHA-256: `C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA` (VERIFIED UNCHANGED)
+
+### Verification Execution Evidence
+```text
+1. ADV-ARCH-004 Tests:
+   Command: .venv\Scripts\pytest.exe -q tests\test_saved_discoveries.py tests\test_project_inspirations.py
+   Result:  25 passed, 1 warning (EXIT CODE 0)
+   Evidence: del_res.status_code == 204, del_res.content == b"", content-length in (None, "0"), application/json not in content-type.
+
+2. ADV-CORR-003 Tests:
+   Command: .venv\Scripts\pytest.exe -q tests\test_build_concurrency.py
+   Result:  9 passed, 1 warning (EXIT CODE 0)
+   Evidence: Builds with identical prompt but distinct scale ("campaign" vs "standard") or world_mode ("open_world" vs "linear") allocate separate build IDs; identical parameters deduplicate cleanly.
+
+3. ADV-SEC-001 Tests:
+   Command: .venv\Scripts\pytest.exe -q tests\test_auth.py
+   Result:  21 passed, 1 warning (EXIT CODE 0)
+   Evidence: 500 ephemeral keys swept by prune_expired(), deque cleanup verified, max_keys capacity cap enforced at 20 with oldest LRU dropped, concurrent access across 8 threads verified thread-safe.
+
+4. Frontend Integrity:
+   - npx tsc --noEmit: 0 errors
+   - npx oxlint: 0 warnings, 0 errors across 88 files
+
+5. Workspace Protection Baseline Check:
+   - GameScene.ts: AE6287F1CE92621BAA781E822278ABD4CFC8E2C8B706A7A7C8D05B266D966095 (MATCH)
+   - vfxSystem.ts: C8A5E0A46C3B0DF950D53DB13368E008B03D8132EF46457B797AFC9AF6D243FA (MATCH)
+```
+
+---
+
+## 4. Documentation
+
+- [x] Authoritative findings artifact `adversarial_code_review_findings.md` preserved and referenced.
+- [x] Task execution ledger `TASK.md` updated with full verification evidence.
+
+---
+
+## 5. Git Checkpoint
+
+- [x] Review `git diff` and `git status` (clean, only intended files touched)
+- [x] `git diff --check`: 0 errors
+- [x] Slice 1 logical commit created: `8494ee8d9da9d5243cb866d2983c781472271de7` (`backend: implement Phase A Slice 1 (ADV-ARCH-004, ADV-CORR-003, ADV-SEC-001)`)
+- [x] Working tree verified: clean except protected user work (`GameScene.ts` & `vfxSystem.ts`)
+
+---
+
+## Previous Tasks Archive
+
+### Task: Full-Scope Adversarial Code Review, Security Audit & Architectural Inspection
+Status: COMPLETE (2026-09-06)
+- **Census**: 25 evaluated findings (23 retained + 2 disproven).
+- **Phase A**: 9 unique items (guarded: `ADV-PERF-001`).
+- **Phase B**: 5 unique items.
+- **Phase C**: 9 unique items.
+- **Artifact**: `adversarial_code_review_findings.md`
+- **Empirical Evidence**: TOCTOU race (500s confirmed), Rate Limiter key leak (1,000 empty deques confirmed), HTTP 204 `b'null'` body confirmed, Duplicate SQLite indexes confirmed.
+
+
+### Task: MEGA Final Browser QA, UI/UX Remediation, Route Audit & Existing-Prototype Validation
+Status: COMPLETE (2026-09-05)
+
 
 ## 1. Pre-Implementation
 

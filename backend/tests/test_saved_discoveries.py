@@ -134,6 +134,9 @@ def test_delete_discovery_owner_success(client):
     del_res = client.delete(f"/api/saved-discoveries/{record_id}",
                             headers=_auth_header(token))
     assert del_res.status_code == 204
+    assert del_res.content == b""
+    assert del_res.headers.get("content-length") in (None, "0")
+    assert "application/json" not in del_res.headers.get("content-type", "")
 
     # Confirm it's gone
     list_res = client.get("/api/saved-discoveries", headers=_auth_header(token))

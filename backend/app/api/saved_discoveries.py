@@ -13,7 +13,7 @@ Security notes:
 """
 import uuid
 import logging
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -102,18 +102,18 @@ async def save_discovery(
         return _error("SAVE_FAILED", "Failed to save discovery. Please try again.", 500)
 
 
-@router.delete("/{record_id}", status_code=204)
+@router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_saved_discovery(
     record_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> Response:
     """
     Remove a saved discovery from the user's bookmarks.
     Owner mismatch returns 404 (same as not-found) to prevent IDOR enumeration.
     """
     try:
         saved_discovery_service.delete_saved(db, current_user.id, record_id)
-        return JSONResponse(status_code=204, content=None)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except SavedDiscoveryNotFoundError:
         return _error("SAVED_DISCOVERY_NOT_FOUND", f"Saved discovery '{record_id}' not found.", 404)

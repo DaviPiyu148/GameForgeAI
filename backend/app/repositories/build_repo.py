@@ -151,6 +151,8 @@ class BuildRepository:
         engine: str,
         art_density: int,
         physics: int,
+        scale: str = "standard",
+        world_mode: str = "linear",
     ) -> Optional[BuildJob]:
         """
         Find an existing active (QUEUED/RUNNING/VALIDATING) build submitted by the same user
@@ -158,6 +160,8 @@ class BuildRepository:
         """
         if not user_id:
             return None
+        resolved_scale = scale or "standard"
+        resolved_world_mode = world_mode or "linear"
         return (
             db.query(BuildJob)
             .filter(
@@ -166,6 +170,8 @@ class BuildRepository:
                 BuildJob.engine == engine,
                 BuildJob.art_density == art_density,
                 BuildJob.physics == physics,
+                BuildJob.scale == resolved_scale,
+                BuildJob.world_mode == resolved_world_mode,
                 BuildJob.status.in_(["QUEUED", "RUNNING", "VALIDATING"]),
             )
             .first()

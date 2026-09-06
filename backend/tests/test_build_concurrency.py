@@ -299,6 +299,74 @@ async def test_duplicate_build_submission_reuses_active_build():
         db.close()
 
 
+@pytest.mark.asyncio
+async def test_duplicate_build_submission_distinguishes_scale_and_world_mode():
+    """Verify ADV-CORR-003: Submitting builds with different scale or world_mode does NOT deduplicate."""
+    db = TestingSessionLocal()
+    try:
+        user = User(
+            email="scale_dedup@example.com",
+            username="scale_dedup",
+            password_hash=hash_password("Pass123!"),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        base_prompt = "Cyberpunk neon racing game"
+
+        # 1. Base build (scale="standard", world_mode="linear")
+        req_standard = BuildCreate(
+            prompt=base_prompt,
+            parameters=BuildParams(
+                engine="Top-Down Action",
+                art_density=50,
+                physics=80,
+                scale="standard",
+                world_mode="linear",
+            ),
+        )
+        b_standard = await build_service.submit_build(db, req_standard, user_id=user.id)
+        assert b_standard.status == "QUEUED"
+
+        # 2. Build with same prompt but different scale ("campaign")
+        req_campaign = BuildCreate(
+            prompt=base_prompt,
+            parameters=BuildParams(
+                engine="Top-Down Action",
+                art_density=50,
+                physics=80,
+                scale="campaign",
+                world_mode="linear",
+            ),
+        )
+        b_campaign = await build_service.submit_build(db, req_campaign, user_id=user.id)
+        assert b_campaign.status == "QUEUED"
+        assert b_campaign.build_id != b_standard.build_id, "Distinct scale must not be deduplicated"
+
+        # 3. Build with same prompt and scale="standard", but different world_mode ("open_world")
+        req_open_world = BuildCreate(
+            prompt=base_prompt,
+            parameters=BuildParams(
+                engine="Top-Down Action",
+                art_density=50,
+                physics=80,
+                scale="standard",
+                world_mode="open_world",
+            ),
+        )
+        b_open_world = await build_service.submit_build(db, req_open_world, user_id=user.id)
+        assert b_open_world.status == "QUEUED"
+        assert b_open_world.build_id != b_standard.build_id, "Distinct world_mode must not be deduplicated"
+        assert b_open_world.build_id != b_campaign.build_id
+
+        # 4. Confirm identical resubmission of campaign DOES deduplicate to b_campaign
+        b_campaign_dup = await build_service.submit_build(db, req_campaign, user_id=user.id)
+        assert b_campaign_dup.build_id == b_campaign.build_id
+    finally:
+        db.close()
+
+
 # -----------------------------------------------------------------------------
 # 4. Startup Orphaned Build Reconciliation Sweep
 # -----------------------------------------------------------------------------

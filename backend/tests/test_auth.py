@@ -10,12 +10,15 @@ Tests:
 Security invariant verified:
   - Same error message and status code for wrong password vs unknown email.
 """
+import time
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
+from app.auth.rate_limit import SlidingWindowRateLimiter
 from app.main import app
 from app.db.session import Base, get_db
 
@@ -255,3 +258,157 @@ def test_form_urlencoded_payload_returns_422_without_crashing(client):
     assert data["error"]["code"] == "AUTH_VALIDATION_FAILED"
     assert "details" in data["error"]
 
+
+# ─── SlidingWindowRateLimiter Hardening (ADV-SEC-001) ──────────
+
+def test_sliding_window_basic_rate_limiting():
+    """Verify requests up to limit are allowed and requests exceeding limit are rejected."""
+    limiter = SlidingWindowRateLimiter(max_keys=100)
+
+    # Allow up to 3 requests in 10-second window
+    assert limiter.is_allowed("user:1", limit=3, window_seconds=10) is True
+    assert limiter.is_allowed("user:1", limit=3, window_seconds=10) is True
+    assert limiter.is_allowed("user:1", limit=3, window_seconds=10) is True
+    # 4th request must be rejected
+    assert limiter.is_allowed("user:1", limit=3, window_seconds=10) is False
+
+    # Different key is independent
+    assert limiter.is_allowed("user:2", limit=3, window_seconds=10) is True
+
+
+def test_empty_deque_cleanup_on_expiration():
+    """Verify that when a key's window expires, subsequent evaluation cleans up the entry."""
+    limiter = SlidingWindowRateLimiter(max_keys=100)
+
+    limiter.is_allowed("ephemeral:1", limit=2, window_seconds=1)
+    assert "ephemeral:1" in limiter._windows
+
+    # Manually backdate timestamp to simulate expiration
+    with limiter._lock:
+        limiter._windows["ephemeral:1"][0] = time.monotonic() - 100.0
+
+    # Next call with 10s window recognizes expired timestamp, prunes empty deque, and allows fresh request
+    allowed = limiter.is_allowed("ephemeral:1", limit=2, window_seconds=10)
+    assert allowed is True
+    assert len(limiter._windows["ephemeral:1"]) == 1
+
+
+def test_prune_expired_reclaims_inactive_ephemeral_keys():
+    """
+    Verify ADV-SEC-001 regression: Ephemeral keys that are never queried again
+    are successfully reclaimed by prune_expired() instead of leaking indefinitely.
+    """
+    limiter = SlidingWindowRateLimiter(max_keys=5000, default_max_window=60)
+
+    # Insert 500 ephemeral keys
+    for i in range(500):
+        limiter.is_allowed(f"ip:{i}", limit=5, window_seconds=60)
+
+    assert len(limiter._windows) == 500
+
+    # Backdate all timestamps to simulate time passing past 60s
+    past = time.monotonic() - 120.0
+    with limiter._lock:
+        for k in limiter._windows:
+            limiter._windows[k][0] = past
+
+    # Run explicit sweep
+    pruned_count = limiter.prune_expired(max_age_seconds=60)
+    assert pruned_count == 500
+    assert len(limiter._windows) == 0, "All expired keys and deques must be purged from memory"
+
+
+def test_max_keys_capacity_cap_and_lru_eviction():
+    """
+    Verify ADV-SEC-001 regression: Memory is strictly bounded by max_keys cap.
+    When max_keys is exceeded, oldest LRU keys are dropped.
+    """
+    max_cap = 20
+    limiter = SlidingWindowRateLimiter(max_keys=max_cap)
+
+    # Insert 50 keys
+    for i in range(50):
+        limiter.is_allowed(f"client:{i}", limit=5, window_seconds=3600)
+        assert len(limiter._windows) <= max_cap, f"Windows size {len(limiter._windows)} exceeded cap {max_cap}"
+
+    assert len(limiter._windows) == max_cap
+
+    # The most recently added key must be present
+    assert "client:49" in limiter._windows
+    # The oldest key should have been evicted
+    assert "client:0" not in limiter._windows
+
+
+def test_concurrent_access_thread_safety():
+    """Verify thread safety under concurrent requests from multiple threads."""
+    limiter = SlidingWindowRateLimiter(max_keys=50)
+
+    def worker(worker_id: int):
+        for i in range(20):
+            # Mix of shared keys and private keys
+            limiter.is_allowed(f"shared:{i % 3}", limit=10, window_seconds=60)
+            limiter.is_allowed(f"worker:{worker_id}:{i}", limit=5, window_seconds=60)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(worker, w) for w in range(8)]
+        for f in futures:
+            f.result()
+
+    assert len(limiter._windows) <= 50
+
+
+def test_true_lru_eviction_access_order():
+    """
+    Verify strict LRU (Least Recently Used) semantics:
+    capacity = 3
+    touch A -> [A]
+    touch B -> [A, B]
+    touch C -> [A, B, C]
+    touch A again -> [B, C, A] (A promoted to most recently used)
+    insert D -> must evict B (least recently used), leaving [C, A, D]
+    """
+    limiter = SlidingWindowRateLimiter(max_keys=3)
+
+    limiter.is_allowed("A", limit=5, window_seconds=60)
+    limiter.is_allowed("B", limit=5, window_seconds=60)
+    limiter.is_allowed("C", limit=5, window_seconds=60)
+
+    # Touch A again to promote it in the LRU order
+    limiter.is_allowed("A", limit=5, window_seconds=60)
+
+    # Now insert D, which must trigger capacity eviction
+    limiter.is_allowed("D", limit=5, window_seconds=60)
+
+    # B must be the evicted key (A was accessed more recently than B)
+    assert "B" not in limiter._windows, "B should have been evicted as least recently used"
+    assert "A" in limiter._windows, "A must NOT be evicted because it was accessed recently"
+    assert "C" in limiter._windows
+    assert "D" in limiter._windows
+    assert len(limiter._windows) == 3
+
+
+def test_prune_expired_contract():
+    """
+    Verify prune_expired contract:
+    - Default threshold uses default_max_window
+    - Custom threshold filters by specified max_age_seconds
+    - Returned integer is count of keys removed (not timestamps)
+    """
+    limiter = SlidingWindowRateLimiter(default_max_window=100)
+
+    # Add key with 3 timestamps
+    limiter.is_allowed("multi_ts_key", limit=10, window_seconds=60)
+    limiter.is_allowed("multi_ts_key", limit=10, window_seconds=60)
+    limiter.is_allowed("multi_ts_key", limit=10, window_seconds=60)
+
+    # Backdate all timestamps to simulate expiration
+    past = time.monotonic() - 150.0
+    with limiter._lock:
+        limiter._windows["multi_ts_key"][0] = past
+        limiter._windows["multi_ts_key"][1] = past
+        limiter._windows["multi_ts_key"][2] = past
+
+    # Calling prune_expired should remove 1 key (even though it had 3 timestamps)
+    pruned_keys = limiter.prune_expired()
+    assert pruned_keys == 1, f"Expected 1 key removed, got {pruned_keys}"
+    assert "multi_ts_key" not in limiter._windows

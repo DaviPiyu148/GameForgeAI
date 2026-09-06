@@ -14,7 +14,7 @@ Security Invariants:
 """
 import logging
 import uuid
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -137,7 +137,7 @@ def detach_inspiration(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     service: ProjectInspirationService = Depends(lambda: project_inspiration_service),
-) -> None:
+) -> Response:
     """
     Detach a game inspiration from an owned project by steam_app_id.
     Returns 204 No Content on success, 404 if project or inspiration not found.
@@ -149,7 +149,7 @@ def detach_inspiration(
             user_id=current_user.id,
             steam_app_id=steam_app_id,
         )
-        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ProjectNotFoundError as e:
         return _error("PROJECT_NOT_FOUND", str(e), status.HTTP_404_NOT_FOUND)  # type: ignore
     except InspirationNotFoundError as e:

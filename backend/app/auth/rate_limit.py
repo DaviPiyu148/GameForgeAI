@@ -14,16 +14,18 @@ Protected limits:
   - Save:     50 saves per user_id per 1 hour
 """
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from threading import Lock
-from typing import Deque, Dict
+from typing import Deque, Optional
 
 
 class SlidingWindowRateLimiter:
-    """Thread-safe in-memory sliding window rate limiter."""
+    """Thread-safe in-memory sliding window rate limiter with LRU eviction and memory bounds."""
 
-    def __init__(self) -> None:
-        self._windows: Dict[str, Deque[float]] = defaultdict(deque)
+    def __init__(self, max_keys: int = 10_000, default_max_window: int = 3600) -> None:
+        self._max_keys = max_keys
+        self._default_max_window = default_max_window
+        self._windows: OrderedDict[str, Deque[float]] = OrderedDict()
         self._lock = Lock()
 
     def is_allowed(self, key: str, limit: int, window_seconds: int) -> bool:
@@ -42,16 +44,95 @@ class SlidingWindowRateLimiter:
         cutoff = now - window_seconds
 
         with self._lock:
-            window = self._windows[key]
-            # Evict entries outside the window
-            while window and window[0] < cutoff:
-                window.popleft()
+            window = self._windows.get(key)
+            if window is not None:
+                # Evict entries outside the sliding window
+                while window and window[0] < cutoff:
+                    window.popleft()
 
-            if len(window) >= limit:
+                if not window:
+                    # All prior timestamps have expired — prune the empty deque
+                    del self._windows[key]
+                    window = None
+
+            if window is not None and len(window) >= limit:
+                # Update LRU ordering even on reject
+                self._windows.move_to_end(key)
                 return False
 
+            if window is None:
+                # If at capacity, prune before allocating new key
+                if len(self._windows) >= self._max_keys:
+                    self._prune(now)
+
+                window = deque()
+                self._windows[key] = window
+            else:
+                self._windows.move_to_end(key)
+
             window.append(now)
+
+            # Defensive post-insertion guard: guarantees strict upper memory bound
+            while len(self._windows) > self._max_keys:
+                self._windows.popitem(last=False)
+
             return True
+
+    def _prune(self, now: float) -> None:
+        """
+        Evict expired entries and enforce capacity cap.
+        Must be called while holding self._lock.
+        """
+        cutoff = now - self._default_max_window
+        keys_to_remove = []
+
+        # Pass 1: Prune keys that are empty or have completely expired timestamps
+        for k, w in self._windows.items():
+            while w and w[0] < cutoff:
+                w.popleft()
+            if not w:
+                keys_to_remove.append(k)
+
+        for k in keys_to_remove:
+            del self._windows[k]
+
+        # Pass 2: If still at or above capacity, drop oldest LRU items from the front
+        while len(self._windows) >= self._max_keys:
+            self._windows.popitem(last=False)
+
+    def prune_expired(self, max_age_seconds: Optional[int] = None) -> int:
+        """
+        Explicitly sweep and prune keys whose timestamps have all expired.
+        Useful for scheduled background maintenance and testing.
+
+        Args:
+            max_age_seconds: Optional expiration threshold in seconds.
+                If None, defaults to `self._default_max_window` (default: 3600 seconds).
+                Any key whose entries are strictly older than (now - max_age_seconds)
+                or empty is purged from memory.
+
+        Returns:
+            int: The exact count of dictionary keys (clients) removed from memory
+                (not individual timestamps).
+        """
+        now = time.monotonic()
+        window_sec = max_age_seconds if max_age_seconds is not None else self._default_max_window
+        cutoff = now - window_sec
+        pruned = 0
+
+        with self._lock:
+            keys_to_remove = []
+            for k, w in self._windows.items():
+                while w and w[0] < cutoff:
+                    w.popleft()
+                if not w:
+                    keys_to_remove.append(k)
+
+            for k in keys_to_remove:
+                del self._windows[k]
+                pruned += 1
+
+        return pruned
 
     def clear(self) -> None:
         """Reset all rate limit windows. Used in test suites."""

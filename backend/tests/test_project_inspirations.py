@@ -279,6 +279,9 @@ def test_detach_inspiration_success(client):
         headers=_auth(token_a),
     )
     assert del_res.status_code == 204
+    assert del_res.content == b""
+    assert del_res.headers.get("content-length") in (None, "0")
+    assert "application/json" not in del_res.headers.get("content-type", "")
 
     # Verify list is now empty
     list_res = client.get(

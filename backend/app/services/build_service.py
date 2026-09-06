@@ -129,6 +129,8 @@ class BuildService:
                 engine=data.parameters.engine,
                 art_density=data.parameters.art_density,
                 physics=data.parameters.physics,
+                scale=data.parameters.scale or "standard",
+                world_mode=data.parameters.world_mode or "linear",
             )
             if duplicate:
                 return self.to_response(duplicate)
@@ -140,7 +142,7 @@ class BuildService:
             art_density=data.parameters.art_density,
             physics=data.parameters.physics,
             modules=data.parameters.modules,
-            scale=data.parameters.scale,
+            scale=data.parameters.scale or "standard",
             world_mode=data.parameters.world_mode or "linear",
             status="QUEUED",
         )
